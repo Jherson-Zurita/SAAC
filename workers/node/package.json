@@ -1,0 +1,19 @@
+{
+  "name": "saac-node-worker",
+  "version": "1.0.0",
+  "description": "SAAC Node.js worker — TypeScript/JavaScript AST parser and metric extractor",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "typescript": "~5.8.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.0.0"
+  }
+}

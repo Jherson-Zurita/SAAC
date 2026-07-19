@@ -1,0 +1,5 @@
+ignored.ts
+node_modules/
+target/
+.venv/
+.git/

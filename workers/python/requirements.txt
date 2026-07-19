@@ -1,0 +1,14 @@
+# Dependencias para el Worker Python de SAAC (Capa 4)
+# 
+# NOTA IMPORTANTE: se usa `tree-sitter-language-pack`, NO `tree-sitter-languages`.
+# Esta última está oficialmente sin mantenimiento (los propios mantenedores
+# recomiendan migrar) y falla al instalar en Python 3.13+.
+#
+# No se fija una versión exacta de `tree-sitter` a propósito: se deja que
+# `tree-sitter-language-pack` resuelva la versión transitoria compatible,
+# evitando conflictos de versión entre ambos paquetes.
+
+tree-sitter-language-pack>=1.12,<2.0
+
+# Para el cálculo de LCOM4 vía componentes conexos del grafo método-atributo
+networkx>=3.0,<4.0
