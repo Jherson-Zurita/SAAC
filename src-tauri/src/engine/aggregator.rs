@@ -92,7 +92,8 @@ use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 
 use crate::engine::amg::{
-    ArchStyle, Dependency, Language, Module, ModuleMetrics, ProjectMetrics, WorkerAnalysisResult,
+    Antipattern, AntipatternType, ArchStyle, Dependency, Language, Module, ModuleMetrics,
+    ModuleType, ProjectMetrics, Severity, WorkerAnalysisResult,
 };
 use crate::engine::go_module_roots::GoModuleInfo;
 use crate::engine::rust_crate_roots::RustCrateInfo;
@@ -110,6 +111,7 @@ pub struct AggregatedProject {
     pub metrics: ProjectMetrics,
     pub detected_style: ArchStyle,
     pub style_confidence: f64,
+    pub antipatterns: Vec<Antipattern>,
 }
 
 pub struct Aggregator;
@@ -370,12 +372,23 @@ impl Aggregator {
 
         let (detected_style, style_confidence) = detect_architecture_style(&modules);
 
+        // ── Detección de antipatrones ──
+        let mut antipatterns: Vec<Antipattern> = Vec::new();
+        antipatterns.extend(detect_god_modules(&modules, metrics.total_dependencies));
+        antipatterns.extend(detect_circular_dependencies(&outgoing_by_module));
+        antipatterns.extend(detect_layer_violations(
+            &modules,
+            &resolved_dependencies,
+            detected_style,
+        ));
+
         AggregatedProject {
             modules,
             dependencies: resolved_dependencies,
             metrics,
             detected_style,
             style_confidence,
+            antipatterns,
         }
     }
 
@@ -625,6 +638,345 @@ fn resolve_rust_use_import(
 }
 
 // ============================================================================
+// Detección de antipatrones — §4.6
+// ============================================================================
+
+/// Detecta módulos con Efferent Coupling excesivo (Ce > 15 ó > 20% del
+/// total de dependencias resueltas del proyecto).
+fn detect_god_modules(modules: &[Module], total_dependencies: u32) -> Vec<Antipattern> {
+    let mut result = Vec::new();
+    let threshold_abs: u32 = 15;
+
+    for m in modules {
+        let ce = m.metrics.ce;
+        let pct = if total_dependencies > 0 {
+            ce as f64 / total_dependencies as f64
+        } else {
+            0.0
+        };
+
+        let is_god = ce > threshold_abs || (total_dependencies > 0 && pct > 0.20);
+
+        if is_god {
+            let short_name = m.id.rsplit('/').next().unwrap_or(&m.id);
+            result.push(Antipattern {
+                id: format!("antipattern:god-module:{}", short_name),
+                antipattern_type: AntipatternType::GodModule,
+                name: "God Module".to_string(),
+                severity: Severity::High,
+                description: format!(
+                    "Module '{}' has excessive efferent coupling (Ce = {}, {:.1}% of project dependencies). \
+                     It depends on too many other modules, making it a change bottleneck.",
+                    m.name, ce, pct * 100.0
+                ),
+                affected_module_ids: vec![m.id.clone()],
+                cycle_path: None,
+                suggested_break_point: None,
+                refactor_suggestion: Some(
+                    "Split this module into smaller, focused modules with single responsibilities \
+                     to reduce coupling and improve maintainability."
+                        .to_string(),
+                ),
+                ignored: false,
+                ignore_justification: None,
+            });
+        }
+    }
+    result
+}
+
+/// Detecta todos los ciclos simples en el grafo de dependencias resueltas
+/// usando DFS. Cada ciclo detectado se normaliza (rotación para empezar por
+/// el id lexicográficamente menor) para evitar reportar el mismo ciclo
+/// múltiples veces con diferentes puntos de entrada.
+fn detect_circular_dependencies(
+    graph: &HashMap<String, HashSet<String>>,
+) -> Vec<Antipattern> {
+    let mut unique_cycles: HashSet<Vec<String>> = HashSet::new();
+    let mut visited: HashSet<String> = HashSet::new();
+    let mut stack: Vec<String> = Vec::new();
+    let mut in_stack: HashSet<String> = HashSet::new();
+
+    fn dfs(
+        node: &str,
+        graph: &HashMap<String, HashSet<String>>,
+        visited: &mut HashSet<String>,
+        stack: &mut Vec<String>,
+        in_stack: &mut HashSet<String>,
+        unique_cycles: &mut HashSet<Vec<String>>,
+    ) {
+        stack.push(node.to_string());
+        in_stack.insert(node.to_string());
+
+        if let Some(neighbors) = graph.get(node) {
+            for neighbor in neighbors {
+                if in_stack.contains(neighbor.as_str()) {
+                    // Encontrado un ciclo: extraer la ruta desde `neighbor`
+                    // hasta el final del stack, y cerrar con `neighbor`.
+                    let cycle_start = stack
+                        .iter()
+                        .position(|n| n == neighbor)
+                        .unwrap_or(0);
+                    let mut cycle: Vec<String> = stack[cycle_start..].to_vec();
+                    cycle.push(neighbor.clone()); // cerrar el ciclo
+
+                    // Normalizar: rotar para que empiece por el menor id
+                    let cycle_body = &cycle[..cycle.len() - 1]; // sin el cierre
+                    if let Some(min_pos) = cycle_body
+                        .iter()
+                        .enumerate()
+                        .min_by_key(|(_, id)| id.as_str())
+                        .map(|(i, _)| i)
+                    {
+                        let mut normalized: Vec<String> = Vec::with_capacity(cycle.len());
+                        for i in 0..cycle_body.len() {
+                            normalized.push(
+                                cycle_body[(min_pos + i) % cycle_body.len()].clone(),
+                            );
+                        }
+                        normalized.push(normalized[0].clone()); // cerrar
+                        unique_cycles.insert(normalized);
+                    }
+                } else if !visited.contains(neighbor.as_str()) {
+                    dfs(neighbor, graph, visited, stack, in_stack, unique_cycles);
+                }
+            }
+        }
+
+        stack.pop();
+        in_stack.remove(node);
+        visited.insert(node.to_string());
+    }
+
+    let all_nodes: HashSet<String> = graph
+        .keys()
+        .cloned()
+        .chain(graph.values().flatten().cloned())
+        .collect();
+
+    for node in &all_nodes {
+        if !visited.contains(node) {
+            dfs(node, graph, &mut visited, &mut stack, &mut in_stack, &mut unique_cycles);
+        }
+    }
+
+    unique_cycles
+        .into_iter()
+        .map(|cycle| {
+            let affected: Vec<String> = cycle[..cycle.len() - 1].to_vec();
+            let cycle_display: Vec<String> = affected
+                .iter()
+                .map(|id| id.rsplit('/').next().unwrap_or(id).to_string())
+                .collect();
+
+            // `break_src`/`break_tgt` se materializan como `String` propios (no
+            // `&str` prestados de `cycle`) precisamente porque más abajo se
+            // mueve `cycle` completo hacia `cycle_path: Some(cycle)` — si
+            // fueran referencias, ese `move` entraría en conflicto con el
+            // préstamo todavía vivo en `suggested_break_point` (E0505: cannot
+            // move out of `cycle` because it is borrowed).
+            let break_src: String = cycle[cycle.len() - 2]
+                .rsplit('/')
+                .next()
+                .unwrap_or(&cycle[cycle.len() - 2])
+                .to_string();
+            let break_tgt: String = cycle[0].rsplit('/').next().unwrap_or(&cycle[0]).to_string();
+
+            Antipattern {
+                id: format!(
+                    "antipattern:circular-dependency:{}-to-{}",
+                    cycle_display.first().unwrap_or(&"?".to_string()),
+                    cycle_display.last().unwrap_or(&"?".to_string()),
+                ),
+                antipattern_type: AntipatternType::CircularDependency,
+                name: "Circular Dependency".to_string(),
+                severity: Severity::Critical,
+                description: format!(
+                    "Circular dependency detected: {}",
+                    cycle_display.join(" → ")
+                ),
+                affected_module_ids: affected,
+                cycle_path: Some(cycle),
+                suggested_break_point: Some(format!("{} → {}", break_src, break_tgt)),
+                refactor_suggestion: Some(
+                    "Introduce an abstraction/interface, use dependency injection, or move \
+                     shared logic to a separate common module to break the circular reference."
+                        .to_string(),
+                ),
+                ignored: false,
+                ignore_justification: None,
+            }
+        })
+        .collect()
+}
+
+/// Asigna un rango jerárquico a un módulo según el estilo arquitectónico
+/// detectado. Usa `ModuleType` como señal primaria (fuente de verdad única
+/// compartida con la UI) y recurre a heurística de carpetas solo cuando el
+/// tipo es `Unknown` o no tiene un mapeo definido para ese estilo.
+///
+/// Retorna `None` si no se puede clasificar (módulos neutrales como Util,
+/// Config, Test, Dto que no participan en la jerarquía de capas).
+fn infer_layer(module: &Module, style: ArchStyle) -> Option<u32> {
+    // 1. Mapeo primario por ModuleType
+    let by_type = match style {
+        ArchStyle::Layered => match module.module_type {
+            ModuleType::Controller | ModuleType::UiComponent | ModuleType::Middleware => Some(3),
+            ModuleType::Service | ModuleType::Store | ModuleType::Hook | ModuleType::Factory => {
+                Some(2)
+            }
+            ModuleType::Repository | ModuleType::Model => Some(1),
+            _ => None,
+        },
+        ArchStyle::Hexagonal => match module.module_type {
+            ModuleType::Controller
+            | ModuleType::Repository
+            | ModuleType::UiComponent
+            | ModuleType::Middleware => Some(3),
+            ModuleType::Service => Some(2),
+            ModuleType::Model => Some(1),
+            _ => None,
+        },
+        _ => return None, // Solo aplicable a Layered y Hexagonal
+    };
+
+    if by_type.is_some() {
+        return by_type;
+    }
+
+    // 2. Fallback: heurística de carpetas (para Unknown o tipos no mapeados)
+    let path_lower = module.id.to_lowercase();
+    let segments: HashSet<&str> = path_lower.split('/').collect();
+    let has = |names: &[&str]| names.iter().any(|n| segments.contains(n));
+
+    match style {
+        ArchStyle::Layered => {
+            if has(&[
+                "controllers",
+                "controller",
+                "api",
+                "web",
+                "handlers",
+                "handler",
+            ]) {
+                Some(3)
+            } else if has(&["services", "service", "logic", "usecases", "usecase"]) {
+                Some(2)
+            } else if has(&[
+                "repositories",
+                "repository",
+                "models",
+                "model",
+                "entities",
+                "entity",
+                "db",
+                "dao",
+            ]) {
+                Some(1)
+            } else {
+                None
+            }
+        }
+        ArchStyle::Hexagonal => {
+            if has(&["adapters", "adapter", "infrastructure", "infra", "ui"]) {
+                Some(3)
+            } else if has(&["ports", "port"]) {
+                Some(2)
+            } else if has(&["domain", "core", "entities", "entity"]) {
+                Some(1)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+/// Detecta dependencias en sentido ascendente (capa inferior → capa
+/// superior) según el estilo arquitectónico detectado, usando `infer_layer`
+/// para clasificar cada módulo.
+fn detect_layer_violations(
+    modules: &[Module],
+    dependencies: &[Dependency],
+    detected_style: ArchStyle,
+) -> Vec<Antipattern> {
+    if !matches!(detected_style, ArchStyle::Layered | ArchStyle::Hexagonal) {
+        return Vec::new();
+    }
+
+    // Pre-computar rangos de capa para todos los módulos
+    let layer_by_id: HashMap<&str, u32> = modules
+        .iter()
+        .filter_map(|m| infer_layer(m, detected_style).map(|rank| (m.id.as_str(), rank)))
+        .collect();
+
+    let style_name = match detected_style {
+        ArchStyle::Layered => "Layered",
+        ArchStyle::Hexagonal => "Hexagonal",
+        _ => "Unknown",
+    };
+
+    let layer_name = |rank: u32| -> &'static str {
+        match (detected_style, rank) {
+            (ArchStyle::Layered, 3) => "Controller/UI",
+            (ArchStyle::Layered, 2) => "Service/Logic",
+            (ArchStyle::Layered, 1) => "Repository/Model",
+            (ArchStyle::Hexagonal, 3) => "Adapter/Infrastructure",
+            (ArchStyle::Hexagonal, 2) => "Port/UseCase",
+            (ArchStyle::Hexagonal, 1) => "Domain/Core",
+            _ => "Unknown",
+        }
+    };
+
+    let mut violations = Vec::new();
+    // Deduplicar: misma source+target solo genera 1 violación
+    let mut seen: HashSet<(String, String)> = HashSet::new();
+
+    for dep in dependencies {
+        let src_rank = layer_by_id.get(dep.source.as_str()).copied();
+        let tgt_rank = layer_by_id.get(dep.target.as_str()).copied();
+
+        if let (Some(sr), Some(tr)) = (src_rank, tgt_rank) {
+            if sr < tr && seen.insert((dep.source.clone(), dep.target.clone())) {
+                let src_short = dep.source.rsplit('/').next().unwrap_or(&dep.source);
+                let tgt_short = dep.target.rsplit('/').next().unwrap_or(&dep.target);
+                violations.push(Antipattern {
+                    id: format!(
+                        "antipattern:layer-violation:{}-to-{}",
+                        src_short, tgt_short
+                    ),
+                    antipattern_type: AntipatternType::LayerViolation,
+                    name: "Layer Violation".to_string(),
+                    severity: Severity::High,
+                    description: format!(
+                        "Layer violation in {} architecture: '{}' ({} layer) depends on '{}' \
+                         ({} layer). Dependencies must only flow downward.",
+                        style_name,
+                        src_short,
+                        layer_name(sr),
+                        tgt_short,
+                        layer_name(tr),
+                    ),
+                    affected_module_ids: vec![dep.source.clone(), dep.target.clone()],
+                    cycle_path: None,
+                    suggested_break_point: Some(format!("{} → {}", src_short, tgt_short)),
+                    refactor_suggestion: Some(format!(
+                        "Apply Dependency Inversion: introduce an abstraction in the {} layer \
+                         that the {} layer implements, so the dependency flows downward.",
+                        layer_name(sr),
+                        layer_name(tr),
+                    )),
+                    ignored: false,
+                    ignore_justification: None,
+                });
+            }
+        }
+    }
+
+    violations
+}
+
+// ============================================================================
 // Detección de ciclos (Tarjan SCC)
 // ============================================================================
 
@@ -717,48 +1069,97 @@ fn count_cyclic_dependencies(graph: &HashMap<String, HashSet<String>>) -> u32 {
 // ============================================================================
 
 /// Heurística de un solo pase basada en nombres de carpeta presentes en
-/// los ids de módulo. Deliberadamente simple: cuenta cuántos módulos
-/// "matchean" cada estilo candidato por la combinación de carpetas en su
-/// path, y devuelve el estilo con más matches junto con una confianza
-/// aproximada (proporción de módulos que matchearon ese estilo sobre el
-/// total). Con cero señales, devuelve `Unknown` con confianza 0.
+/// los ids de módulo.
+///
+/// IMPORTANTE — corrección de un bug real: la condición de cada estilo es
+/// del tipo `has(carpetas_tipo_A) && has(carpetas_tipo_B)` (ej. Layered
+/// necesita `controllers` Y `services` en alguna parte del PROYECTO). La
+/// primera versión de esta función evaluaba esa condición POR MÓDULO
+/// INDIVIDUAL dentro del loop (`for m in modules`), lo que exige que un
+/// mismo archivo tenga simultáneamente `controllers` Y `services` en su
+/// propio path — algo que casi nunca ocurre, porque un archivo vive en una
+/// sola carpeta. El síntoma observado: proyectos con la estructura
+/// Layered de manual (`controllers/`, `services/`, `repositories/` como
+/// carpetas hermanas) caían en `Unknown` con confianza 0, porque ningún
+/// módulo individual matcheaba ambas condiciones a la vez.
+///
+/// El fix: primero se recolecta el conjunto de segmentos de carpeta
+/// presentes en TODO el proyecto (unión sobre todos los módulos), y las
+/// condiciones `has(A) && has(B)` se evalúan UNA vez sobre ese conjunto
+/// global. Para la confianza (proporción 0-1), se cuenta aparte cuántos
+/// módulos individuales pertenecen a alguna de las carpetas señal del
+/// estilo ganador — esa sí es una medida legítima por módulo (qué tan
+/// extendida está la convención en el proyecto), distinta de la detección
+/// del estilo en sí (que es una propiedad del proyecto completo).
 fn detect_architecture_style(modules: &[Module]) -> (ArchStyle, f64) {
-    let mut signal_counts: HashMap<ArchStyleKey, u32> = HashMap::new();
-
+    // Unión de todos los segmentos de carpeta presentes en el proyecto.
+    let mut project_segments: HashSet<String> = HashSet::new();
     for m in modules {
         let path_lower = m.id.to_lowercase();
-        let segments: HashSet<&str> = path_lower.split('/').collect();
+        project_segments.extend(path_lower.split('/').map(|s| s.to_string()));
+    }
+    let has = |names: &[&str]| names.iter().any(|n| project_segments.contains(*n));
 
-        let has = |names: &[&str]| names.iter().any(|n| segments.contains(n));
+    let mut candidates: Vec<(ArchStyle, &[&str], &[&str])> = Vec::new();
+    if has(&["adapters", "adapter"]) && has(&["domain", "ports", "port"]) {
+        candidates.push((
+            ArchStyle::Hexagonal,
+            &["adapters", "adapter"],
+            &["domain", "ports", "port"],
+        ));
+    }
+    if has(&["controllers", "controller"]) && has(&["services", "service"]) {
+        candidates.push((
+            ArchStyle::Layered,
+            &["controllers", "controller"],
+            &["services", "service"],
+        ));
+    }
+    if has(&["events", "handlers"]) && has(&["publishers", "subscribers", "listeners"]) {
+        candidates.push((
+            ArchStyle::EventDriven,
+            &["events", "handlers"],
+            &["publishers", "subscribers", "listeners"],
+        ));
+    }
+    if has(&["commands"]) && has(&["queries"]) {
+        candidates.push((ArchStyle::Cqrs, &["commands"], &["queries"]));
+    }
+    if has(&["plugins", "extensions"]) && has(&["core"]) {
+        candidates.push((ArchStyle::Microkernel, &["plugins", "extensions"], &["core"]));
+    }
 
-        if has(&["adapters", "adapter"]) && has(&["domain", "ports", "port"]) {
-            *signal_counts.entry(ArchStyleKey(ArchStyle::Hexagonal)).or_insert(0) += 1;
-        }
-        if has(&["controllers", "controller"]) && has(&["services", "service"]) {
-            *signal_counts.entry(ArchStyleKey(ArchStyle::Layered)).or_insert(0) += 1;
-        }
-        if has(&["events", "handlers"]) && has(&["publishers", "subscribers", "listeners"]) {
-            *signal_counts.entry(ArchStyleKey(ArchStyle::EventDriven)).or_insert(0) += 1;
-        }
-        if has(&["commands"]) && has(&["queries"]) {
-            *signal_counts.entry(ArchStyleKey(ArchStyle::Cqrs)).or_insert(0) += 1;
-        }
-        if has(&["plugins", "extensions"]) && has(&["core"]) {
-            *signal_counts.entry(ArchStyleKey(ArchStyle::Microkernel)).or_insert(0) += 1;
+    if candidates.is_empty() {
+        return (ArchStyle::Unknown, 0.0);
+    }
+
+    // Entre los estilos cuya condición matchea a nivel de proyecto, se
+    // elige el que tiene más módulos individuales participando en
+    // cualquiera de sus dos grupos de carpetas señal — esto sirve tanto de
+    // desempate (proyectos con señales de más de un estilo) como de base
+    // para la confianza reportada.
+    let mut best: Option<(ArchStyle, u32)> = None;
+    for (style, group_a, group_b) in &candidates {
+        let matching_modules = modules
+            .iter()
+            .filter(|m| {
+                let path_lower = m.id.to_lowercase();
+                let segments: HashSet<&str> = path_lower.split('/').collect();
+                group_a.iter().any(|n| segments.contains(n))
+                    || group_b.iter().any(|n| segments.contains(n))
+            })
+            .count() as u32;
+
+        if best.map(|(_, count)| matching_modules > count).unwrap_or(true) {
+            best = Some((*style, matching_modules));
         }
     }
 
-    match signal_counts.into_iter().max_by_key(|(_, count)| *count) {
-        Some((style_key, count)) if count > 0 => {
+    match best {
+        Some((style, count)) => {
             let confidence = (count as f64 / modules.len().max(1) as f64).min(1.0);
-            (style_key.0, confidence)
+            (style, confidence)
         }
-        _ => (ArchStyle::Unknown, 0.0),
+        None => (ArchStyle::Unknown, 0.0),
     }
 }
-
-/// Wrapper para poder usar `ArchStyle` como clave de `HashMap` sin
-/// derivarle `Hash`/`Eq` en `amg.rs` (donde no hace falta para el resto
-/// de sus usos — el enum ya deriva `PartialEq, Eq`, pero no `Hash`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-struct ArchStyleKey(ArchStyle);

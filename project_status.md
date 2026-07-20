@@ -100,7 +100,8 @@ SAAC/
 └── tests/                         # Suites de pruebas de integración E2E y de contratos
     ├── test_worker_contract.py    # Test que valida el protocolo JSON-Lines de los workers externos
     ├── test_analyze_project.py    # Test del pipeline de escaneo, límites de tamaño, exclusions y cancelación
-    └── test_resolved_imports.py   # Test de validación detallada de resolución de imports absolutos (Java, Go, Rust)
+    ├── test_resolved_imports.py   # Test de validación detallada de resolución de imports absolutos (Java, Go, Rust)
+    └── test_antipatterns.py       # Test de verificación de antipatrones (God Module, Circular Dependency, Layer Violation)
 ```
 
 ---
@@ -110,6 +111,7 @@ SAAC/
 ### 1. Backend Core (Rust + Tauri) - **100% Completado y Funcional**
 * **Modelos AMG (`amg.rs`)**: Se reflejó la especificación completa en tipos nativos Rust con soporte serde (camelCase) derivado para su comunicación transparente con el frontend.
 * **Detección de Proyectos (`project_detector.rs`)**: Identifica el `ProjectType` analizando la presencia de marcadores de framework y archivos de configuración (Tauri, React Native, Electron, etc.) y calcula el mix de lenguajes.
+* **Detección de Estilos de Arquitectura (`aggregator.rs`)**: Detecta estilos como `Layered` o `Hexagonal` evaluando la presencia de convenciones de directorios clave de forma global en todo el proyecto para evitar falsos negativos.
 * **Caché Persistente (`cache.rs`)**: Basado en `sled`, calcula el hash SHA-256 de los archivos antes de enviarlos a los workers. Si el hash coincide con uno previo, recupera el análisis en milisegundos sin coste de procesamiento de AST.
 * **Resolución de Imports Absolutos (`aggregator.rs`)**:
   * **Java**: Traduce imports de paquetes (`com.example.service.UserService`) y los resuelve contra archivos específicos usando las raíces de fuentes detectadas en `pom.xml`/`build.gradle`.
@@ -117,6 +119,10 @@ SAAC/
   * **Rust**: Resuelve imports `use crate::...` o `use my_crate::...` identificando el crate origen y mapeando tanto la sintaxis moderna (`helper.rs`) como clásica (`helper/mod.rs`).
 * **Métricas Globales**: Calcula acoplamiento Aferente ($Ca$), Eferente ($Ce$), Instabilidad ($I = Ce / (Ca + Ce)$), Cohesión de Módulo (`Ce / total_imports`) y la Distancia a la Secuencia Principal ($D = |A + I - 1|$).
 * **Ciclos de Dependencia**: Implementa el algoritmo SCC de Tarjan para detectar componentes fuertemente conexas formadas por ciclos en el grafo interno de dependencias.
+* **Detección de Antipatrones de Arquitectura (`aggregator.rs`)**:
+  * **God Module**: Módulos con $Ce > 15$ o que concentran $> 20\%$ de todas las dependencias del proyecto.
+  * **Circular Dependency**: Ciclos simples en el grafo de dependencias resueltas usando DFS, con rutas completas del ciclo (`cycle_path`), normalización rotacional (para consolidar duplicados) y propuesta del enlace a romper.
+  * **Layer Violation**: Chequea dependencias ascendentes usando un diseño híbrido: primero clasifica el nivel/rango del módulo según su `ModuleType` (fuente de verdad alineada con la UI), y si es `Unknown` o no mapeado, aplica fallback por coincidencia de palabras clave en carpetas.
 
 ### 2. Capa de Workers AST (Node.js & Python) - **100% Completado y Funcional**
 * **Protocolo de comunicación**: Basado en JSON-Lines a través de StdIn y StdOut estándar. Implementa chunking de archivos e hilos paralelos de monitoreo.
@@ -128,13 +134,13 @@ SAAC/
 * **Contratos (`test_worker_contract.py`)**: Valida que los comandos `parse` y `analyze` funcionen correctamente en los workers y cumplan la especificación.
 * **Pipeline General (`test_analyze_project.py`)**: Verifica que `cargo check` compile, que el sistema ignore adecuadamente según el archivo `.gitignore` y carpetas típicas (`node_modules`), filtre archivos de más de 1MB y aplique la **cancelación cooperativa** abortando entre batches.
 * **Resoluciones (`test_resolved_imports.py`)**: Suite de pruebas específica que genera un monorepo temporal con módulos en Java, Go y Rust, ejecuta el análisis completo del backend y afirma que cada import absoluto se asocie de forma idéntica a su nodo destino correspondiente en el AMG.
+* **Antipatrones (`test_antipatterns.py`)**: Valida la generación e identificación exacta de ciclos, violaciones de capas en estilo Layered y módulos gigantes.
 
 ---
 
 ## 📈 Siguientes Hitos y Roadmap Técnico
 
-Con el motor y la infraestructura core finalizados, las siguientes fases de desarrollo implican:
-1. **Detección de Antipatrones de Arquitectura**: Programar las heurísticas específicas para identificar `God Module` (módulos gigantes), `Layer Violation` (capas importando niveles superiores) y `Circular Dependencies` (usando el conteo de ciclos de Tarjan).
-2. **Generación de C4 Diagrams**: Diseñar la lógica para mapear los módulos agregados en vistas de contenedor y diagramas C4 dinámicos exportables.
-3. **Integración con LLM Local (Ollama)**: Desarrollar el comando `ask_ai` para alimentar el AMG resultante en modelos de lenguaje locales para auditorías interactivas.
-4. **Desarrollo del Frontend (React + TS)**: Reemplazar el layout por defecto de la interfaz con los paneles interactivos de SAAC v2.0, integrando el flujo de estados Zustand para mostrar las métricas, la lista de dependencias y el visor gráfico del AMG.
+Con la infraestructura y detección de antipatrones finalizadas, las siguientes fases de desarrollo implican:
+1. **Generación de C4 Diagrams**: Diseñar la lógica para mapear los módulos agregados en vistas de contenedor y diagramas C4 dinámicos exportables.
+2. **Integración con LLM Local (Ollama)**: Desarrollar el comando `ask_ai` para alimentar el AMG resultante en modelos de lenguaje locales para auditorías interactivas.
+3. **Desarrollo del Frontend (React + TS)**: Reemplazar el layout por defecto de la interfaz con los paneles interactivos de SAAC v2.0, integrando el flujo de estados Zustand para mostrar las métricas, la lista de dependencias y el visor gráfico del AMG.

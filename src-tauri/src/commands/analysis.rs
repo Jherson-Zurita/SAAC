@@ -510,7 +510,7 @@ pub async fn analyze_project(
             external_systems: Vec::new(),
             actors: Vec::new(),
             external_calls: Vec::new(),
-            antipatterns: Vec::new(),
+            antipatterns: aggregated.antipatterns,
             metrics: aggregated.metrics,
             c4_models: crate::engine::amg::C4Models::default(),
         };
