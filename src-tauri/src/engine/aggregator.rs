@@ -92,9 +92,11 @@ use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 
 use crate::engine::amg::{
-    Antipattern, AntipatternType, ArchStyle, Dependency, Language, Module, ModuleMetrics,
-    ModuleType, ProjectMetrics, Severity, WorkerAnalysisResult,
+    Actor, Antipattern, AntipatternType, ArchStyle, C4Models, Container, Dependency, ExternalCall,
+    ExternalSystem, Language, Module, ModuleMetrics, ModuleType, ProjectMetrics, ProjectType,
+    Severity, WorkerAnalysisResult,
 };
+use crate::engine::c4_generator::C4Generator;
 use crate::engine::go_module_roots::GoModuleInfo;
 use crate::engine::rust_crate_roots::RustCrateInfo;
 use crate::workers::types::{AnalysisFileStatus, FileAnalysisOutcome};
@@ -112,6 +114,11 @@ pub struct AggregatedProject {
     pub detected_style: ArchStyle,
     pub style_confidence: f64,
     pub antipatterns: Vec<Antipattern>,
+    pub containers: Vec<Container>,
+    pub external_systems: Vec<ExternalSystem>,
+    pub actors: Vec<Actor>,
+    pub external_calls: Vec<ExternalCall>,
+    pub c4_models: C4Models,
 }
 
 pub struct Aggregator;
@@ -272,7 +279,7 @@ impl Aggregator {
         let mut total_classes: u32 = 0;
         let mut total_functions: u32 = 0;
 
-        for r in worker_results {
+        for r in &worker_results {
             let module_id = r.module.id.clone();
 
             let ce = outgoing_by_module
@@ -311,7 +318,7 @@ impl Aggregator {
             };
 
             let final_metrics = ModuleMetrics::from_worker(
-                r.module.metrics,
+                r.module.metrics.clone(),
                 ca,
                 ce,
                 instability,
@@ -330,22 +337,22 @@ impl Aggregator {
             total_functions += r.module.functions.len() as u32;
 
             modules.push(Module {
-                id: r.module.id,
+                id: r.module.id.clone(),
                 node_type: r.module.node_type,
-                name: r.module.name,
+                name: r.module.name.clone(),
                 module_type: r.module.module_type,
                 language: r.module.language,
                 loc: r.module.loc,
                 lloc: r.module.lloc,
-                classes: r.module.classes,
-                functions: r.module.functions,
-                imports: r.module.imports,
+                classes: r.module.classes.clone(),
+                functions: r.module.functions.clone(),
+                imports: r.module.imports.clone(),
                 imported_by: incoming_by_module
                     .get(&module_id)
                     .map(|s| s.iter().cloned().collect())
                     .unwrap_or_default(),
-                stable_since: r.module.stable_since,
-                last_seen_in: r.module.last_seen_in,
+                stable_since: r.module.stable_since.clone(),
+                last_seen_in: r.module.last_seen_in.clone(),
                 metrics: final_metrics,
             });
         }
@@ -372,6 +379,12 @@ impl Aggregator {
 
         let (detected_style, style_confidence) = detect_architecture_style(&modules);
 
+        // ── Acumular llamadas externas ──
+        let mut raw_external_calls: Vec<ExternalCall> = Vec::new();
+        for r in &worker_results {
+            raw_external_calls.extend(r.external_calls.clone());
+        }
+
         // ── Detección de antipatrones ──
         let mut antipatterns: Vec<Antipattern> = Vec::new();
         antipatterns.extend(detect_god_modules(&modules, metrics.total_dependencies));
@@ -382,6 +395,27 @@ impl Aggregator {
             detected_style,
         ));
 
+        // ── Generación de Diagramas C4 e inferencia de contenedores/actores ──
+        //
+        // `antipatterns` se pasa aquí para que el diagrama suplementario de
+        // dependencias circulares reutilice los `cycle_path` EXACTOS que ya
+        // calculó `detect_circular_dependencies` (Tarjan + DFS) en vez de
+        // recalcular "candidatos a ciclo" con una heurística propia — antes
+        // `generate_circular_dependencies_diagram` filtraba por
+        // `Ce > 0 && Ca > 0`, una condición necesaria pero NO suficiente
+        // (un módulo puede tener entrada y salida de dependencias sin
+        // participar en ningún ciclo real), lo que podía mostrar módulos
+        // que la propia detección de antipatrones no consideraba cíclicos.
+        let c4_output = C4Generator::generate(
+            "Project",
+            ProjectType::Desktop, // Se actualiza en compile_amg con el project_type detectado
+            detected_style,
+            &modules,
+            &resolved_dependencies,
+            &raw_external_calls,
+            &antipatterns,
+        );
+
         AggregatedProject {
             modules,
             dependencies: resolved_dependencies,
@@ -389,6 +423,11 @@ impl Aggregator {
             detected_style,
             style_confidence,
             antipatterns,
+            containers: c4_output.containers,
+            external_systems: c4_output.external_systems,
+            actors: c4_output.actors,
+            external_calls: raw_external_calls,
+            c4_models: c4_output.c4_models,
         }
     }
 

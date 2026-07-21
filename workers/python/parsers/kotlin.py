@@ -325,14 +325,18 @@ def _extract_class_declaration(node, source: bytes, module_id: str) -> dict[str,
     method_body_nodes: list[Any] = []
 
     if primary_ctor is not None:
+        ctor_loc = primary_ctor.end_point[0] - primary_ctor.start_point[0] + 1
         methods.append({
             "name": name,
             "isConstructor": True,
             "visibility": "public",
+            "isStatic": False,
+            "isAbstract": False,
             "parameters": ctor_params,
             "returnType": name,
             "cyclomaticComplexity": 1,
             "cognitiveComplexity": 0,
+            "loc": ctor_loc,
             "isAsync": False,
             "decorators": [],
         })
@@ -351,7 +355,10 @@ def _extract_class_declaration(node, source: bytes, module_id: str) -> dict[str,
                     attributes.append(attr)
 
     return {
+        "id": f"{module_id}::{name}",
         "name": name,
+        "isAbstract": _has_modifier_token(node, "abstract"),
+        "isInterface": False,  # Kotlin interfaces no se detectan todavía — ver nota aparte
         "extends": extends,
         "implements": implements,
         "decorators": decorators,
@@ -393,7 +400,10 @@ def _extract_object_declaration(node, source: bytes, module_id: str) -> dict[str
                     attributes.append(attr)
 
     return {
+        "id": f"{module_id}::{name}",
         "name": name,
+        "isAbstract": False,
+        "isInterface": False,
         "extends": extends,
         "implements": implements,
         "decorators": decorators,
@@ -434,7 +444,10 @@ def _extract_companion_object(node, source: bytes, module_id: str) -> dict[str, 
                     attributes.append(attr)
 
     return {
+        "id": f"{module_id}::{name}",
         "name": name,
+        "isAbstract": False,
+        "isInterface": False,
         "extends": [],
         "implements": [],
         "decorators": [],
@@ -493,7 +506,8 @@ def _extract_primary_constructor(ctor_node, source: bytes) -> tuple[list[dict], 
                 "name": name,
                 "type": type_str,
                 "visibility": param_visibility,
-                "isReadOnly": is_val,
+                "isStatic": False,
+                "isReadonly": is_val,
                 "decorators": param_decorators,
             })
 
@@ -564,7 +578,8 @@ def _extract_property_declaration(node, source: bytes) -> dict[str, Any] | None:
         "name": name_node.text.decode("utf-8"),
         "type": "Any",  # el tipo no siempre está anotado explícitamente; se refina si se requiere
         "visibility": visibility,
-        "isReadOnly": is_val,
+        "isStatic": False,
+        "isReadonly": is_val,
         "decorators": decorators,
     }
 
@@ -655,15 +670,22 @@ def _extract_function(node, source: bytes) -> tuple[dict[str, Any], Any]:
 
     cc = cyclomatic_complexity(complexity_root, KOTLIN_COMPLEXITY_CONFIG) if complexity_root else 1
     cog = cognitive_complexity(complexity_root, KOTLIN_COMPLEXITY_CONFIG) if complexity_root else 0
+    # loc se mide sobre el function_declaration completo (firma + cuerpo),
+    # no solo el body, para que funciones abstractas sin cuerpo (una sola
+    # línea de firma) den loc=1 en vez de fallar por no tener body_node.
+    loc = node.end_point[0] - node.start_point[0] + 1
 
     method_info = {
         "name": name,
         "isConstructor": False,
         "visibility": visibility,
+        "isStatic": False,  # No se distingue static (companion object/object) del resto todavía
+        "isAbstract": _has_modifier_token(node, "abstract"),
         "parameters": params,
         "returnType": "Any",  # se refina si se requiere el tipo de retorno explícito
         "cyclomaticComplexity": cc,
         "cognitiveComplexity": cog,
+        "loc": loc,
         "isAsync": is_async,
         "decorators": decorators,
     }
@@ -729,6 +751,50 @@ def _extract_top_level_functions(root, source: bytes) -> list[dict[str, Any]]:
     return functions
 
 
+# ─────────────────────────────────────────────────────────────────────────
+# Detección de llamadas HTTP externas
+# ─────────────────────────────────────────────────────────────────────────
+
+def _detect_external_calls(root, source: bytes, module_id: str) -> list[dict[str, Any]]:
+    """
+    Detecta llamadas HTTP conocidas (OkHttp: newCall/execute; Ktor:
+    HttpClient/get/post/put/delete).
+
+    PENDIENTE DE VERIFICAR contra un volcado real de tree-sitter-kotlin: a
+    diferencia del resto de este archivo (respaldado por
+    hallazgos-kotlin.md), la forma exacta de una llamada a función
+    (call_expression) no fue parte de esa investigación — se asume el
+    mismo nombre de nodo `call_expression` que otras gramáticas de la
+    familia JVM/C-like ya verificadas en este proyecto (java.py usa
+    `method_invocation`, un nombre DISTINTO — no se puede asumir que
+    Kotlin comparta ese nombre en particular). Se toma el texto del
+    primer hijo (posicional, sin asumir field name) como aproximación del
+    callee. Si un volcado real contradice el nombre de nodo o la
+    estructura, ajustar aquí.
+    """
+    calls: list[dict[str, Any]] = []
+    call_name_markers = (
+        "newCall", "execute", ".get(", ".post(", ".put(", ".delete(",
+        "HttpClient", "OkHttpClient",
+    )
+
+    def _visit(node):
+        if node.type == "call_expression" and node.children:
+            snippet = _node_text(node, source)[:80]
+            if any(marker in snippet for marker in call_name_markers):
+                calls.append({
+                    "moduleId": module_id,
+                    "externalSystemId": "http-api",
+                    "protocol": "http",
+                    "description": snippet[:60],
+                })
+        for child in node.children:
+            _visit(child)
+
+    _visit(root)
+    return calls
+
+
 def parse_kotlin_file(file_path: str, tree, source: bytes) -> dict[str, Any]:
     """
     Parseo detallado de un archivo Kotlin, extrayendo la estructura completa
@@ -745,6 +811,7 @@ def parse_kotlin_file(file_path: str, tree, source: bytes) -> dict[str, Any]:
     imports_data = _extract_imports(root, source)
     classes = _extract_classes(root, source, module_id)
     functions = _extract_top_level_functions(root, source)
+    external_calls = _detect_external_calls(root, source, module_id)
 
     # Calcular métricas por clase y limpiar el campo interno _methodBodyNodes
     # antes de exponer el resultado (no es parte del esquema WorkerAnalysisResult).
@@ -775,6 +842,7 @@ def parse_kotlin_file(file_path: str, tree, source: bytes) -> dict[str, Any]:
     return {
         "module": {
             "id": module_id,
+            "type": "module",
             "name": module_name,
             "moduleType": "unknown",
             "language": "kotlin",
@@ -802,6 +870,6 @@ def parse_kotlin_file(file_path: str, tree, source: bytes) -> dict[str, Any]:
             for imp in set(import_ids)
         ],
         "invocations": [],
-        "externalCalls": [],
+        "externalCalls": external_calls,
         "rawImports": imports_data,
     }

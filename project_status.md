@@ -101,7 +101,8 @@ SAAC/
     ├── test_worker_contract.py    # Test que valida el protocolo JSON-Lines de los workers externos
     ├── test_analyze_project.py    # Test del pipeline de escaneo, límites de tamaño, exclusions y cancelación
     ├── test_resolved_imports.py   # Test de validación detallada de resolución de imports absolutos (Java, Go, Rust)
-    └── test_antipatterns.py       # Test de verificación de antipatrones (God Module, Circular Dependency, Layer Violation)
+    ├── test_antipatterns.py       # Test de verificación de antipatrones (God Module, Circular Dependency, Layer Violation)
+    └── test_c4_diagrams.py        # Test de verificación de diagramas C4 (Niveles 1, 2, 3, 4 y subgrafos suplementarios)
 ```
 
 ---
@@ -123,6 +124,13 @@ SAAC/
   * **God Module**: Módulos con $Ce > 15$ o que concentran $> 20\%$ de todas las dependencias del proyecto.
   * **Circular Dependency**: Ciclos simples en el grafo de dependencias resueltas usando DFS, con rutas completas del ciclo (`cycle_path`), normalización rotacional (para consolidar duplicados) y propuesta del enlace a romper.
   * **Layer Violation**: Chequea dependencias ascendentes usando un diseño híbrido: primero clasifica el nivel/rango del módulo según su `ModuleType` (fuente de verdad alineada con la UI), y si es `Unknown` o no mapeado, aplica fallback por coincidencia de palabras clave en carpetas.
+* **Generación de Diagramas C4 (`c4_generator.rs`)**:
+  * **Inferencia de Elementos**: Detecta `Actor` (Admin User / Public User / User) por presencia de controladores y `ExternalSystem` (APIs HTTP, bases de datos) acumulando los `external_calls` reales emitidos por los workers Python y Node.
+  * **Nivel 1 (Contexto)**: Mapa del sistema central interactuando con actores y sistemas externos.
+  * **Nivel 2 (Contenedores)**: Infiere unidades desplegables dinámicas (ej: para Tauri crea Frontend SPA y Core Engine Backend).
+  * **Nivel 3 (Componentes)**: Desglosa cada contenedor en sus módulos constituyentes y sus relaciones de dependencia.
+  * **Nivel 4 (Código / UML bajo demanda)**: Función `generate_module_code_diagram` que transforma las clases (`ClassInfo`) e interfaces de un módulo en subgrafos UML con sus herencias (`extends` e `implements`).
+  * **Diagrama Suplementario de Módulos Circulares**: Muestra únicamente los ciclos de dependencias reales reutilizando las rutas exactas de los antipatrones detectados.
 
 ### 2. Capa de Workers AST (Node.js & Python) - **100% Completado y Funcional**
 * **Protocolo de comunicación**: Basado en JSON-Lines a través de StdIn y StdOut estándar. Implementa chunking de archivos e hilos paralelos de monitoreo.
@@ -135,12 +143,13 @@ SAAC/
 * **Pipeline General (`test_analyze_project.py`)**: Verifica que `cargo check` compile, que el sistema ignore adecuadamente según el archivo `.gitignore` y carpetas típicas (`node_modules`), filtre archivos de más de 1MB y aplique la **cancelación cooperativa** abortando entre batches.
 * **Resoluciones (`test_resolved_imports.py`)**: Suite de pruebas específica que genera un monorepo temporal con módulos en Java, Go y Rust, ejecuta el análisis completo del backend y afirma que cada import absoluto se asocie de forma idéntica a su nodo destino correspondiente en el AMG.
 * **Antipatrones (`test_antipatterns.py`)**: Valida la generación e identificación exacta de ciclos, violaciones de capas en estilo Layered y módulos gigantes.
+* **Diagramas C4 (`test_c4_diagrams.py`)**: Valida la inferencia de actores, sistemas externos, contenedores y los 4 niveles de diagramas C4 con sus relaciones.
 
 ---
 
 ## 📈 Siguientes Hitos y Roadmap Técnico
 
-Con la infraestructura y detección de antipatrones finalizadas, las siguientes fases de desarrollo implican:
-1. **Generación de C4 Diagrams**: Diseñar la lógica para mapear los módulos agregados en vistas de contenedor y diagramas C4 dinámicos exportables.
+Con la infraestructura core, la detección de antipatrones y el motor de diagramas C4 (Niveles 1 a 4) finalizados, las siguientes fases de desarrollo implican:
+1. **Diagramas Suplementarios Adicionales (`supplementary_diagrams.rs`)**: Implementar en Rust la generación del Diagrama de Paquetes (Package Diagram), Árbol de Herencia (Inheritance Tree) y Modelo Entidad-Relación (ER Diagram).
 2. **Integración con LLM Local (Ollama)**: Desarrollar el comando `ask_ai` para alimentar el AMG resultante en modelos de lenguaje locales para auditorías interactivas.
 3. **Desarrollo del Frontend (React + TS)**: Reemplazar el layout por defecto de la interfaz con los paneles interactivos de SAAC v2.0, integrando el flujo de estados Zustand para mostrar las métricas, la lista de dependencias y el visor gráfico del AMG.

@@ -506,13 +506,13 @@ pub async fn analyze_project(
             snapshot_type: SnapshotType::Full,
             modules: aggregated.modules,
             dependencies: aggregated.dependencies,
-            containers: Vec::new(),
-            external_systems: Vec::new(),
-            actors: Vec::new(),
-            external_calls: Vec::new(),
+            containers: aggregated.containers,
+            external_systems: aggregated.external_systems,
+            actors: aggregated.actors,
+            external_calls: aggregated.external_calls,
             antipatterns: aggregated.antipatterns,
             metrics: aggregated.metrics,
-            c4_models: crate::engine::amg::C4Models::default(),
+            c4_models: aggregated.c4_models,
         };
 
         if let Some(ref cache_mgr) = cache {
