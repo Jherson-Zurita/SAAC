@@ -13,6 +13,7 @@ use crate::engine::amg::{
     Container, ContainerType, Dependency, ExternalCall, ExternalProtocol, ExternalSystem,
     ExternalSystemType, Language, Module, NodeType, ProjectType,
 };
+use crate::engine::supplementary_diagrams::SupplementaryDiagrams;
 
 pub struct C4GeneratorOutput {
     pub actors: Vec<Actor>,
@@ -469,6 +470,15 @@ fn generate_component_diagrams(
     // `generate_circular_dependencies_diagram`).
     let circular_diagram = generate_circular_dependencies_diagram(modules, antipatterns);
     map.insert("supplementary:circular-dependencies".to_string(), circular_diagram);
+
+    // Añadir el resto de diagramas suplementarios adicionales (§4.4.5):
+    // Package Diagram, Inheritance Tree, ER Diagram. Se fusionan en el
+    // mismo mapa `component_diagrams` bajo sus propias claves
+    // "supplementary:*", en vez de vivir en un campo separado del AMG —
+    // consistente con cómo ya conviven aquí los diagramas por contenedor
+    // y el de dependencias circulares.
+    let extra_diagrams = SupplementaryDiagrams::generate_all(modules, dependencies);
+    map.extend(extra_diagrams);
 
     map
 }

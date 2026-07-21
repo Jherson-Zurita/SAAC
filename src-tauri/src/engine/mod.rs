@@ -6,3 +6,4 @@ pub mod java_source_roots;
 pub mod go_module_roots;
 pub mod rust_crate_roots;
 pub mod c4_generator;
+pub mod supplementary_diagrams;

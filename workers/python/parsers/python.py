@@ -199,6 +199,83 @@ def _extract_parameters(params_node, source: bytes) -> list[dict[str, Any]]:
     return params
 
 
+def _extract_self_attribute_types(method_body_node, source: bytes) -> dict[str, str]:
+    """
+    Recorre el cuerpo de un método buscando asignaciones ANOTADAS a
+    atributos de instancia (`self.x: Tipo = valor`), y devuelve un dict
+    {nombre_atributo: tipo_como_texto}.
+
+    Complementa a `extract_self_attributes` (metrics/cohesion.py), que solo
+    devuelve NOMBRES de atributos (para el cálculo de LCOM4, donde el tipo
+    es irrelevante). Antes de esta función, `_extract_class_members` poblaba
+    SIEMPRE `AttributeInfo.type` como el literal `"any"`, incluso cuando el
+    código tenía una anotación de tipo explícita — perdiendo esa
+    información para cualquier consumidor que sí la necesite (ej. el ER
+    Diagram de `supplementary_diagrams.rs` en el backend Rust, que detecta
+    relaciones entre entidades comparando el tipo de un atributo contra
+    nombres de clase conocidos).
+
+    Solo se capturan atributos con anotación EXPLÍCITA (`self.x: Tipo = v`).
+    Asignaciones simples (`self.x = v`, sin anotación) simplemente no
+    aparecen en el dict devuelto — el caller conserva el fallback `"any"`
+    para esos casos, ya que no hay tipo real que extraer del AST.
+
+    En la gramática tree-sitter-python, una asignación anotada es un nodo
+    `assignment` con TRES campos con nombre: `left` (el target, aquí un
+    `attribute` con objeto `self`), `type` (el nodo de la anotación de
+    tipo, presente SOLO si hay anotación), y `right` (el valor asignado).
+    Una asignación simple (`self.x = v`) es el mismo tipo de nodo `assignment`
+    pero SIN el campo `type` (`child_by_field_name("type")` da `None`).
+
+    Args:
+        method_body_node: Nodo tree-sitter del cuerpo (block) del método.
+        source: Bytes del código fuente completo, para decodificar el texto
+            de los nodos de tipo (que pueden ser genéricos multi-token
+            como `list[OrderItem]`, no solo un `identifier` simple).
+
+    Returns:
+        Dict con los atributos que tienen anotación explícita de tipo.
+    """
+    types: dict[str, str] = {}
+    if method_body_node is None:
+        return types
+
+    def _visit(node):
+        if node.type == "assignment":
+            left = node.child_by_field_name("left")
+            type_node = node.child_by_field_name("type")
+
+            if (
+                left is not None
+                and type_node is not None
+                and left.type == "attribute"
+            ):
+                left_children = left.children
+                # Estructura de `attribute`: object '.' attribute_name.
+                # Solo nos interesan los atributos de `self` (instancia),
+                # igual que el criterio de `extract_self_attributes`.
+                if (
+                    len(left_children) >= 3
+                    and left_children[0].type == "identifier"
+                    and left_children[0].text == b"self"
+                    and left_children[2].type == "identifier"
+                ):
+                    attr_name = left_children[2].text.decode("utf-8")
+                    type_text = source[type_node.start_byte:type_node.end_byte].decode(
+                        "utf-8", errors="replace"
+                    )
+                    # Si el mismo atributo se anota más de una vez en el
+                    # método (raro, pero posible con reasignaciones), se
+                    # conserva la PRIMERA anotación encontrada.
+                    types.setdefault(attr_name, type_text)
+
+        for child in node.children:
+            _visit(child)
+
+    _visit(method_body_node)
+    return types
+
+
 def _first_child_of_type(node, type_name: str):
     for child in node.children:
         if child.type == type_name:
@@ -332,12 +409,17 @@ def _extract_class_members(
 
             # Extraer atributos de self.x del body del método
             if method_body is not None:
+                # Tipos anotados explícitamente (self.x: Tipo = valor), si
+                # los hay en este método — ver docstring de
+                # `_extract_self_attribute_types` para el porqué de esto.
+                annotated_types = _extract_self_attribute_types(method_body, source)
+
                 for attr_name in extract_self_attributes(method_body):
                     if attr_name not in seen_attrs:
                         seen_attrs.add(attr_name)
                         attributes.append({
                             "name": attr_name,
-                            "type": "any",
+                            "type": annotated_types.get(attr_name, "any"),
                             "visibility": "private" if attr_name.startswith("_") else "public",
                             "isStatic": False,
                             "isReadonly": False,
