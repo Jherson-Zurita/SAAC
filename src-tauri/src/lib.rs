@@ -39,6 +39,7 @@ pub fn build_app() -> tauri::App<tauri::Wry> {
             commands::analysis::cancel_analysis,
             commands::project::open_project,
             commands::ai::ask_ai,
+            commands::ai::check_ai_status,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

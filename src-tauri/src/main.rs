@@ -118,5 +118,52 @@ fn main() {
         });
     }
 
+    // Modo CLI de testing: `tauri-app --ask-ai-mock <prompt>` ejercita
+    // `AiClient::ask` en modo `Mock` de forma aislada — sin arrancar Tauri,
+    // sin workers, sin red — para validar que el fallback/respuesta
+    // simulada y la construcción de prompts (`build_prompt`) funcionan
+    // correctamente. A diferencia de `--analyze-project-json`, este modo
+    // NO necesita `build_app()`/`init_workers()` porque `AiClient::ask` no
+    // depende de `State`/`AppHandle` en absoluto — es una función asociada
+    // normal, así que un `block_on` directo alcanza.
+    if let Some(pos) = args.iter().position(|a| a == "--ask-ai-mock") {
+        let prompt = match args.get(pos + 1) {
+            Some(p) => p.clone(),
+            None => {
+                eprintln!("Error: --ask-ai-mock requiere un prompt como argumento.");
+                std::process::exit(2);
+            }
+        };
+
+        use tauri_app_lib::engine::ai_client::{AiClient, AiConfig, AiContextType, AiProvider};
+
+        let config = AiConfig {
+            provider: AiProvider::Mock,
+            ..AiConfig::default()
+        };
+
+        let result = tauri::async_runtime::block_on(AiClient::ask(
+            &prompt,
+            &AiContextType::FullAmg,
+            None, // Sin AMG cargado — ejercita la rama "CONTEXTO GENERAL" de build_prompt.
+            &config,
+        ));
+
+        match result {
+            Ok(response) => {
+                println!(
+                    "{}",
+                    serde_json::to_string(&response)
+                        .expect("Fallo al serializar AiResponse")
+                );
+                std::process::exit(0);
+            }
+            Err(e) => {
+                eprintln!("Error en AiClient::ask: {e}");
+                std::process::exit(1);
+            }
+        }
+    }
+
     tauri_app_lib::run()
 }

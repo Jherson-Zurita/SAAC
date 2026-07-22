@@ -7,3 +7,4 @@ pub mod go_module_roots;
 pub mod rust_crate_roots;
 pub mod c4_generator;
 pub mod supplementary_diagrams;
+pub mod ai_client;
