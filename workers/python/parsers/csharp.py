@@ -523,7 +523,12 @@ def _extract_members(
             cog = cognitive_complexity(body, CSHARP_COMPLEXITY_CONFIG) if body else 0
             loc = body.end_point[0] - body.start_point[0] + 1 if body else 1
 
+            # Llamadas dentro del body, necesarias para resolver `invocations`
+            # a nivel de módulo (ver _extract_call_names / _extract_invocations).
+            calls = _extract_call_names(body, source) if body else []
+
             methods.append({
+                "id": f"{module_id}::{class_name}::{name}",
                 "name": name,
                 "visibility": visibility,
                 "isStatic": is_static,
@@ -535,6 +540,7 @@ def _extract_members(
                 "cyclomaticComplexity": cc,
                 "cognitiveComplexity": cog,
                 "loc": loc,
+                "calls": calls,
                 "decorators": decorators,
             })
             method_bodies.append(body)
@@ -613,6 +619,159 @@ def _extract_members(
     return methods, method_bodies, attributes
 
 
+# ── Extracción de Llamadas (para invocations) ──
+
+def _extract_call_names(body_node, source: bytes) -> list[str]:
+    """
+    Extrae las llamadas a métodos dentro de un cuerpo de método/constructor.
+
+    Reutiliza la misma forma de `invocation_expression` ya verificada en
+    `_detect_external_calls`: field `function`, que puede ser
+    `member_access_expression` (con fields `expression`/`name`, receptor +
+    método) o `identifier` directo (llamada sin receptor explícito). Se
+    devuelve el texto tal como aparece en el código: "Metodo" (sin
+    receptor), "this.Metodo", "obj.Metodo", "Clase.Metodo".
+    """
+    calls: list[str] = []
+
+    def _visit(node):
+        if node.type == "invocation_expression":
+            func_node = node.child_by_field_name("function")
+            if func_node is not None:
+                if func_node.type == "member_access_expression":
+                    name_n = func_node.child_by_field_name("name")
+                    expr_n = func_node.child_by_field_name("expression")
+                    if name_n is not None:
+                        name_str = _node_text(name_n, source)
+                        if expr_n is not None:
+                            calls.append(f"{_node_text(expr_n, source)}.{name_str}")
+                        else:
+                            calls.append(name_str)
+                elif func_node.type == "identifier":
+                    calls.append(_node_text(func_node, source))
+        for child in node.children:
+            _visit(child)
+
+    _visit(body_node)
+    return calls
+
+
+# ── Resolución de Invocations ──
+#
+# `calls` (ver _extract_call_names) captura el TEXTO crudo de cada llamada:
+# "Metodo" (sin receptor), "this.Metodo", "obj.Metodo", "Clase.Metodo".
+# Esta sección resuelve ese texto contra los métodos conocidos del PROPIO
+# archivo (incluidos tipos anidados), produciendo el arreglo "invocations".
+# Llamadas a símbolos externos (using, librerías, variables de tipo
+# desconocido) requerirían inferencia de tipos — fuera del alcance de un
+# parser de un solo archivo — y se omiten en vez de adivinar.
+
+def _build_call_index(
+    classes: list[dict[str, Any]],
+) -> tuple[dict[str, str], dict[str, dict[str, str]]]:
+    """
+    Construye índices para resolver llamadas dentro del archivo:
+
+    - `by_simple_name`: nombre simple de método -> id calificado. Si el
+      mismo nombre existe en varios tipos (overloads o clases distintas),
+      se queda con el último visto — sin inferencia de tipos no hay forma
+      de saber a cuál pertenece un receptor de tipo desconocido.
+    - `methods_by_class`: nombre de tipo (puede ser calificado, ej.
+      "Outer.Inner") -> {nombre_metodo: id}, para resolver `this.Metodo`
+      con receptor conocido y `Clase.Metodo` por nombre explícito.
+    """
+    by_simple_name: dict[str, str] = {}
+    methods_by_class: dict[str, dict[str, str]] = {}
+
+    for cls in classes:
+        class_name = cls["name"]
+        methods_by_class[class_name] = {}
+        for m in cls.get("methods", []):
+            m_id = m.get("id")
+            if not m_id:
+                continue
+            methods_by_class[class_name][m["name"]] = m_id
+            by_simple_name[m["name"]] = m_id
+
+    return by_simple_name, methods_by_class
+
+
+def _resolve_call_target(
+    call_text: str,
+    caller_class: str,
+    by_simple_name: dict[str, str],
+    methods_by_class: dict[str, dict[str, str]],
+) -> str | None:
+    """
+    Intenta resolver el texto de una llamada a un id calificado del archivo.
+
+    Casos manejados, en orden:
+      1. `Metodo(...)` sin receptor: llamada implícita sobre `this` (o a un
+         método estático). Se prueba primero contra el propio tipo del
+         caller y, si no está ahí, contra `by_simple_name` como fallback.
+      2. `this.Metodo(...)`: se resuelve contra los métodos de
+         `caller_class` (receptor conocido).
+      3. `Clase.Metodo(...)`: se resuelve contra `methods_by_class` si
+         `Clase` es un tipo conocido del archivo (llamada estática o
+         explícita por nombre, incluye tipos anidados si se pasa el
+         nombre calificado).
+      4. Cualquier otro caso (receptor de tipo desconocido, variable
+         local, parámetro, símbolo de un `using`, etc.): no se resuelve —
+         se devuelve None y el caller la descarta.
+    """
+    if "." not in call_text:
+        return methods_by_class.get(caller_class, {}).get(call_text) \
+            or by_simple_name.get(call_text)
+
+    receiver, method_name = call_text.rsplit(".", 1)
+
+    if receiver == "this":
+        return methods_by_class.get(caller_class, {}).get(method_name)
+
+    if receiver in methods_by_class:
+        return methods_by_class[receiver].get(method_name)
+
+    return None
+
+
+def _extract_invocations(classes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """
+    Construye el grafo de invocaciones (método -> método) dentro del propio
+    archivo, a partir de los `calls` ya extraídos por `_extract_members`.
+
+    Cada entrada resuelta produce un dict:
+        {"source": <id del caller>, "target": <id del callee>,
+         "kind": "call", "weight": N}
+    donde `weight` es el número de veces que `source` invoca a `target`
+    (llamadas repetidas al mismo target dentro del mismo caller se agregan,
+    en vez de producir entradas duplicadas).
+    """
+    by_simple_name, methods_by_class = _build_call_index(classes)
+
+    # (source_id, target_id) -> weight
+    weights: dict[tuple[str, str], int] = {}
+
+    for cls in classes:
+        class_name = cls["name"]
+        for m in cls.get("methods", []):
+            source_id = m.get("id")
+            if not source_id:
+                continue
+            for call_text in m.get("calls", []):
+                target_id = _resolve_call_target(
+                    call_text, class_name, by_simple_name, methods_by_class
+                )
+                if target_id is None or target_id == source_id:
+                    continue  # No resuelto, o recursión directa (se omite).
+                key = (source_id, target_id)
+                weights[key] = weights.get(key, 0) + 1
+
+    return [
+        {"source": src, "target": tgt, "kind": "call", "weight": w}
+        for (src, tgt), w in weights.items()
+    ]
+
+
 # ── Detección de Llamadas HTTP Externas ──
 
 def _detect_external_calls(root, source: bytes, module_id: str) -> list[dict[str, Any]]:
@@ -688,6 +847,7 @@ def parse_csharp_file(
     imports_data = _extract_imports(root, source)
     classes = _extract_classes_and_structures(root, source, module_id)
     external_calls = _detect_external_calls(root, source, module_id)
+    invocations = _extract_invocations(classes)
 
     import_ids: list[str] = [imp["module"] for imp in imports_data]
 
@@ -743,7 +903,7 @@ def parse_csharp_file(
             {"source": module_id, "target": imp, "kind": "import", "weight": 1}
             for imp in set(import_ids)
         ],
-        "invocations": [],
+        "invocations": invocations,
         "externalCalls": external_calls,
         "rawImports": imports_data,
     }

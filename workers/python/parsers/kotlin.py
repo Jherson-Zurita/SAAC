@@ -327,6 +327,7 @@ def _extract_class_declaration(node, source: bytes, module_id: str) -> dict[str,
     if primary_ctor is not None:
         ctor_loc = primary_ctor.end_point[0] - primary_ctor.start_point[0] + 1
         methods.append({
+            "id": f"{module_id}::{name}::{name}",
             "name": name,
             "isConstructor": True,
             "visibility": "public",
@@ -338,6 +339,7 @@ def _extract_class_declaration(node, source: bytes, module_id: str) -> dict[str,
             "cognitiveComplexity": 0,
             "loc": ctor_loc,
             "isAsync": False,
+            "calls": [],  # constructor primario sin block propio: no hay body que recorrer
             "decorators": [],
         })
         method_body_nodes.append(None)  # el constructor primario no tiene block propio
@@ -346,7 +348,7 @@ def _extract_class_declaration(node, source: bytes, module_id: str) -> dict[str,
     if class_body is not None:
         for child in class_body.children:
             if child.type == "function_declaration":
-                m, body = _extract_function(child, source)
+                m, body = _extract_function(child, source, module_id, name)
                 methods.append(m)
                 method_body_nodes.append(body)
             elif child.type == "property_declaration":
@@ -391,7 +393,7 @@ def _extract_object_declaration(node, source: bytes, module_id: str) -> dict[str
     if class_body is not None:
         for child in class_body.children:
             if child.type == "function_declaration":
-                m, body = _extract_function(child, source)
+                m, body = _extract_function(child, source, module_id, name)
                 methods.append(m)
                 method_body_nodes.append(body)
             elif child.type == "property_declaration":
@@ -435,7 +437,7 @@ def _extract_companion_object(node, source: bytes, module_id: str) -> dict[str, 
     if class_body is not None:
         for child in class_body.children:
             if child.type == "function_declaration":
-                m, body = _extract_function(child, source)
+                m, body = _extract_function(child, source, module_id, name)
                 methods.append(m)
                 method_body_nodes.append(body)
             elif child.type == "property_declaration":
@@ -646,13 +648,20 @@ KOTLIN_COMPLEXITY_CONFIG = ComplexityLanguageConfig(
 )
 
 
-def _extract_function(node, source: bytes) -> tuple[dict[str, Any], Any]:
+def _extract_function(
+    node, source: bytes, module_id: str, owner_name: str | None
+) -> tuple[dict[str, Any], Any]:
     """
     Extrae un `function_declaration`. Verificado (hallazgos-kotlin.md §3):
     el cuerpo puede ser un `block` normal O una expresión directa sin
     llaves (`fun getX() = x`) — se pasa tal cual a cyclomatic_complexity/
     cognitive_complexity, que operan sobre cualquier nodo sin asumir su
     tipo específico.
+
+    `owner_name` es el nombre de la clase/object/companion que contiene la
+    función, o None si es una función top-level — se usa para calificar el
+    `id` (`modulo::Clase::funcion` o `modulo::funcion`, mismo patrón que
+    python.py/java.py).
     """
     name_node = node.child_by_field_name("name") or _first_named_child(node, "identifier")
     name = name_node.text.decode("utf-8") if name_node else "<anonima>"
@@ -675,7 +684,14 @@ def _extract_function(node, source: bytes) -> tuple[dict[str, Any], Any]:
     # línea de firma) den loc=1 en vez de fallar por no tener body_node.
     loc = node.end_point[0] - node.start_point[0] + 1
 
+    # Llamadas dentro del cuerpo, necesarias para resolver `invocations` a
+    # nivel de módulo (ver _extract_call_names / _extract_invocations).
+    calls = _extract_call_names(complexity_root, source) if complexity_root else []
+
+    qualified_id = f"{module_id}::{owner_name}::{name}" if owner_name else f"{module_id}::{name}"
+
     method_info = {
+        "id": qualified_id,
         "name": name,
         "isConstructor": False,
         "visibility": visibility,
@@ -687,6 +703,7 @@ def _extract_function(node, source: bytes) -> tuple[dict[str, Any], Any]:
         "cognitiveComplexity": cog,
         "loc": loc,
         "isAsync": is_async,
+        "calls": calls,
         "decorators": decorators,
     }
 
@@ -736,7 +753,7 @@ def _compute_class_metrics(class_info: dict[str, Any]) -> dict[str, Any]:
     return metrics
 
 
-def _extract_top_level_functions(root, source: bytes) -> list[dict[str, Any]]:
+def _extract_top_level_functions(root, source: bytes, module_id: str) -> list[dict[str, Any]]:
     """
     Extrae `function_declaration` que son hijos DIRECTOS de source_file, no
     anidados dentro de ningún class_body/companion_object. Kotlin permite
@@ -746,9 +763,180 @@ def _extract_top_level_functions(root, source: bytes) -> list[dict[str, Any]]:
     functions: list[dict[str, Any]] = []
     for child in root.children:
         if child.type == "function_declaration":
-            m, _ = _extract_function(child, source)
+            m, _ = _extract_function(child, source, module_id, None)
             functions.append(m)
     return functions
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Extracción de llamadas (para invocations)
+# ─────────────────────────────────────────────────────────────────────────
+
+def _extract_call_names(body_node, source: bytes) -> list[str]:
+    """
+    Extrae el texto de cada llamada a función/método dentro de un cuerpo.
+
+    PENDIENTE DE VERIFICAR contra un volcado real de tree-sitter-kotlin,
+    misma advertencia que en `_detect_external_calls`: se asume el nodo
+    `call_expression`, con el callee expuesto vía field name `function` si
+    existe (patrón más común en gramáticas de esta familia) o, si no,
+    como el primer hijo con nombre del nodo (fallback posicional, igual
+    estrategia que ya usa `_detect_external_calls` al tomar el snippet
+    completo sin depender de un field). Si un volcado real contradice el
+    nombre de nodo o la estructura, ajustar aquí — la resolución en
+    `_resolve_call_target` solo depende del TEXTO devuelto, no de cómo se
+    obtuvo, así que corregir esta función basta para propagar el fix.
+    """
+    calls: list[str] = []
+
+    def _visit(node):
+        if node.type == "call_expression":
+            callee = node.child_by_field_name("function")
+            if callee is None:
+                for child in node.children:
+                    if child.is_named:
+                        callee = child
+                        break
+            if callee is not None:
+                calls.append(_node_text(callee, source))
+        for child in node.children:
+            _visit(child)
+
+    if body_node is not None:
+        _visit(body_node)
+    return calls
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Resolución de invocations
+# ─────────────────────────────────────────────────────────────────────────
+#
+# `calls` (ver _extract_call_names) captura el TEXTO crudo de cada llamada:
+# "funcion" (sin receptor), "this.metodo", "obj.metodo", "Clase.metodo".
+# Esta sección resuelve ese texto contra las funciones/métodos conocidos
+# del PROPIO archivo, produciendo el arreglo "invocations". Llamadas a
+# símbolos externos (imports, librerías, receptores de tipo desconocido)
+# requerirían inferencia de tipos — fuera del alcance de un parser de un
+# solo archivo — y se omiten en vez de adivinar.
+
+def _build_call_index(
+    classes: list[dict[str, Any]], functions: list[dict[str, Any]]
+) -> tuple[dict[str, str], dict[str, dict[str, str]]]:
+    """
+    Construye índices para resolver llamadas dentro del archivo:
+
+    - `by_simple_name`: nombre simple -> id calificado, para funciones
+      top-level y métodos. Si el mismo nombre existe en varios lugares, se
+      queda con el último visto — sin inferencia de tipos no hay forma de
+      saber a cuál pertenece un receptor de tipo desconocido.
+    - `methods_by_class`: nombre de clase/object/companion -> {nombre:
+      id}, para resolver `this.metodo` y `Clase.metodo` por nombre
+      explícito.
+    """
+    by_simple_name: dict[str, str] = {}
+    methods_by_class: dict[str, dict[str, str]] = {}
+
+    for fn in functions:
+        by_simple_name[fn["name"]] = fn["id"]
+
+    for cls in classes:
+        class_name = cls["name"]
+        methods_by_class[class_name] = {}
+        for m in cls.get("methods", []):
+            m_id = m.get("id")
+            if not m_id:
+                continue
+            methods_by_class[class_name][m["name"]] = m_id
+            by_simple_name[m["name"]] = m_id
+
+    return by_simple_name, methods_by_class
+
+
+def _resolve_call_target(
+    call_text: str,
+    caller_class: str | None,
+    by_simple_name: dict[str, str],
+    methods_by_class: dict[str, dict[str, str]],
+) -> str | None:
+    """
+    Intenta resolver el texto de una llamada a un id calificado del
+    archivo. Casos manejados, en orden:
+
+      1. `funcion(...)` sin receptor: se prueba primero contra la propia
+         clase del caller (si la llamada está dentro de un método) y, si
+         no está ahí, contra `by_simple_name` como fallback (función
+         top-level u otro método con ese nombre).
+      2. `this.metodo(...)`: se resuelve contra los métodos de
+         `caller_class` (receptor conocido).
+      3. `Clase.metodo(...)`: se resuelve contra `methods_by_class` si
+         `Clase` es una clase/object/companion conocido del archivo.
+      4. Cualquier otro caso (receptor de tipo desconocido, variable
+         local, símbolo importado, etc.): no se resuelve — se devuelve
+         None y el caller la descarta.
+    """
+    if "." not in call_text:
+        if caller_class is not None:
+            hit = methods_by_class.get(caller_class, {}).get(call_text)
+            if hit is not None:
+                return hit
+        return by_simple_name.get(call_text)
+
+    receiver, method_name = call_text.rsplit(".", 1)
+
+    if receiver == "this" and caller_class is not None:
+        return methods_by_class.get(caller_class, {}).get(method_name)
+
+    if receiver in methods_by_class:
+        return methods_by_class[receiver].get(method_name)
+
+    return None
+
+
+def _extract_invocations(
+    classes: list[dict[str, Any]], functions: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """
+    Construye el grafo de invocaciones (función/método -> función/método)
+    dentro del propio archivo, a partir de los `calls` ya extraídos por
+    `_extract_function`.
+
+    Cada entrada resuelta produce un dict:
+        {"source": <id del caller>, "target": <id del callee>,
+         "kind": "call", "weight": N}
+    donde `weight` es el número de veces que `source` invoca a `target`
+    (llamadas repetidas al mismo target dentro del mismo caller se agregan,
+    en vez de producir entradas duplicadas).
+    """
+    by_simple_name, methods_by_class = _build_call_index(classes, functions)
+
+    # (source_id, target_id) -> weight
+    weights: dict[tuple[str, str], int] = {}
+
+    def _accumulate(source_id: str, caller_class: str | None, calls: list[str]):
+        for call_text in calls:
+            target_id = _resolve_call_target(
+                call_text, caller_class, by_simple_name, methods_by_class
+            )
+            if target_id is None or target_id == source_id:
+                continue  # No resuelto, o recursión directa (se omite).
+            key = (source_id, target_id)
+            weights[key] = weights.get(key, 0) + 1
+
+    for fn in functions:
+        _accumulate(fn["id"], None, fn.get("calls", []))
+
+    for cls in classes:
+        class_name = cls["name"]
+        for m in cls.get("methods", []):
+            m_id = m.get("id")
+            if not m_id:
+                continue
+            _accumulate(m_id, class_name, m.get("calls", []))
+
+    return [
+        {"source": src, "target": tgt, "kind": "call", "weight": w}
+        for (src, tgt), w in weights.items()
+    ]
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -810,8 +998,9 @@ def parse_kotlin_file(file_path: str, tree, source: bytes) -> dict[str, Any]:
 
     imports_data = _extract_imports(root, source)
     classes = _extract_classes(root, source, module_id)
-    functions = _extract_top_level_functions(root, source)
+    functions = _extract_top_level_functions(root, source, module_id)
     external_calls = _detect_external_calls(root, source, module_id)
+    invocations = _extract_invocations(classes, functions)
 
     # Calcular métricas por clase y limpiar el campo interno _methodBodyNodes
     # antes de exponer el resultado (no es parte del esquema WorkerAnalysisResult).
@@ -869,7 +1058,7 @@ def parse_kotlin_file(file_path: str, tree, source: bytes) -> dict[str, Any]:
             {"source": module_id, "target": imp, "kind": "import", "weight": 1}
             for imp in set(import_ids)
         ],
-        "invocations": [],
+        "invocations": invocations,
         "externalCalls": external_calls,
         "rawImports": imports_data,
     }

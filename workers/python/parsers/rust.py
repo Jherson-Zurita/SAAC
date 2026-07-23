@@ -344,7 +344,13 @@ def _extract_classes_and_structures(
                         cog = cognitive_complexity(body, RUST_COMPLEXITY_CONFIG) if body else 0
                         loc = body.end_point[0] - body.start_point[0] + 1 if body else 1
 
+                        # Llamadas dentro del body, necesarias para resolver
+                        # `invocations` a nivel de módulo (ver
+                        # _extract_call_names / _extract_invocations).
+                        calls = _extract_call_names(body, source) if body else []
+
                         method_info = {
+                            "id": f"{module_id}::{struct_name}::{m_name}",
                             "name": m_name,
                             "visibility": m_visibility,
                             "isStatic": not is_instance,
@@ -356,6 +362,7 @@ def _extract_classes_and_structures(
                             "cyclomaticComplexity": cc,
                             "cognitiveComplexity": cog,
                             "loc": loc,
+                            "calls": calls,
                             "decorators": [],
                         }
 
@@ -414,6 +421,10 @@ def _extract_global_functions(root, source: bytes, module_id: str) -> list[dict[
             cog = cognitive_complexity(body, RUST_COMPLEXITY_CONFIG) if body else 0
             loc = body.end_point[0] - body.start_point[0] + 1 if body else 1
 
+            # Llamadas dentro del body, necesarias para resolver `invocations`
+            # a nivel de módulo (ver _extract_call_names / _extract_invocations).
+            calls = _extract_call_names(body, source) if body else []
+
             functions.append({
                 "id": f"{module_id}::{name}",
                 "name": name,
@@ -425,11 +436,175 @@ def _extract_global_functions(root, source: bytes, module_id: str) -> list[dict[
                 "cyclomaticComplexity": cc,
                 "cognitiveComplexity": cog,
                 "loc": loc,
-                "calls": [],
+                "calls": calls,
                 "decorators": [],
             })
 
     return functions
+
+
+# ── Extracción de Llamadas (para invocations) ──
+
+def _extract_call_names(body_node, source: bytes) -> list[str]:
+    """
+    Extrae las llamadas a funciones/métodos dentro de un cuerpo, cubriendo
+    las DOS sintaxis de llamada de Rust (ambas producen un `call_expression`
+    con field `function`, pero con forma interna distinta):
+
+      - `self.metodo(...)` / `obj.metodo(...)`: el field `function` es un
+        `field_expression` (mismo nodo que usa make_rust_attribute_extractor
+        para atributos, aquí con receptor + `field_identifier`). Se
+        devuelve como "self.metodo" / "obj.metodo".
+      - `Struct::metodo(...)` / `funcion(...)`: el field `function` es un
+        `scoped_identifier` (ruta completa, ej. "Struct::new") o un
+        `identifier` simple (función global sin receptor). Se devuelve tal
+        cual aparece ("Struct::metodo" o "funcion"), sin transformar `::`.
+    """
+    calls: list[str] = []
+
+    def _visit(node):
+        if node.type == "call_expression":
+            func_node = node.child_by_field_name("function")
+            if func_node is not None:
+                if func_node.type == "field_expression":
+                    receiver = func_node.children[0] if func_node.children else None
+                    field_node = func_node.child_by_field_name("field")
+                    if receiver is not None and field_node is not None:
+                        calls.append(
+                            f"{_node_text(receiver, source)}.{_node_text(field_node, source)}"
+                        )
+                elif func_node.type in ("scoped_identifier", "identifier"):
+                    calls.append(_node_text(func_node, source))
+        for child in node.children:
+            _visit(child)
+
+    _visit(body_node)
+    return calls
+
+
+# ── Resolución de Invocations ──
+#
+# `calls` (ver _extract_call_names) captura el TEXTO crudo de cada llamada:
+# "funcion" (global, sin receptor), "self.metodo", "obj.metodo",
+# "Struct::metodo" (ruta asociada/estática, separador `::`). Esta sección
+# resuelve ese texto contra las funciones/métodos conocidos del PROPIO
+# archivo, produciendo el arreglo "invocations". Llamadas a símbolos
+# externos (imports `use`, crates, receptores de tipo desconocido)
+# requerirían inferencia de tipos — fuera del alcance de un parser de un
+# solo archivo — y se omiten en vez de adivinar.
+
+def _build_call_index(
+    classes: list[dict[str, Any]], functions: list[dict[str, Any]]
+) -> tuple[dict[str, str], dict[str, dict[str, str]]]:
+    """
+    Construye índices para resolver llamadas dentro del archivo:
+
+    - `by_simple_name`: nombre simple -> id calificado, para funciones
+      globales y métodos. Si el mismo nombre existe en varios lugares, se
+      queda con el último visto — sin inferencia de tipos no hay forma de
+      saber a cuál pertenece un receptor de tipo desconocido.
+    - `methods_by_struct`: nombre de struct -> {nombre_metodo: id}, para
+      resolver `self.metodo` (receptor conocido) y `Struct::metodo` (ruta
+      asociada explícita).
+    """
+    by_simple_name: dict[str, str] = {}
+    methods_by_struct: dict[str, dict[str, str]] = {}
+
+    for fn in functions:
+        by_simple_name[fn["name"]] = fn["id"]
+
+    for cls in classes:
+        struct_name = cls["name"]
+        methods_by_struct[struct_name] = {}
+        for m in cls.get("methods", []):
+            m_id = m.get("id")
+            if not m_id:
+                continue
+            methods_by_struct[struct_name][m["name"]] = m_id
+            by_simple_name[m["name"]] = m_id
+
+    return by_simple_name, methods_by_struct
+
+
+def _resolve_call_target(
+    call_text: str,
+    caller_struct: str | None,
+    by_simple_name: dict[str, str],
+    methods_by_struct: dict[str, dict[str, str]],
+) -> str | None:
+    """
+    Intenta resolver el texto de una llamada a un id calificado del archivo.
+
+    Casos manejados, en orden:
+      1. `Struct::metodo(...)` (contiene `::`): ruta asociada/estática
+         explícita — se resuelve contra `methods_by_struct[Struct]`.
+      2. `self.metodo(...)`: se resuelve contra los métodos del propio
+         struct del caller (receptor conocido).
+      3. `obj.metodo(...)` con receptor distinto de `self`: el tipo de
+         `obj` es desconocido sin inferencia de tipos — no se resuelve.
+      4. `funcion(...)` sin receptor (sin `.` ni `::`): función global,
+         resuelta contra `by_simple_name`.
+      5. Cualquier otro caso: no se resuelve — se devuelve None y el
+         caller la descarta.
+    """
+    if "::" in call_text:
+        struct_name, method_name = call_text.rsplit("::", 1)
+        return methods_by_struct.get(struct_name, {}).get(method_name)
+
+    if "." in call_text:
+        receiver, method_name = call_text.split(".", 1)
+        if receiver == "self" and caller_struct is not None:
+            return methods_by_struct.get(caller_struct, {}).get(method_name)
+        return None  # receptor de tipo desconocido: no se adivina.
+
+    return by_simple_name.get(call_text)
+
+
+def _extract_invocations(
+    classes: list[dict[str, Any]], functions: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """
+    Construye el grafo de invocaciones (función/método -> función/método)
+    dentro del propio archivo, a partir de los `calls` ya extraídos por
+    `_extract_classes_and_structures` / `_extract_global_functions`.
+
+    Cada entrada resuelta produce un dict:
+        {"source": <id del caller>, "target": <id del callee>,
+         "kind": "call", "weight": N}
+    donde `weight` es el número de veces que `source` invoca a `target`
+    (llamadas repetidas al mismo target dentro del mismo caller se agregan,
+    en vez de producir entradas duplicadas).
+    """
+    by_simple_name, methods_by_struct = _build_call_index(classes, functions)
+
+    # (source_id, target_id) -> weight
+    weights: dict[tuple[str, str], int] = {}
+
+    def _accumulate(source_id: str, caller_struct: str | None, calls: list[str]):
+        for call_text in calls:
+            target_id = _resolve_call_target(
+                call_text, caller_struct, by_simple_name, methods_by_struct
+            )
+            if target_id is None or target_id == source_id:
+                continue  # No resuelto, o recursión directa (se omite).
+            key = (source_id, target_id)
+            weights[key] = weights.get(key, 0) + 1
+
+    for fn in functions:
+        _accumulate(fn["id"], None, fn.get("calls", []))
+
+    for cls in classes:
+        struct_name = cls["name"]
+        for m in cls.get("methods", []):
+            m_id = m.get("id")
+            if not m_id:
+                continue
+            _accumulate(m_id, struct_name, m.get("calls", []))
+
+    return [
+        {"source": src, "target": tgt, "kind": "call", "weight": w}
+        for (src, tgt), w in weights.items()
+    ]
 
 
 # ── Detección de Llamadas HTTP Externas ──
@@ -505,6 +680,7 @@ def parse_rust_file(
     classes = _extract_classes_and_structures(root, source, module_id)
     global_functions = _extract_global_functions(root, source, module_id)
     external_calls = _detect_external_calls(root, source, module_id)
+    invocations = _extract_invocations(classes, global_functions)
 
     import_ids: list[str] = [imp["module"] for imp in imports_data]
 
@@ -562,7 +738,7 @@ def parse_rust_file(
             {"source": module_id, "target": imp, "kind": "import", "weight": 1}
             for imp in set(import_ids)
         ],
-        "invocations": [],
+        "invocations": invocations,
         "externalCalls": external_calls,
         "rawImports": imports_data,
     }

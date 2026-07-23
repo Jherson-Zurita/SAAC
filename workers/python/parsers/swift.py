@@ -405,7 +405,12 @@ def _extract_members(
             cog = cognitive_complexity(body, SWIFT_COMPLEXITY_CONFIG) if body else 0
             loc = body.end_point[0] - body.start_point[0] + 1 if body else 1
 
+            # Llamadas dentro del body, necesarias para resolver `invocations`
+            # a nivel de módulo (ver _extract_call_names / _extract_invocations).
+            calls = _extract_call_names(body, source) if body else []
+
             methods.append({
+                "id": f"{module_id}::{class_name}::{name}",
                 "name": name,
                 "visibility": visibility,
                 "isStatic": is_static,
@@ -417,6 +422,7 @@ def _extract_members(
                 "cyclomaticComplexity": cc,
                 "cognitiveComplexity": cog,
                 "loc": loc,
+                "calls": calls,
                 "decorators": decorators,
             })
             method_bodies.append(body)
@@ -457,6 +463,165 @@ def _extract_members(
             })
 
     return methods, method_bodies, attributes
+
+
+# ── Extracción de Llamadas (para invocations) ──
+
+def _extract_call_names(body_node, source: bytes) -> list[str]:
+    """
+    Extrae el texto de cada llamada a función/método dentro de un cuerpo.
+
+    Reutiliza el mismo patrón POSICIONAL ya usado en `_detect_external_calls`
+    para identificar el callee de un `call_expression`: el primer hijo de
+    tipo `simple_identifier` (llamada sin receptor: "metodo(...)") o
+    `navigation_expression` (llamada con receptor: "self.metodo(...)",
+    "obj.metodo(...)"), tomado como texto completo. A diferencia de C#/Java
+    (donde el research SÍ confirmó un field name "function" para el
+    callee), aquí no hay evidencia en este archivo de que exista ese field
+    en tree-sitter-swift — se mantiene el mismo enfoque posicional que ya
+    se usaba, en vez de introducir una suposición nueva sin verificar.
+    """
+    calls: list[str] = []
+
+    def _visit(node):
+        if node.type == "call_expression":
+            for sub in node.children:
+                if sub.type in ("simple_identifier", "navigation_expression"):
+                    calls.append(_node_text(sub, source))
+                    break
+        for child in node.children:
+            _visit(child)
+
+    if body_node is not None:
+        _visit(body_node)
+    return calls
+
+
+# ── Resolución de Invocations ──
+#
+# `calls` (ver _extract_call_names) captura el TEXTO crudo de cada llamada:
+# "metodo" (sin receptor), "self.metodo", "obj.metodo". A diferencia de
+# otros lenguajes, en Swift una `navigation_expression` puede encadenar
+# más de un nivel (ej. "a.b.metodo") — solo se resuelve el caso de UN
+# receptor directo (mismo alcance que los demás parsers de esta serie);
+# cadenas más largas no se resuelven, no se rompen a mitad ni se adivinan.
+# Esta sección resuelve el texto contra los métodos conocidos del PROPIO
+# archivo (incluidos tipos anidados), produciendo el arreglo "invocations".
+# Llamadas a símbolos externos (imports, librerías, receptores de tipo
+# desconocido) requerirían inferencia de tipos — fuera del alcance de un
+# parser de un solo archivo — y se omiten en vez de adivinar.
+
+def _build_call_index(
+    classes: list[dict[str, Any]],
+) -> tuple[dict[str, str], dict[str, dict[str, str]]]:
+    """
+    Construye índices para resolver llamadas dentro del archivo:
+
+    - `by_simple_name`: nombre simple de método -> id calificado. Si el
+      mismo nombre existe en varios tipos, se queda con el último visto —
+      sin inferencia de tipos no hay forma de saber a cuál pertenece un
+      receptor de tipo desconocido.
+    - `methods_by_type`: nombre de tipo (puede ser calificado, ej.
+      "Outer.Inner") -> {nombre_metodo: id}, para resolver `self.metodo`
+      con receptor conocido y `Tipo.metodo` por nombre explícito (llamadas
+      estáticas o a métodos de tipo).
+    """
+    by_simple_name: dict[str, str] = {}
+    methods_by_type: dict[str, dict[str, str]] = {}
+
+    for cls in classes:
+        type_name = cls["name"]
+        methods_by_type[type_name] = {}
+        for m in cls.get("methods", []):
+            m_id = m.get("id")
+            if not m_id:
+                continue
+            methods_by_type[type_name][m["name"]] = m_id
+            by_simple_name[m["name"]] = m_id
+
+    return by_simple_name, methods_by_type
+
+
+def _resolve_call_target(
+    call_text: str,
+    caller_type: str,
+    by_simple_name: dict[str, str],
+    methods_by_type: dict[str, dict[str, str]],
+) -> str | None:
+    """
+    Intenta resolver el texto de una llamada a un id calificado del
+    archivo. Casos manejados, en orden:
+
+      1. `metodo(...)` sin receptor: se prueba primero contra el propio
+         tipo del caller y, si no está ahí, contra `by_simple_name` como
+         fallback (otro tipo con un método del mismo nombre).
+      2. `self.metodo(...)`: se resuelve contra los métodos de
+         `caller_type` (receptor conocido).
+      3. `Tipo.metodo(...)`: se resuelve contra `methods_by_type` si
+         `Tipo` es un tipo conocido del archivo (llamada estática/de tipo,
+         incluye tipos anidados si se pasa el nombre calificado).
+      4. Cualquier otro caso (receptor de tipo desconocido, variable
+         local, cadena de más de un nivel como "a.b.metodo", símbolo
+         importado, etc.): no se resuelve — se devuelve None y el caller
+         la descarta.
+    """
+    if "." not in call_text:
+        return methods_by_type.get(caller_type, {}).get(call_text) \
+            or by_simple_name.get(call_text)
+
+    parts = call_text.split(".")
+    if len(parts) != 2:
+        # Cadena de más de un nivel (a.b.metodo): no hay suficiente
+        # información de tipos para saber el receptor real.
+        return None
+
+    receiver, method_name = parts
+
+    if receiver == "self":
+        return methods_by_type.get(caller_type, {}).get(method_name)
+
+    if receiver in methods_by_type:
+        return methods_by_type[receiver].get(method_name)
+
+    return None
+
+
+def _extract_invocations(classes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """
+    Construye el grafo de invocaciones (método -> método) dentro del propio
+    archivo, a partir de los `calls` ya extraídos por `_extract_members`.
+
+    Cada entrada resuelta produce un dict:
+        {"source": <id del caller>, "target": <id del callee>,
+         "kind": "call", "weight": N}
+    donde `weight` es el número de veces que `source` invoca a `target`
+    (llamadas repetidas al mismo target dentro del mismo caller se agregan,
+    en vez de producir entradas duplicadas).
+    """
+    by_simple_name, methods_by_type = _build_call_index(classes)
+
+    # (source_id, target_id) -> weight
+    weights: dict[tuple[str, str], int] = {}
+
+    for cls in classes:
+        type_name = cls["name"]
+        for m in cls.get("methods", []):
+            source_id = m.get("id")
+            if not source_id:
+                continue
+            for call_text in m.get("calls", []):
+                target_id = _resolve_call_target(
+                    call_text, type_name, by_simple_name, methods_by_type
+                )
+                if target_id is None or target_id == source_id:
+                    continue  # No resuelto, o recursión directa (se omite).
+                key = (source_id, target_id)
+                weights[key] = weights.get(key, 0) + 1
+
+    return [
+        {"source": src, "target": tgt, "kind": "call", "weight": w}
+        for (src, tgt), w in weights.items()
+    ]
 
 
 # ── Detección de Llamadas HTTP Externas ──
@@ -537,6 +702,7 @@ def parse_swift_file(
     imports_data = _extract_imports(root, source)
     classes = _extract_classes_and_structures(root, source, module_id)
     external_calls = _detect_external_calls(root, source, module_id)
+    invocations = _extract_invocations(classes)
 
     import_ids: list[str] = [imp["module"] for imp in imports_data]
 
@@ -592,7 +758,7 @@ def parse_swift_file(
             {"source": module_id, "target": imp, "kind": "import", "weight": 1}
             for imp in set(import_ids)
         ],
-        "invocations": [],
+        "invocations": invocations,
         "externalCalls": external_calls,
         "rawImports": imports_data,
     }

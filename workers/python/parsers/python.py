@@ -453,6 +453,10 @@ def _extract_method(
     is_abstract = "abstractmethod" in decorators
     is_async = any(c.type == "async" for c in func_node.children)
 
+    # Extraer llamadas desde el body (mismo criterio que _extract_functions,
+    # necesario para poder resolver `invocations` a nivel de módulo).
+    calls = _extract_call_names(body) if body else []
+
     # Determinar visibilidad por convención de Python
     if name.startswith("__") and not name.endswith("__"):
         visibility = "private"
@@ -462,6 +466,7 @@ def _extract_method(
         visibility = "public"
 
     method_info = {
+        "id": f"{module_id}::{class_name}::{name}",
         "name": name,
         "visibility": visibility,
         "isStatic": is_static,
@@ -474,6 +479,7 @@ def _extract_method(
         "cyclomaticComplexity": cc,
         "cognitiveComplexity": cog,
         "loc": loc,
+        "calls": calls,
         "decorators": decorators,
     }
 
@@ -568,6 +574,140 @@ def _extract_call_names(body_node) -> list[str]:
 def _node_text_fast(node) -> str:
     """Extrae el texto de un nodo usando su propio .text (bytes)."""
     return node.text.decode("utf-8", errors="replace") if node.text else ""
+
+
+# ── Resolución de Invocations ──
+#
+# `calls` (ver _extract_call_names) captura el TEXTO crudo de cada llamada
+# tal como aparece en el código: "foo", "self.bar", "obj.baz", "pkg.mod.qux".
+# Esta sección resuelve ese texto contra las funciones/métodos conocidos del
+# PROPIO módulo, produciendo el arreglo "invocations" (grafo de llamadas
+# intra-módulo). Llamadas a símbolos externos (imports, librerías, atributos
+# de objetos de tipo desconocido) no se pueden resolver aquí de forma
+# confiable — requerirían resolución de tipos, fuera del alcance de un
+# parser de un solo archivo — y simplemente se omiten, en vez de adivinar.
+
+def _build_call_index(
+    classes: list[dict[str, Any]], functions: list[dict[str, Any]]
+) -> tuple[dict[str, str], dict[str, list[str]]]:
+    """
+    Construye índices para resolver llamadas dentro del módulo:
+
+    - `by_simple_name`: nombre simple -> id calificado, para funciones
+      top-level y para métodos (último gana si hay colisión de nombres
+      entre métodos de distintas clases, ya que sin inferencia de tipos no
+      hay forma de saber a cuál clase pertenece el receptor).
+    - `methods_by_class`: nombre de clase -> {nombre_metodo: id}, para
+      resolver llamadas con receptor conocido de forma explícita, como
+      `self.foo(...)` dentro de una clase o `ClaseX.metodo(...)`.
+    """
+    by_simple_name: dict[str, str] = {}
+    methods_by_class: dict[str, dict[str, str]] = {}
+
+    for fn in functions:
+        by_simple_name[fn["name"]] = fn["id"]
+
+    for cls in classes:
+        class_name = cls["name"]
+        methods_by_class[class_name] = {}
+        for m in cls.get("methods", []):
+            m_id = m.get("id")
+            if not m_id:
+                continue
+            methods_by_class[class_name][m["name"]] = m_id
+            # No sobreescribir una función top-level con el mismo nombre;
+            # entre métodos de clases distintas, se queda el último visto.
+            by_simple_name.setdefault(m["name"], m_id)
+            by_simple_name[m["name"]] = m_id
+
+    return by_simple_name, methods_by_class
+
+
+def _resolve_call_target(
+    call_text: str,
+    caller_class: str | None,
+    by_simple_name: dict[str, str],
+    methods_by_class: dict[str, list[str]],
+) -> str | None:
+    """
+    Intenta resolver el texto de una llamada a un id calificado del módulo.
+
+    Casos manejados, en orden:
+      1. `self.metodo(...)` / `cls.metodo(...)` dentro de una clase: se
+         resuelve contra los métodos de `caller_class` (receptor conocido).
+      2. `NombreClase.metodo(...)`: se resuelve contra `methods_by_class`
+         si `NombreClase` es una clase conocida del módulo (llamada
+         estática o a través del nombre de la clase).
+      3. `identificador_simple(...)`: se resuelve contra `by_simple_name`
+         (función top-level o método, ver limitación en `_build_call_index`).
+      4. Cualquier otro caso (atributo de objeto de tipo desconocido,
+         llamada encadenada, símbolo importado, builtin, etc.): no se
+         resuelve — se devuelve None y el caller la descarta.
+    """
+    if "." not in call_text:
+        return by_simple_name.get(call_text)
+
+    parts = call_text.split(".")
+    if len(parts) != 2:
+        # Llamadas encadenadas (a.b.c(...)) o con subíndices no se resuelven:
+        # no hay suficiente información de tipos para saber el receptor real.
+        return None
+
+    receiver, method_name = parts
+
+    if receiver in ("self", "cls") and caller_class is not None:
+        return methods_by_class.get(caller_class, {}).get(method_name)
+
+    if receiver in methods_by_class:
+        return methods_by_class[receiver].get(method_name)
+
+    return None
+
+
+def _extract_invocations(
+    classes: list[dict[str, Any]], functions: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """
+    Construye el grafo de invocaciones (llamadas función/método -> función/
+    método) dentro del propio módulo, a partir de los `calls` ya extraídos
+    por `_extract_functions` / `_extract_method`.
+
+    Cada entrada resuelta produce un dict:
+        {"source": <id del caller>, "target": <id del callee>, "weight": N}
+    donde `weight` es el número de veces que `source` invoca a `target`
+    (llamadas repetidas al mismo target dentro del mismo caller se agregan,
+    en vez de producir entradas duplicadas).
+    """
+    by_simple_name, methods_by_class = _build_call_index(classes, functions)
+
+    # (source_id, target_id) -> weight
+    weights: dict[tuple[str, str], int] = {}
+
+    def _accumulate(source_id: str, caller_class: str | None, calls: list[str]):
+        for call_text in calls:
+            target_id = _resolve_call_target(
+                call_text, caller_class, by_simple_name, methods_by_class
+            )
+            if target_id is None or target_id == source_id:
+                continue  # No resuelto, o recursión directa (se omite).
+            key = (source_id, target_id)
+            weights[key] = weights.get(key, 0) + 1
+
+    for fn in functions:
+        _accumulate(fn["id"], None, fn.get("calls", []))
+
+    for cls in classes:
+        class_name = cls["name"]
+        for m in cls.get("methods", []):
+            m_id = m.get("id")
+            if not m_id:
+                continue
+            _accumulate(m_id, class_name, m.get("calls", []))
+
+    return [
+        {"source": src, "target": tgt, "kind": "call", "weight": w}
+        for (src, tgt), w in weights.items()
+    ]
 
 
 # ── Detección de Llamadas HTTP ──
@@ -670,6 +810,7 @@ def parse_python_file(
     classes, _ = _extract_classes(root, source, module_id)
     functions = _extract_functions(root, source, module_id)
     external_calls = _detect_external_calls(root, source, module_id)
+    invocations = _extract_invocations(classes, functions)
 
     # Imports resueltos como IDs de módulo
     import_ids: list[str] = []
@@ -736,7 +877,7 @@ def parse_python_file(
             {"source": module_id, "target": imp, "kind": "import", "weight": 1}
             for imp in set(import_ids)
         ],
-        "invocations": [],
+        "invocations": invocations,
         "externalCalls": external_calls,
         "rawImports": imports_data,
     }

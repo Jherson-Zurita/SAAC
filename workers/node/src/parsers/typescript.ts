@@ -38,6 +38,7 @@ interface AttributeInfo {
 }
 
 interface MethodInfo {
+  id: string;
   name: string;
   visibility: 'public' | 'private' | 'protected' | 'internal' | 'package';
   isStatic: boolean;
@@ -47,6 +48,7 @@ interface MethodInfo {
   cyclomaticComplexity: number;
   cognitiveComplexity: number;
   loc: number;
+  calls: string[];
 }
 
 interface ClassMetrics {
@@ -102,8 +104,10 @@ interface ExternalCall {
 }
 
 interface Invocation {
-  caller: string;
-  callee: string;
+  source: string;
+  target: string;
+  kind: 'call';
+  weight: number;
 }
 
 export interface ParseResult {
@@ -342,8 +346,12 @@ function extractClass(
       const cogComp = ts.isMethodDeclaration(member) && member.body
         ? calculateCognitiveComplexity(member.body)
         : 0;
+      const calls = ts.isMethodDeclaration(member) && member.body
+        ? extractCallNames(member.body)
+        : [];
 
       methods.push({
+        id: `${moduleId}::${name}::${methodName}`,
         name: methodName,
         visibility: getVisibility(member),
         isStatic: isStatic(member),
@@ -353,6 +361,7 @@ function extractClass(
         cyclomaticComplexity: cc,
         cognitiveComplexity: cogComp,
         loc: countLines(member, sourceFile),
+        calls,
       });
     } else if (ts.isPropertyDeclaration(member) || ts.isPropertySignature(member)) {
       attributes.push({
@@ -379,6 +388,7 @@ function extractClass(
 
       // Constructor itself as a method
       methods.push({
+        id: `${moduleId}::${name}::constructor`,
         name: 'constructor',
         visibility: getVisibility(member),
         isStatic: false,
@@ -388,6 +398,7 @@ function extractClass(
         cyclomaticComplexity: member.body ? calculateCyclomaticComplexity(member.body) : 1,
         cognitiveComplexity: member.body ? calculateCognitiveComplexity(member.body) : 0,
         loc: countLines(member, sourceFile),
+        calls: member.body ? extractCallNames(member.body) : [],
       });
     }
   }
@@ -481,6 +492,151 @@ function extractExportedArrowFunction(
   }
 
   return results;
+}
+
+// ── Resolución de Invocations ──
+//
+// `calls` (ver extractCallNames) captura el TEXTO crudo de cada llamada tal
+// como aparece en el código: "foo", "this.bar", "obj.baz", "pkg.mod.qux".
+// Esta sección resuelve ese texto contra las funciones/métodos conocidos del
+// PROPIO módulo, produciendo el arreglo "invocations" (grafo de llamadas
+// intra-módulo). Llamadas a símbolos externos (imports, librerías, atributos
+// de objetos de tipo desconocido) no se pueden resolver aquí de forma
+// confiable — requerirían resolución de tipos, fuera del alcance de un
+// parser de un solo archivo — y simplemente se omiten, en vez de adivinar.
+
+/**
+ * Construye índices para resolver llamadas dentro del módulo:
+ *
+ * - `bySimpleName`: nombre simple -> id calificado, para funciones
+ *   top-level y para métodos (el último gana si hay colisión de nombres
+ *   entre métodos de distintas clases, ya que sin inferencia de tipos no
+ *   hay forma de saber a cuál clase pertenece el receptor).
+ * - `methodsByClass`: nombre de clase -> Map(nombre_metodo -> id), para
+ *   resolver llamadas con receptor conocido de forma explícita, como
+ *   `this.foo(...)` dentro de una clase o `ClaseX.metodo(...)`.
+ */
+function buildCallIndex(
+  classes: ClassInfo[],
+  functions: FunctionInfo[]
+): { bySimpleName: Map<string, string>; methodsByClass: Map<string, Map<string, string>> } {
+  const bySimpleName = new Map<string, string>();
+  const methodsByClass = new Map<string, Map<string, string>>();
+
+  for (const fn of functions) {
+    bySimpleName.set(fn.name, fn.id);
+  }
+
+  for (const cls of classes) {
+    const classMethods = new Map<string, string>();
+    methodsByClass.set(cls.name, classMethods);
+    for (const m of cls.methods) {
+      if (!m.id) continue;
+      classMethods.set(m.name, m.id);
+      // No sobreescribir una función top-level con el mismo nombre;
+      // entre métodos de clases distintas, se queda el último visto.
+      bySimpleName.set(m.name, m.id);
+    }
+  }
+
+  return { bySimpleName, methodsByClass };
+}
+
+/**
+ * Intenta resolver el texto de una llamada a un id calificado del módulo.
+ *
+ * Casos manejados, en orden:
+ *   1. `this.metodo(...)` dentro de una clase: se resuelve contra los
+ *      métodos de `callerClass` (receptor conocido).
+ *   2. `NombreClase.metodo(...)`: se resuelve contra `methodsByClass` si
+ *      `NombreClase` es una clase conocida del módulo (llamada estática o
+ *      a través del nombre de la clase).
+ *   3. `identificador_simple(...)`: se resuelve contra `bySimpleName`
+ *      (función top-level o método, ver limitación en `buildCallIndex`).
+ *   4. Cualquier otro caso (atributo de objeto de tipo desconocido, llamada
+ *      encadenada, símbolo importado, builtin, etc.): no se resuelve — se
+ *      devuelve null y el caller la descarta.
+ */
+function resolveCallTarget(
+  callText: string,
+  callerClass: string | null,
+  bySimpleName: Map<string, string>,
+  methodsByClass: Map<string, Map<string, string>>
+): string | null {
+  if (!callText.includes('.')) {
+    return bySimpleName.get(callText) ?? null;
+  }
+
+  const parts = callText.split('.');
+  if (parts.length !== 2) {
+    // Llamadas encadenadas (a.b.c(...)) o con subíndices no se resuelven:
+    // no hay suficiente información de tipos para saber el receptor real.
+    return null;
+  }
+
+  const [receiver, methodName] = parts;
+
+  if (receiver === 'this' && callerClass !== null) {
+    return methodsByClass.get(callerClass)?.get(methodName) ?? null;
+  }
+
+  if (methodsByClass.has(receiver)) {
+    return methodsByClass.get(receiver)!.get(methodName) ?? null;
+  }
+
+  return null;
+}
+
+/**
+ * Construye el grafo de invocaciones (llamada función/método -> función/
+ * método) dentro del propio módulo, a partir de los `calls` ya extraídos
+ * por `extractFunction` / `extractExportedArrowFunction` / `extractClass`.
+ *
+ * Cada entrada resuelta produce:
+ *   { source: <id del caller>, target: <id del callee>, kind: 'call', weight: N }
+ * donde `weight` es el número de veces que `source` invoca a `target`
+ * (llamadas repetidas al mismo target dentro del mismo caller se agregan,
+ * en vez de producir entradas duplicadas).
+ */
+function extractInvocations(classes: ClassInfo[], functions: FunctionInfo[]): Invocation[] {
+  const { bySimpleName, methodsByClass } = buildCallIndex(classes, functions);
+
+  // "source_id::target_id" -> weight
+  const weights = new Map<string, { source: string; target: string; weight: number }>();
+
+  function accumulate(sourceId: string, callerClass: string | null, calls: string[]): void {
+    for (const callText of calls) {
+      const targetId = resolveCallTarget(callText, callerClass, bySimpleName, methodsByClass);
+      if (targetId === null || targetId === sourceId) {
+        continue; // No resuelto, o recursión directa (se omite).
+      }
+      const key = `${sourceId}::${targetId}`;
+      const existing = weights.get(key);
+      if (existing) {
+        existing.weight += 1;
+      } else {
+        weights.set(key, { source: sourceId, target: targetId, weight: 1 });
+      }
+    }
+  }
+
+  for (const fn of functions) {
+    accumulate(fn.id, null, fn.calls);
+  }
+
+  for (const cls of classes) {
+    for (const m of cls.methods) {
+      if (!m.id) continue;
+      accumulate(m.id, cls.name, m.calls);
+    }
+  }
+
+  return Array.from(weights.values()).map(({ source, target, weight }) => ({
+    source,
+    target,
+    kind: 'call' as const,
+    weight,
+  }));
 }
 
 // ── Detector de llamadas HTTP externas ──
@@ -675,6 +831,9 @@ export async function parseTypeScriptFile(
     }
   });
 
+  // ── Invocations (grafo de llamadas intra-módulo) ──
+  const invocations = extractInvocations(classes, functions);
+
   // ── External calls ──
   const externalCalls = detectExternalCalls(sourceFile, moduleId);
 
@@ -747,7 +906,7 @@ export async function parseTypeScriptFile(
       },
     },
     dependencies,
-    invocations: [], // TODO: construir desde calls[] de FunctionInfo
+    invocations,
     externalCalls,
   };
 }

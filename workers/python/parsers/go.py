@@ -271,6 +271,7 @@ def _extract_classes_and_structures(
                                     ret_type = _node_text(ret_node, source) if ret_node else "void"
 
                                     methods.append({
+                                        "id": f"{module_id}::{raw_name}::{m_name}",
                                         "name": m_name,
                                         "visibility": _go_visibility(m_name),
                                         "isStatic": False,
@@ -282,6 +283,7 @@ def _extract_classes_and_structures(
                                         "cyclomaticComplexity": 1,
                                         "cognitiveComplexity": 0,
                                         "loc": 1,
+                                        "calls": [],  # method_spec de interfaz: sin body, nada que recorrer
                                         "decorators": [],
                                     })
                                     method_bodies.append(None)
@@ -318,11 +320,18 @@ def _extract_classes_and_structures(
 
 def _process_functions_and_methods(
     root, source: bytes, module_id: str, classes: list[dict[str, Any]]
-) -> list[dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], dict[str, str]]:
     """
     Procesa todas las funciones y métodos del archivo Go.
     Asocia métodos a sus estructuras (classes) correspondientes, y recopila
     las funciones globales del módulo.
+
+    Returns:
+        (global_functions, receiver_var_by_method_id) — el segundo es un
+        mapa id_de_método -> nombre de variable del receiver (ej. "c" en
+        `func (c *Circle) Area()`), necesario en _extract_invocations para
+        resolver llamadas `c.Metodo(...)` dentro de ese método, ya que Go
+        no tiene un literal fijo como "self"/"this".
     """
     global_functions: list[dict[str, Any]] = []
 
@@ -348,27 +357,16 @@ def _process_functions_and_methods(
             cog = cognitive_complexity(body, GO_COMPLEXITY_CONFIG) if body else 0
             loc = body.end_point[0] - body.start_point[0] + 1 if body else 1
 
-            method_info = {
-                "name": name,
-                "visibility": _go_visibility(name),
-                "isStatic": not is_method,
-                "isAbstract": False,
-                "isAsync": False,
-                "isConstructor": False, # En Go los constructores son funciones convencionales (ej: NewCircle)
-                "parameters": params,
-                "returnType": ret_type,
-                "cyclomaticComplexity": cc,
-                "cognitiveComplexity": cog,
-                "loc": loc,
-                "decorators": [],
-            }
+            # Llamadas dentro del body, necesarias para resolver `invocations`
+            # a nivel de módulo (ver _extract_call_names / _extract_invocations).
+            calls = _extract_call_names(body, source) if body else []
 
+            # Determinar receptor (se calcula antes de armar method_info para
+            # poder calificar su "id" con el nombre real del struct).
+            receiver_struct_name = ""
+            receiver_var_name = ""
             if is_method:
-                # Determinar receptor
                 receiver_node = child.child_by_field_name("receiver")
-                receiver_struct_name = ""
-                receiver_var_name = ""
-
                 if receiver_node:
                     # receiver_node es un parameter_list que contiene un parameter_declaration
                     # Ej: (c *Circle) o (c Circle)
@@ -387,6 +385,30 @@ def _process_functions_and_methods(
                                 # Si es un puntero (ej: *Circle), quitamos el '*'
                                 receiver_struct_name = t_str.lstrip("*")
 
+            qualified_id = (
+                f"{module_id}::{receiver_struct_name}::{name}"
+                if is_method and receiver_struct_name
+                else f"{module_id}::{name}"
+            )
+
+            method_info = {
+                "id": qualified_id,
+                "name": name,
+                "visibility": _go_visibility(name),
+                "isStatic": not is_method,
+                "isAbstract": False,
+                "isAsync": False,
+                "isConstructor": False, # En Go los constructores son funciones convencionales (ej: NewCircle)
+                "parameters": params,
+                "returnType": ret_type,
+                "cyclomaticComplexity": cc,
+                "cognitiveComplexity": cog,
+                "loc": loc,
+                "calls": calls,
+                "decorators": [],
+            }
+
+            if is_method:
                 # Asociar al struct
                 target_cls = class_map.get(receiver_struct_name)
                 if target_cls:
@@ -407,11 +429,17 @@ def _process_functions_and_methods(
                     "cyclomaticComplexity": cc,
                     "cognitiveComplexity": cog,
                     "loc": loc,
-                    "calls": [], # Opcional: llamadas locales
+                    "calls": calls,
                     "decorators": [],
                 })
 
-    # Calcular métricas de cohesión definitivas para cada struct
+    # Calcular métricas de cohesión definitivas para cada struct, y
+    # recolectar el nombre de variable del receiver de cada método (Go no
+    # usa un literal fijo como "self"/"this" — el nombre lo elige quien
+    # escribe el método, ej. `func (c *Circle) Area()` -> "c"). Se necesita
+    # más adelante para resolver `c.Metodo(...)` en _extract_invocations.
+    receiver_var_by_method_id: dict[str, str] = {}
+
     for cls in classes:
         if cls.get("isStruct"):
             methods_list = []
@@ -419,9 +447,11 @@ def _process_functions_and_methods(
             temp_data = cls.pop("temp_method_data", [])
 
             # Primero populamos los métodos y bodies
-            for m_info, m_body, _ in temp_data:
+            for m_info, m_body, r_var in temp_data:
                 methods_list.append(m_info)
                 bodies_list.append(m_body)
+                if m_info.get("id") and r_var:
+                    receiver_var_by_method_id[m_info["id"]] = r_var
 
             cls["methods"] = methods_list
 
@@ -446,7 +476,173 @@ def _process_functions_and_methods(
                 constructor_names=frozenset(), # Go no tiene constructores nativos OOP
             )
 
-    return global_functions
+    return global_functions, receiver_var_by_method_id
+
+
+# ── Extracción de Llamadas (para invocations) ──
+
+def _extract_call_names(body_node, source: bytes) -> list[str]:
+    """
+    Extrae el texto de cada llamada a función/método dentro de un cuerpo.
+
+    Reutiliza la misma forma de `call_expression` ya verificada en
+    `_detect_external_calls`: field `function`, tomado como texto libre.
+    En Go una llamada con receptor (`c.Metodo(...)`) es un
+    `selector_expression` (mismo tipo de nodo que usa
+    make_go_attribute_extractor para atributos) dentro de ese field — se
+    devuelve tal cual aparece en el código: "Funcion" (sin receptor),
+    "c.Metodo" (con receptor, donde "c" es el nombre real de variable, no
+    necesariamente el receiver — ver limitación en _resolve_call_target),
+    "pkg.Funcion" (llamada calificada por paquete importado).
+    """
+    calls: list[str] = []
+
+    def _visit(node):
+        if node.type == "call_expression":
+            func_node = node.child_by_field_name("function")
+            if func_node is not None:
+                calls.append(_node_text(func_node, source))
+        for child in node.children:
+            _visit(child)
+
+    if body_node is not None:
+        _visit(body_node)
+    return calls
+
+
+# ── Resolución de Invocations ──
+#
+# `calls` (ver _extract_call_names) captura el TEXTO crudo de cada llamada:
+# "Funcion" (global, sin receptor), "c.Metodo" (con receptor — "c" es el
+# nombre de variable usado en el código, sea el receiver del método o
+# cualquier otra variable local de tipo struct). Esta sección resuelve ese
+# texto contra las funciones/métodos conocidos del PROPIO archivo,
+# produciendo el arreglo "invocations". Llamadas a símbolos externos
+# (paquetes importados, variables de tipo desconocido) requerirían
+# inferencia de tipos — fuera del alcance de un parser de un solo archivo —
+# y se omiten en vez de adivinar.
+
+def _build_call_index(
+    classes: list[dict[str, Any]], functions: list[dict[str, Any]]
+) -> tuple[dict[str, str], dict[str, dict[str, str]]]:
+    """
+    Construye índices para resolver llamadas dentro del archivo:
+
+    - `by_simple_name`: nombre simple -> id calificado, para funciones
+      globales y métodos. Si el mismo nombre existe en varios structs, se
+      queda con el último visto — sin inferencia de tipos no hay forma de
+      saber a cuál pertenece un receptor de tipo desconocido.
+    - `methods_by_struct`: nombre de struct -> {nombre_metodo: id}, para
+      resolver `receiver.Metodo` cuando se conoce a qué struct pertenece
+      el método que está llamando (ver _resolve_call_target).
+    """
+    by_simple_name: dict[str, str] = {}
+    methods_by_struct: dict[str, dict[str, str]] = {}
+
+    for fn in functions:
+        by_simple_name[fn["name"]] = fn["id"]
+
+    for cls in classes:
+        struct_name = cls["name"]
+        methods_by_struct[struct_name] = {}
+        for m in cls.get("methods", []):
+            m_id = m.get("id")
+            if not m_id:
+                continue
+            methods_by_struct[struct_name][m["name"]] = m_id
+            by_simple_name[m["name"]] = m_id
+
+    return by_simple_name, methods_by_struct
+
+
+def _resolve_call_target(
+    call_text: str,
+    caller_struct: str | None,
+    caller_receiver_var: str,
+    by_simple_name: dict[str, str],
+    methods_by_struct: dict[str, dict[str, str]],
+) -> str | None:
+    """
+    Intenta resolver el texto de una llamada a un id calificado del
+    archivo. Casos manejados, en orden:
+
+      1. `receiver.Metodo(...)` donde `receiver` coincide EXACTAMENTE con
+         el nombre de variable del receiver de `caller` (ej. `c` en
+         `func (c *Circle) Area()`): se resuelve contra los métodos del
+         propio struct del caller. Este es el único caso con receptor que
+         se puede resolver con certeza, porque Go no tiene un literal fijo
+         como "self" — el nombre de variable es lo único disponible, y
+         solo es fiable cuando es precisamente el receiver del método que
+         contiene la llamada.
+      2. `Funcion(...)` sin receptor: función global o constructor
+         convencional (`NewCircle`), resuelta contra `by_simple_name`.
+      3. Cualquier otro caso con receptor (`otraVar.Metodo(...)`, incluida
+         una variable local de tipo struct distinta del receiver, o un
+         paquete importado como `pkg.Funcion`): no se resuelve — el tipo
+         de `otraVar` es desconocido sin inferencia de tipos, y no se
+         adivina.
+    """
+    if "." not in call_text:
+        return by_simple_name.get(call_text)
+
+    receiver, method_name = call_text.split(".", 1)
+
+    if caller_struct is not None and caller_receiver_var and receiver == caller_receiver_var:
+        return methods_by_struct.get(caller_struct, {}).get(method_name)
+
+    return None
+
+
+def _extract_invocations(
+    classes: list[dict[str, Any]],
+    functions: list[dict[str, Any]],
+    receiver_var_by_method_id: dict[str, str],
+) -> list[dict[str, Any]]:
+    """
+    Construye el grafo de invocaciones (función/método -> función/método)
+    dentro del propio archivo, a partir de los `calls` ya extraídos por
+    `_process_functions_and_methods`.
+
+    Cada entrada resuelta produce un dict:
+        {"source": <id del caller>, "target": <id del callee>,
+         "kind": "call", "weight": N}
+    donde `weight` es el número de veces que `source` invoca a `target`
+    (llamadas repetidas al mismo target dentro del mismo caller se agregan,
+    en vez de producir entradas duplicadas).
+    """
+    by_simple_name, methods_by_struct = _build_call_index(classes, functions)
+
+    # (source_id, target_id) -> weight
+    weights: dict[tuple[str, str], int] = {}
+
+    def _accumulate(
+        source_id: str, caller_struct: str | None, receiver_var: str, calls: list[str]
+    ):
+        for call_text in calls:
+            target_id = _resolve_call_target(
+                call_text, caller_struct, receiver_var, by_simple_name, methods_by_struct
+            )
+            if target_id is None or target_id == source_id:
+                continue  # No resuelto, o recursión directa (se omite).
+            key = (source_id, target_id)
+            weights[key] = weights.get(key, 0) + 1
+
+    for fn in functions:
+        _accumulate(fn["id"], None, "", fn.get("calls", []))
+
+    for cls in classes:
+        struct_name = cls["name"]
+        for m in cls.get("methods", []):
+            m_id = m.get("id")
+            if not m_id:
+                continue
+            receiver_var = receiver_var_by_method_id.get(m_id, "")
+            _accumulate(m_id, struct_name, receiver_var, m.get("calls", []))
+
+    return [
+        {"source": src, "target": tgt, "kind": "call", "weight": w}
+        for (src, tgt), w in weights.items()
+    ]
 
 
 # ── Detección de Llamadas HTTP Externas ──
@@ -521,8 +717,11 @@ def parse_go_file(
     # Extraer estructura base
     imports_data = _extract_imports(root, source)
     classes = _extract_classes_and_structures(root, source, module_id)
-    global_functions = _process_functions_and_methods(root, source, module_id, classes)
+    global_functions, receiver_var_by_method_id = _process_functions_and_methods(
+        root, source, module_id, classes
+    )
     external_calls = _detect_external_calls(root, source, module_id)
+    invocations = _extract_invocations(classes, global_functions, receiver_var_by_method_id)
 
     import_ids: list[str] = [imp["module"] for imp in imports_data]
 
@@ -580,7 +779,7 @@ def parse_go_file(
             {"source": module_id, "target": imp, "kind": "import", "weight": 1}
             for imp in set(import_ids)
         ],
-        "invocations": [],
+        "invocations": invocations,
         "externalCalls": external_calls,
         "rawImports": imports_data,
     }
