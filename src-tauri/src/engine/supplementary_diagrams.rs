@@ -8,7 +8,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::engine::amg::{
-    C4DiagramData, C4Edge, C4Node, Dependency, Module, ModuleType,
+    C4DiagramData, C4Edge, C4Node, Dependency, Invocation, Module, ModuleType,
 };
 
 pub struct SupplementaryDiagrams;
@@ -18,6 +18,7 @@ impl SupplementaryDiagrams {
     pub fn generate_all(
         modules: &[Module],
         dependencies: &[Dependency],
+        invocations: &[Invocation],
     ) -> HashMap<String, C4DiagramData> {
         let mut diagrams = HashMap::new();
 
@@ -34,6 +35,26 @@ impl SupplementaryDiagrams {
         diagrams.insert(
             "supplementary:er-diagram".to_string(),
             generate_er_diagram(modules),
+        );
+
+        diagrams.insert(
+            "supplementary:call-graph".to_string(),
+            generate_call_graph(modules, invocations),
+        );
+
+        diagrams.insert(
+            "supplementary:sequence-diagram".to_string(),
+            generate_sequence_diagram(modules, invocations),
+        );
+
+        diagrams.insert(
+            "supplementary:dynamic-diagram".to_string(),
+            generate_dynamic_diagram(modules, invocations),
+        );
+
+        diagrams.insert(
+            "supplementary:dfd-diagram".to_string(),
+            generate_dfd_diagram(modules, invocations),
         );
 
         diagrams
@@ -273,6 +294,184 @@ fn generate_er_diagram(modules: &[Module]) -> C4DiagramData {
                     protocol: Some("FK / Association".to_string()),
                 });
             }
+        }
+    }
+
+    C4DiagramData { nodes, edges }
+}
+
+// ============================================================================
+// 4. Grafo de Llamadas (Call Graph) — §4.4.5
+// ============================================================================
+
+fn generate_call_graph(modules: &[Module], invocations: &[Invocation]) -> C4DiagramData {
+    let mut nodes = Vec::new();
+    let mut edges = Vec::new();
+
+    let mut added_nodes: HashSet<String> = HashSet::new();
+
+    for m in modules {
+        for fn_info in &m.functions {
+            let id = if fn_info.id.is_empty() {
+                format!("{}::{}", m.id, fn_info.name)
+            } else {
+                fn_info.id.clone()
+            };
+
+            if added_nodes.insert(id.clone()) {
+                nodes.push(C4Node {
+                    id,
+                    label: format!("{}()", fn_info.name),
+                    element_type: "Function".to_string(),
+                    technology: format!("{:?}", m.language),
+                    description: format!("Module: {}", m.name),
+                    amg_node_id: Some(m.id.clone()),
+                });
+            }
+        }
+
+        for cls in &m.classes {
+            for method in &cls.methods {
+                let id = format!("{}::{}::{}", m.id, cls.name, method.name);
+                if added_nodes.insert(id.clone()) {
+                    nodes.push(C4Node {
+                        id,
+                        label: format!("{}::{}()", cls.name, method.name),
+                        element_type: "Method".to_string(),
+                        technology: format!("{:?}", m.language),
+                        description: format!("Class: {}, Module: {}", cls.name, m.name),
+                        amg_node_id: Some(m.id.clone()),
+                    });
+                }
+            }
+        }
+    }
+
+    for inv in invocations {
+        edges.push(C4Edge {
+            source: inv.source.clone(),
+            target: inv.target.clone(),
+            label: format!("calls (x{})", inv.weight),
+            protocol: None,
+        });
+    }
+
+    C4DiagramData { nodes, edges }
+}
+
+// ============================================================================
+// 5. Diagrama de Secuencia (Sequence Diagram, UML) — §4.4.5
+// ============================================================================
+
+fn generate_sequence_diagram(_modules: &[Module], invocations: &[Invocation]) -> C4DiagramData {
+    let mut nodes = Vec::new();
+    let mut edges = Vec::new();
+
+    let mut participants: HashSet<String> = HashSet::new();
+
+    for inv in invocations {
+        participants.insert(inv.source.clone());
+        participants.insert(inv.target.clone());
+    }
+
+    for p in &participants {
+        nodes.push(C4Node {
+            id: p.clone(),
+            label: p.split("::").last().unwrap_or(p).to_string(),
+            element_type: "Participant".to_string(),
+            technology: "UML Lifeline".to_string(),
+            description: format!("Call participant: {}", p),
+            amg_node_id: None,
+        });
+    }
+
+    for (step, inv) in invocations.iter().enumerate() {
+        edges.push(C4Edge {
+            source: inv.source.clone(),
+            target: inv.target.clone(),
+            label: format!("{}: call()", step + 1),
+            protocol: Some("Sync".to_string()),
+        });
+    }
+
+    C4DiagramData { nodes, edges }
+}
+
+// ============================================================================
+// 6. Diagrama Dinámico (Dynamic Diagram, C4) — §4.4.5
+// ============================================================================
+
+fn generate_dynamic_diagram(modules: &[Module], invocations: &[Invocation]) -> C4DiagramData {
+    let mut nodes = Vec::new();
+    let mut edges = Vec::new();
+
+    let mut component_ids: HashSet<String> = HashSet::new();
+
+    for m in modules {
+        component_ids.insert(m.id.clone());
+        nodes.push(C4Node {
+            id: m.id.clone(),
+            label: m.name.clone(),
+            element_type: "Dynamic Component".to_string(),
+            technology: format!("{:?}", m.language),
+            description: format!("LOC: {}", m.loc),
+            amg_node_id: Some(m.id.clone()),
+        });
+    }
+
+    for (idx, inv) in invocations.iter().enumerate() {
+        let src_mod = inv.source.split("::").next().unwrap_or(&inv.source);
+        let tgt_mod = inv.target.split("::").next().unwrap_or(&inv.target);
+
+        if component_ids.contains(src_mod) && component_ids.contains(tgt_mod) {
+            edges.push(C4Edge {
+                source: src_mod.to_string(),
+                target: tgt_mod.to_string(),
+                label: format!("{}: dynamic interaction", idx + 1),
+                protocol: None,
+            });
+        }
+    }
+
+    C4DiagramData { nodes, edges }
+}
+
+// ============================================================================
+// 7. Diagrama de Flujo de Datos (DFD) — §4.4.5
+// ============================================================================
+
+fn generate_dfd_diagram(modules: &[Module], invocations: &[Invocation]) -> C4DiagramData {
+    let mut nodes = Vec::new();
+    let mut edges = Vec::new();
+
+    for m in modules {
+        let element_type = if m.module_type == ModuleType::Model {
+            "Data Store"
+        } else {
+            "Process"
+        };
+
+        nodes.push(C4Node {
+            id: m.id.clone(),
+            label: m.name.clone(),
+            element_type: element_type.to_string(),
+            technology: format!("{:?}", m.language),
+            description: format!("{:?} Module", m.module_type),
+            amg_node_id: Some(m.id.clone()),
+        });
+    }
+
+    for inv in invocations {
+        let src_mod = inv.source.split("::").next().unwrap_or(&inv.source);
+        let tgt_mod = inv.target.split("::").next().unwrap_or(&inv.target);
+
+        if src_mod != tgt_mod {
+            edges.push(C4Edge {
+                source: src_mod.to_string(),
+                target: tgt_mod.to_string(),
+                label: "data flow".to_string(),
+                protocol: None,
+            });
         }
     }
 

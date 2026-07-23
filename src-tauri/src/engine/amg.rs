@@ -554,8 +554,22 @@ pub struct Dependency {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Invocation {
-    pub caller: String,
-    pub callee: String,
+    #[serde(alias = "caller")]
+    pub source: String,
+    #[serde(alias = "callee")]
+    pub target: String,
+    #[serde(default = "default_call_kind")]
+    pub kind: String,
+    #[serde(default = "default_weight")]
+    pub weight: u32,
+}
+
+fn default_call_kind() -> String {
+    "call".to_string()
+}
+
+fn default_weight() -> u32 {
+    1
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

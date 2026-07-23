@@ -71,8 +71,9 @@
 //! - No detecta antipatrones, ni genera Containers/ExternalSystems/Actors/
 //!   diagramas C4 (§4.4, §4.6) — estructuras placeholder vacías en
 //!   `amg.rs`, sin lógica de detección en ningún lado todavía.
-//! - No resuelve el call graph (`invocations`) — ningún parser Python lo
-//!   emite todavía (`invocations: []` siempre).
+//! - El call graph (`invocations`) se recolecta de los workers y se pasa
+//!   a los generadores de diagramas suplementarios (Call Graph, Sequence,
+//!   Dynamic, DFD). La resolución es intra-módulo (ver parsers).
 //! - `quantumCount` y `fitnessScore` (§4.3.6, §7) quedan en 0 — dependen
 //!   de sistemas (Architecture Quanta, Fitness Functions/Rules) no
 //!   implementados en ningún punto del pipeline.
@@ -93,8 +94,8 @@ use std::collections::{HashMap, HashSet};
 
 use crate::engine::amg::{
     Actor, Antipattern, AntipatternType, ArchStyle, C4Models, Container, Dependency, ExternalCall,
-    ExternalSystem, Language, Module, ModuleMetrics, ModuleType, ProjectMetrics, ProjectType,
-    Severity, WorkerAnalysisResult,
+    ExternalSystem, Invocation, Language, Module, ModuleMetrics, ModuleType, ProjectMetrics,
+    ProjectType, Severity, WorkerAnalysisResult,
 };
 use crate::engine::c4_generator::C4Generator;
 use crate::engine::go_module_roots::GoModuleInfo;
@@ -379,10 +380,12 @@ impl Aggregator {
 
         let (detected_style, style_confidence) = detect_architecture_style(&modules);
 
-        // ── Acumular llamadas externas ──
+        // ── Acumular llamadas externas e invocations ──
         let mut raw_external_calls: Vec<ExternalCall> = Vec::new();
+        let mut all_invocations: Vec<Invocation> = Vec::new();
         for r in &worker_results {
             raw_external_calls.extend(r.external_calls.clone());
+            all_invocations.extend(r.invocations.clone());
         }
 
         // ── Detección de antipatrones ──
@@ -400,12 +403,10 @@ impl Aggregator {
         // `antipatterns` se pasa aquí para que el diagrama suplementario de
         // dependencias circulares reutilice los `cycle_path` EXACTOS que ya
         // calculó `detect_circular_dependencies` (Tarjan + DFS) en vez de
-        // recalcular "candidatos a ciclo" con una heurística propia — antes
-        // `generate_circular_dependencies_diagram` filtraba por
-        // `Ce > 0 && Ca > 0`, una condición necesaria pero NO suficiente
-        // (un módulo puede tener entrada y salida de dependencias sin
-        // participar en ningún ciclo real), lo que podía mostrar módulos
-        // que la propia detección de antipatrones no consideraba cíclicos.
+        // recalcular "candidatos a ciclo" con una heurística propia.
+        //
+        // `all_invocations` se pasa para generar los diagramas basados en
+        // traza: Call Graph, Sequence Diagram, Dynamic Diagram, DFD.
         let c4_output = C4Generator::generate(
             "Project",
             ProjectType::Desktop, // Se actualiza en compile_amg con el project_type detectado
@@ -414,6 +415,7 @@ impl Aggregator {
             &resolved_dependencies,
             &raw_external_calls,
             &antipatterns,
+            &all_invocations,
         );
 
         AggregatedProject {

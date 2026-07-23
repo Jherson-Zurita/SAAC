@@ -33,7 +33,7 @@ Estas son diferencias **deliberadas y documentadas**, no descuidos — el plan d
 | Lo que dice la especificación | Lo que existe hoy | Cómo lo maneja este plan |
 |---|---|---|
 | Nivel 4 (Código) es parte de `c4Models` | Nivel 4 es una función bajo demanda, **no expuesta como comando Tauri todavía** — `generate_module_code_diagram` vive en Rust pero no tiene wrapper `#[tauri::command]` | El plan incluye como tarea previa (Fase 1) exponer `generate_module_code_diagram` como comando, antes de construir la UI de drill-down a Nivel 4 |
-| Call Graph, Sequence Diagram, Dynamic Diagram, DFD (§4.4, diagramas 15-18) | Bloqueados: ningún parser emite `invocations` | Estas 4 vistas **no se implementan** en este plan; el menú de diagramas las muestra deshabilitadas con tooltip explicativo, no rotas ni ausentes sin explicación |
+| Call Graph, Sequence Diagram, Dynamic Diagram, DFD (§4.4, diagramas 15-18) | ✅ **100% Implementado**: los parsers emiten `invocations` y Rust genera sus grafos suplementarios | Se implementan normalmente en la UI como vistas suplementarias interactivas en ReactFlow |
 | `AnalysisRun`/`History`/versionado AMG (§3.2, §3.4) | `analyze_project` genera un AMG nuevo cada vez, sin persistir un historial navegable ni calcular `AMGDelta` | El Downbar → "Historial de Análisis" (§5.1.5) se implementa en versión reducida: lista de análisis corridos **en la sesión actual** (estado de Zustand, no persistido), sin comparación de versiones |
 | `Rule`/`FitnessEvaluation`/Fitness Score (§7, Status Bar §5.1.6) | No implementado en Rust | El indicador de Fitness Score en la Status Bar se **omite** de este plan hasta que exista el motor de reglas |
 | `ADR`, `Risk`, `Annotation` persistidos en `saac.annotations.json` (§5.4, §5.6) | No implementado en Rust — no hay comando para leer/escribir ese archivo | Botón "Ignorar" en Antipatrones y anotaciones en C4 quedan como **UI presente pero deshabilitada** con nota "Próximamente", en vez de fingir que persiste |
@@ -201,8 +201,8 @@ Construir la estructura completa de §5.1 con paneles colapsables/redimensionabl
 1. `C4Viewer` con breadcrumb de navegación (Contexto→Contenedores→Componentes→Código) sobre `amg.c4Models`.
 2. Nodos custom de ReactFlow por tipo de elemento C4 (Person, Software System, Container, Component).
 3. Drill-down a Nivel 4 vía el comando expuesto en Fase 0 (`get_module_code_diagram`), al hacer doble clic en un componente.
-4. `PackageDiagramView` / `InheritanceTreeView` / `ErDiagramView`: mismo motor `C4Canvas`, alimentados desde `c4Models.componentDiagrams["supplementary:*"]`.
-5. Menú de selección de diagrama (Toolbar) incluye las 4 vistas bloqueadas (Call Graph, Sequence, Dynamic, DFD) **deshabilitadas** con tooltip "Requiere análisis de invocaciones — no disponible en esta versión" (ver brecha 0.3), en vez de omitirlas silenciosamente.
+4. `PackageDiagramView` / `InheritanceTreeView` / `ErDiagramView` / `CallGraphView` / `SequenceDiagramView` / `DynamicDiagramView` / `DfdDiagramView`: mismo motor `C4Canvas`, alimentados desde `c4Models.componentDiagrams["supplementary:*"]` que genera el backend con las invocaciones resueltas.
+5. El menú de selección de diagrama (Toolbar) habilita y permite alternar entre **todos** los 12 diagramas de backend disponibles (C4 Niveles 1-3, Módulos Circulares, Paquetes, Herencia, ER, Call Graph, Sequence, Dynamic y DFD).
 6. Exportación: solo JSON del diagrama activo en esta fase (ver brecha 0.3).
 
 ### Fase 5 — Antipatrones (§5.6)

@@ -139,79 +139,78 @@ SAAC/
 * **Ciclos de Dependencia**: Implementa el algoritmo SCC de Tarjan para detectar componentes fuertemente conexas, más un DFS adicional para extraer la ruta exacta (`cycle_path`) de cada ciclo, normalizada por rotación lexicográfica para consolidar duplicados.
 * **Detección de Antipatrones de Arquitectura (`aggregator.rs`)**:
   * **God Module**: Módulos con $Ce > 15$ o que concentran $> 20\%$ de todas las dependencias del proyecto.
-  * **Circular Dependency**: Ciclos reales extraídos vía Tarjan + DFS, con rutas completas (`cycle_path`), normalización rotacional y punto de ruptura sugerido.
-  * **Layer Violation**: Diseño híbrido — clasifica el nivel/rango del módulo primero por su `ModuleType` (fuente de verdad alineada con la UI), y si es `Unknown` o no mapeado, aplica fallback por coincidencia de palabras clave en carpetas.
+  * **Java**: Traduce imports de paquetes contra las raíces de fuentes detectadas.
+  * **Go**: Mapea imports lógicos de módulos vía `go.mod`.
+  * **Rust**: Resuelve imports `use crate::...` o `use my_crate::...`.
+* **Métricas Globales**: Calcula acoplamiento Aferente ($Ca$), Eferente ($Ce$), Instabilidad ($I$), Cohesión de Módulo y la Distancia a la Secuencia Principal ($D$).
+* **Ciclos de Dependencia**: Implementa el algoritmo SCC de Tarjan para detectar componentes fuertemente conexas.
+* **Detección de Antipatrones de Arquitectura (`aggregator.rs`)**: God Module, Circular Dependency, Layer Violation.
 * **Generación de Diagramas C4 (`c4_generator.rs`)** — **Niveles 1 a 4 completos**:
   * **Inferencia de Elementos**: Detecta `Actor` (Admin User / Public User / User) por presencia de controladores, y `ExternalSystem` (APIs HTTP, bases de datos) acumulando los `external_calls` reales emitidos por los workers Python y Node.
   * **Nivel 1 (Contexto)**: Mapa del sistema central interactuando con actores y sistemas externos.
-  * **Nivel 2 (Contenedores)**: Infiere unidades desplegables dinámicas (ej. para Tauri crea Frontend SPA y Core Engine Backend).
-  * **Nivel 3 (Componentes)**: Desglosa cada contenedor en sus módulos constituyentes y sus relaciones de dependencia.
-  * **Nivel 4 (Código / UML bajo demanda)**: `generate_module_code_diagram` transforma las clases (`ClassInfo`) e interfaces de un módulo individual en subgrafos UML con sus herencias (`extends`/`implements`) — resolución intencionalmente limitada al propio módulo (ver Inheritance Tree para resolución cross-módulo).
-  * **Diagrama Suplementario de Módulos Circulares**: Reutiliza los `cycle_path` exactos de los antipatrones ya detectados (Tarjan + DFS), en vez de una heurística de Ce/Ca separada que podía desincronizarse de la lista de antipatrones real.
+  * **Nivel 2 (Contenedores)**: Infiere unidades desplegables dinámicas.
+  * **Nivel 3 (Componentes)**: Desglosa cada contenedor en sus módulos constituyentes.
+  * **Nivel 4 (Código / UML bajo demanda)**: `generate_module_code_diagram` transforma las clases en subgrafos UML.
+  * **Diagrama Suplementario de Módulos Circulares**: Reutiliza los `cycle_path` exactos de los antipatrones ya detectados.
 * **Diagramas Suplementarios Adicionales (`supplementary_diagrams.rs`)** — **Completo**:
-  * **Package Diagram**: Agrupa módulos por directorio contenedor completo (jerarquía completa, no solo el segmento inmediato — corregido para que sub-paquetes anidados como `services/billing` y `services/shipping` no aparezcan como paquetes sin relación entre sí) y agrega las dependencias cruzadas entre paquetes.
-  * **Inheritance Tree**: Construye la jerarquía de herencia (`extends`/`implements`) a nivel de **todo el proyecto**, resolviendo relaciones cross-módulo (clase base e hija en archivos distintos) — a diferencia del Nivel 4 de C4, que es intra-módulo por diseño.
-  * **ER Diagram**: Identifica entidades (`ModuleType::Model` o carpetas `models/`/`entities/`/`domain/`) y detecta relaciones por coincidencia de tipo de atributo contra nombres de entidad conocidos.
-* **Integración de IA Local (`ai_client.rs`)** — **Completo (Mock verificado; Ollama/OpenAI-Compatible reales sin probar contra servidor real)**:
-  * **`AiConfig` flexible**: soporta proveedor `Ollama` (default, `http://localhost:11434`), `OpenAiCompatible` (LM Studio, vLLM, cualquier endpoint compatible) y `Mock` (modo de prueba/offline, sin red).
-  * **`check_ai_status`**: ping ligero (timeout 5s) a `/api/tags` (Ollama) o `/models` (OpenAI-Compatible) para reportar si el servidor está online y qué modelos hay disponibles.
-  * **`build_prompt`**: construye system+user prompt inyectando contexto real del AMG según 3 modos — `FullAmg` (métricas globales, estilo, antipatrones), `ModuleDetail` (clases, acoplamiento, imports de un módulo puntual) y `AntipatternDetail` (descripción, ruta de ciclo, sugerencia de refactor de un antipatrón puntual).
-  * **`ask`**: envía la consulta real vía `/api/chat` (Ollama) o `/chat/completions` (OpenAI-Compatible) con timeout configurable (default 60s); si el proveedor es `Mock` o el servidor no responde, retorna un **fallback elegante** — respuesta estructurada marcada explícitamente (`isMockFallback: true`) que incluye el contexto ya construido, para que la UI y las pruebas nunca se rompan por falta de un LLM corriendo.
-  * **Modo CLI de testing (`--ask-ai-mock <prompt>`)**: ejercita `AiClient::ask` en modo `Mock` de forma aislada (sin Tauri, sin workers, sin red), permitiendo verificar el flujo real de construcción de prompt y respuesta sin depender de infraestructura externa.
+  * **Package Diagram**: Agrupa módulos por directorio contenedor completo y agrega dependencias cruzadas.
+  * **Inheritance Tree**: Construye la jerarquía de herencia (`extends`/`implements`) a nivel de **todo el proyecto**.
+  * **ER Diagram**: Identifica entidades y detecta relaciones por coincidencia de tipo de atributo contra nombres de entidad conocidos.
+  * **Call Graph (Grafo de Llamadas)**: Mapea las llamadas función-a-función y método-a-método dentro y entre módulos a partir de los `invocations` resueltos por los parsers.
+  * **Sequence Diagram (Diagrama de Secuencia UML)**: Genera la secuencia ordenada de llamadas entre participantes (clases, funciones, módulos) con numeración de pasos y líneas de vida.
+  * **Dynamic Diagram (Diagrama Dinámico C4)**: Muestra la interacción en tiempo de ejecución entre componentes dinámicos ordenados por el flujo de invocaciones.
+  * **Diagrama de Flujo de Datos (DFD)**: Clasifica los módulos en procesos y almacenes de datos (*Data Stores*), trazando los flujos de datos según la dirección de las invocaciones.
+* **Integración de IA Local (`ai_client.rs`)** — **Completo**:
+  * **`AiConfig` flexible**: soporta `Ollama`, `OpenAiCompatible` y `Mock`.
+  * **`check_ai_status`**: ping ligero para reportar disponibilidad de servidores.
+  * **`build_prompt`**: construcción contextual según modos (`FullAmg`, `ModuleDetail`, `AntipatternDetail`).
+  * **`ask`**: envío de consultas con timeout y **fallback elegante** para modo Mock.
+  * **Modo CLI de testing (`--ask-ai-mock <prompt>`)**: ejercita el flujo sin red.
 
 ### 2. Capa de Workers AST (Node.js & Python) — **100% Completado y Funcional**
 
-* **Protocolo de comunicación**: Basado en JSON-Lines a través de StdIn y StdOut estándar. Implementa chunking de archivos e hilos paralelos de monitoreo.
-* **Worker Node**: Compilado y listo para analizar código TypeScript y JavaScript.
-* **Worker Python**: Emplea `tree-sitter-language-pack` para parsear Python, Java, Kotlin, C#, Swift, Go y Rust de forma nativa sin requerir descargas ni compilaciones en tiempo de ejecución.
-* **Corrección Go**: Se ajustó `parsers/go.py` para permitir la correcta extracción sintáctica de imports escritos en una sola línea.
-* **Corrección Python — tipos de atributos anotados**: `parsers/python.py` ahora extrae el tipo real de atributos de instancia con anotación explícita (`self.x: Tipo = valor`), en vez de reportar siempre `"any"`. Esto habilita relaciones precisas en el ER Diagram y cualquier otro consumidor que dependa de `AttributeInfo.type`.
+* **Protocolo de comunicación**: Basado en JSON-Lines a través de StdIn y StdOut.
+* **Worker Node**: Compilado y listo para analizar código TypeScript y JavaScript. Soporta extracción completa de `invocations` intra-módulo (`extractCallNames` + `extractInvocations`).
+* **Worker Python**: Emplea `tree-sitter-language-pack` para parsear Python, Java, Kotlin, C#, Swift, Go y Rust.
+* **Extracción de `invocations` en los 8 Lenguajes**: Implementado en todos los parsers AST (`python.py`, `java.py`, `kotlin.py`, `csharp.py`, `go.py`, `rust.py`, `swift.py`, `typescript.ts`), resolviendo llamadas implícitas (`this`/`self`), llamadas por nombre de clase/struct y funciones top-level.
+* **Corrección Go/Python**: Ajustes en `parsers/go.py` para imports en una línea y en `parsers/python.py` para tipos de atributos anotados.
 
 ### 3. Suite de Pruebas (Python E2E) — **100% Verificado e Integrado**
 
-* **Contratos (`test_worker_contract.py`)**: Valida que los comandos `parse` y `analyze` funcionen correctamente en los workers y cumplan la especificación.
-* **Pipeline General (`test_analyze_project.py`)**: Verifica que `cargo check` compile, que el sistema ignore adecuadamente según `.gitignore` y carpetas típicas (`node_modules`), filtre archivos de más de 1MB, y aplique la **cancelación cooperativa** abortando entre chunks (usando el binario real vía `--analyze-project-json --cancel-after-ms`).
-* **Resoluciones (`test_resolved_imports.py`)**: Genera un monorepo temporal con módulos en Java, Go y Rust y afirma que cada import absoluto se asocia correctamente a su nodo destino en el AMG.
-* **Antipatrones (`test_antipatterns.py`)**: Valida la generación e identificación exacta de ciclos (con `cycle_path`), violaciones de capas en estilo Layered, y módulos gigantes.
-* **Diagramas C4 (`test_c4_diagrams.py`)**: Valida la inferencia de actores, sistemas externos, contenedores, y los Niveles 1-3 de diagramas C4 con sus relaciones.
-* **Diagramas Suplementarios (`test_supplementary_diagrams.py`)**: Valida Package Diagram (incluyendo agrupación correcta de sub-paquetes anidados), Inheritance Tree (incluyendo resolución de herencia cross-módulo), y ER Diagram (incluyendo relaciones por tipo de atributo anotado).
-* **Integración de IA (`test_ai_integration.py`)**: Verifica compilación con `reqwest`, que `analyze_project` no sufrió regresiones, y ejecuta `AiClient::ask` REAL en modo `Mock` (vía `--ask-ai-mock`) validando `isMockFallback`, `providerUsed`, contenido de respuesta no vacío, y que el prompt del usuario se refleje en `generatedPrompt`.
+* **Contratos/Pipeline/Resoluciones/Antipatrones/Diagramas**: Suites completas que validan desde el contrato de workers hasta la generación de diagramas complejos (C4, Paquetes, Herencia, ER, Call Graph, Secuencia, Dinámico, DFD).
+* **Integración de IA**: Validación de `AiClient::ask` real con `isMockFallback`, `providerUsed` y `generatedPrompt`.
 
 ---
 
 ## 🗺️ Estado del Roadmap de Diagramas (§4.4.1–§4.4.9, 19 vistas totales)
 
-| #   | Diagrama                                          | Estado　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　 |
-| -----| ---------------------------------------------------| --------------------------------------------------------------------------------------------------|
-| 1   | Contexto del Sistema (C4 Nivel 1)                 | ✅ Backend　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　|
-| 2   | Contenedores (C4 Nivel 2)                         | ✅ Backend　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　|
-| 3   | Componentes (C4 Nivel 3)                          | ✅ Backend　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　|
-| 4   | Código / UML de Módulo (C4 Nivel 4, bajo demanda) | ✅ Backend　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　|
-| 5   | Módulos Circulares                                | ✅ Backend　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　|
-| 6   | Diagrama de Paquetes                              | ✅ Backend　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　|
-| 7   | Árbol de Herencia                                 | ✅ Backend　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　|
-| 8   | Diagrama Entidad-Relación                         | ✅ Backend　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　|
-| 9   | Mapa de Calor de Acoplamiento (Coupling Matrix)   | ❓ Por confirmar si ya existe una fuente de datos dedicada　　　　　　　　　　　　　　　　　　　　|
-| 10  | Deployment Diagram                                | ❓ Alcanzable con datos actuales (`docker-compose.yml`/k8s), sin decisión tomada aún　　　　　　　|
-| 11  | Árbol de Directorios (File Tree)                  | 🎨 Frontend puro, sin trabajo de Rust pendiente　　　　　　　　　　　　　　　　　　　　　　　　　|
-| 12  | Mapa de Carpetas (Treemap D3)                     | 🎨 Frontend puro　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　 |
-| 13  | Línea de Tiempo de Evolución                      | 🎨 Frontend + snapshots ya cacheados en sled　　　　　　　　　　　　　　　　　　　　　　　　　　 |
-| 14  | Mapa de Calor de Contribuciones (Ownership)       | 🎨 Frontend + `git log`/`git blame`　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　|
-| 15  | Dynamic Diagram                                   | ⏸️ Bloqueado: requiere `invocations` (call graph), que ningún parser emite todavía　　　　　　　　|
-| 16  | Call Graph                                        | ⏸️ Bloqueado: ídem　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　|
-| 17  | Diagrama de Secuencia                             | ⏸️ Bloqueado: ídem　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　|
-| 18  | Diagrama de Flujo de Datos (DFD)                  | ⏸️ Bloqueado: ídem, más seguimiento de flujo de variables　　　　　　　　　　　　　　　　　　　　 |
+| #   | Diagrama                                          | Estado                                                             |
+| -----| ---------------------------------------------------| -------------------------------------------------------------------|
+| 1   | Contexto del Sistema (C4 Nivel 1)                 | ✅ Backend                                                         |
+| 2   | Contenedores (C4 Nivel 2)                         | ✅ Backend                                                         |
+| 3   | Componentes (C4 Nivel 3)                          | ✅ Backend                                                         |
+| 4   | Código / UML de Módulo (C4 Nivel 4, bajo demanda) | ✅ Backend                                                         |
+| 5   | Módulos Circulares                                | ✅ Backend                                                         |
+| 6   | Diagrama de Paquetes                              | ✅ Backend                                                         |
+| 7   | Árbol de Herencia                                 | ✅ Backend                                                         |
+| 8   | Diagrama Entidad-Relación                         | ✅ Backend                                                         |
+| 9   | Mapa de Calor de Acoplamiento (Coupling Matrix)   | ❓ Por confirmar si ya existe una fuente de datos dedicada         |
+| 10  | Deployment Diagram                                | ❓ Alcanzable con datos actuales (`docker-compose.yml`/k8s), sin decisión tomada aún |
+| 11  | Árbol de Directorios (File Tree)                  | 🎨 Frontend puro, sin trabajo de Rust pendiente                    |
+| 12  | Mapa de Carpetas (Treemap D3)                     | 🎨 Frontend puro                                                   |
+| 13  | Línea de Tiempo de Evolución                      | 🎨 Frontend + snapshots ya cacheados en sled                       |
+| 14  | Mapa de Calor de Contribuciones (Ownership)       | 🎨 Frontend + `git log`/`git blame`                                |
+| 15  | Dynamic Diagram                                   | ✅ Backend (`supplementary:dynamic-diagram` vía `invocations`)     |
+| 16  | Call Graph                                        | ✅ Backend (`supplementary:call-graph` vía `invocations`)          |
+| 17  | Diagrama de Secuencia                             | ✅ Backend (`supplementary:sequence-diagram` vía `invocations`)    |
+| 18  | Diagrama de Flujo de Datos (DFD)                  | ✅ Backend (`supplementary:dfd-diagram` vía `invocations`)         |
 | 19  | System Landscape                                  | ❓ Requiere soporte multi-proyecto, no implementado en `analyze_project` (recibe un único `path`) |
-
-**Nota sobre los bloqueados (15-18)**: todos dependen de que los parsers AST extraigan `invocations` (qué función llama a qué función, no solo qué archivo importa a qué archivo). Hoy todos los parsers emiten `"invocations": []`. Implementarlo es un esfuerzo comparable al del resto del motor de agregación junto (resolución de llamadas por lenguaje, con las mismas ambigüedades de nombres que los imports pero multiplicadas por la frecuencia de nombres de método comunes). Se pospone deliberadamente hasta que haya señal real de demanda de estos diagramas específicos.
 
 ---
 
 ## 📈 Siguientes Hitos y Roadmap Técnico
 
-Con la infraestructura core, la detección de antipatrones, el motor de diagramas C4 (Niveles 1-4), los Diagramas Suplementarios (Paquetes/Herencia/ER) y la Integración de IA Local (Mock verificado) finalizados y verificados con tests E2E, las siguientes fases de desarrollo implican:
+Con la infraestructura core, la detección de antipatrones, los diagramas C4 (Niveles 1-4), los Diagramas Suplementarios (Paquetes, Herencia, ER, Call Graph, Secuencia, Dinámico, DFD) y la extracción de `invocations` en los 8 lenguajes completamente listos:
 
-1. **Desarrollo del Frontend (React + TS)** — **siguiente prioridad**: Reemplazar el layout por defecto de la interfaz con los paneles interactivos de SAAC v2.0, integrando el flujo de estados Zustand para mostrar las métricas, la lista de dependencias y el visor gráfico del AMG (incluyendo los diagramas 100% frontend: File Tree, Treemap, Timeline, Ownership Map) y la interfaz de consulta con `ask_ai`/`check_ai_status`.
-2. **Cabos sueltos de diagramas** (bajo esfuerzo, opcional): confirmar/implementar Coupling Matrix Data y evaluar si Deployment Diagram entra en el alcance actual.
-3. **Verificación de IA contra servidor real**: `check_ai_status`/`ask_ai` en modo `Ollama`/`OpenAiCompatible` compilan y siguen el diseño correcto, pero no se han probado contra un servidor LLM real corriendo en la máquina — pendiente cuando haya uno disponible para pruebas.
-4. **(Futuro, sin priorizar)** Extracción de `invocations` por lenguaje, para desbloquear Call Graph, Secuencia, Dynamic Diagram y DFD.
+1. **Desarrollo del Frontend (React + TS)** — **siguiente prioridad**: Construir el AppShell tipo IDE y los paneles interactivos de SAAC v2.0 (Dashboard, visualizador ReactFlow para C4 y diagramas suplementarios, tablas TanStack Table, panel de antipatrones y chat de IA).
+2. **Verificación de IA contra servidor real**: `check_ai_status`/`ask_ai` en modo `Ollama`/`OpenAiCompatible` compilan y siguen el diseño correcto, pero no se han probado contra un servidor LLM real corriendo en la máquina — pendiente cuando haya uno disponible para pruebas.

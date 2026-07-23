@@ -11,7 +11,7 @@ use std::collections::{HashMap, HashSet};
 use crate::engine::amg::{
     Actor, Antipattern, AntipatternType, ArchStyle, C4DiagramData, C4Edge, C4Models, C4Node,
     Container, ContainerType, Dependency, ExternalCall, ExternalProtocol, ExternalSystem,
-    ExternalSystemType, Language, Module, NodeType, ProjectType,
+    ExternalSystemType, Invocation, Language, Module, NodeType, ProjectType,
 };
 use crate::engine::supplementary_diagrams::SupplementaryDiagrams;
 
@@ -41,11 +41,12 @@ impl C4Generator {
         dependencies: &[Dependency],
         raw_external_calls: &[ExternalCall],
         antipatterns: &[Antipattern],
+        invocations: &[Invocation],
     ) -> C4GeneratorOutput {
         // 1. Inferir Sistemas Externos desde las llamadas externas
         let external_systems = infer_external_systems(raw_external_calls);
 
-        // 2. Inferir Actores desde los módulos/rutas del proyecto
+        // 2. Inferir Actores desde los módulos del proyecto
         let actors = infer_actors(modules);
 
         // 3. Inferir Contenedores según el tipo de proyecto
@@ -60,7 +61,7 @@ impl C4Generator {
 
         // 6. Generar Nivel 3: Diagrama de Componentes (por cada contenedor)
         let component_diagrams =
-            generate_component_diagrams(&containers, modules, dependencies, antipatterns);
+            generate_component_diagrams(&containers, modules, dependencies, antipatterns, invocations);
 
         let c4_models = C4Models {
             context_diagram,
@@ -417,6 +418,7 @@ fn generate_component_diagrams(
     modules: &[Module],
     dependencies: &[Dependency],
     antipatterns: &[Antipattern],
+    invocations: &[Invocation],
 ) -> HashMap<String, C4DiagramData> {
     let mut map = HashMap::new();
 
@@ -472,12 +474,10 @@ fn generate_component_diagrams(
     map.insert("supplementary:circular-dependencies".to_string(), circular_diagram);
 
     // Añadir el resto de diagramas suplementarios adicionales (§4.4.5):
-    // Package Diagram, Inheritance Tree, ER Diagram. Se fusionan en el
-    // mismo mapa `component_diagrams` bajo sus propias claves
-    // "supplementary:*", en vez de vivir en un campo separado del AMG —
-    // consistente con cómo ya conviven aquí los diagramas por contenedor
-    // y el de dependencias circulares.
-    let extra_diagrams = SupplementaryDiagrams::generate_all(modules, dependencies);
+    // Package Diagram, Inheritance Tree, ER Diagram, Call Graph, Sequence Diagram,
+    // Dynamic Diagram, DFD Diagram. Se fusionan en el mismo mapa `component_diagrams`
+    // bajo sus propias claves "supplementary:*".
+    let extra_diagrams = SupplementaryDiagrams::generate_all(modules, dependencies, invocations);
     map.extend(extra_diagrams);
 
     map
