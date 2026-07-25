@@ -166,6 +166,14 @@ SAAC/
   * **`build_prompt`**: construcción contextual según modos (`FullAmg`, `ModuleDetail`, `AntipatternDetail`).
   * **`ask`**: envío de consultas con timeout y **fallback elegante** para modo Mock.
   * **Modo CLI de testing (`--ask-ai-mock <prompt>`)**: ejercita el flujo sin red.
+* **Módulos Pre-Frontend (`preparacion_backend.md`)** — **100% Completados**:
+  * **Ignoración Configurable (`project_config.rs`)**: Lee `.saacignore` y patrones de `.saac/config.json` e integra filtros en `ignore::WalkBuilder`.
+  * **Consola SAAC (`console.rs`)**: Intérprete de comandos internos `saac> ` (`help`, `analyze`, `cancel`, `ai`, `ignore add`, `rules check`, `clear`) y estructura de logs.
+  * **Anotaciones, ADRs y Antipatrones Ignorados (`annotations.rs`)**: Persistencia local en `.saac/annotations.json`.
+  * **Motor de Reglas y Fitness Score (`rules.rs`)**: Evaluador de reglas de arquitectura y cálculo de Fitness Score (0-100) en `.saac/rules.json`.
+  * **Historial y Versionado AMG (`history.rs`)**: Snapshots inmutables de ejecuciones en `.saac/history.json` y cálculo de deltas `AMGDelta`.
+  * **Configuración Global del Sistema (`global_config.rs`)**: Persistencia de configuraciones globales en `%APPDATA%/saac/global_config.json`.
+  * **Comando Drill-Down Nivel 4 (`commands/pre_frontend.rs`)**: `get_module_code_diagram` expuesto para inspeccionar el UML de código de un módulo bajo demanda.
 
 ### 2. Capa de Workers AST (Node.js & Python) — **100% Completado y Funcional**
 

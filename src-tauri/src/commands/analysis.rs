@@ -18,6 +18,9 @@ use crate::engine::java_source_roots::detect_java_source_roots;
 use crate::engine::go_module_roots::detect_go_modules;
 use crate::engine::rust_crate_roots::detect_rust_crates;
 use crate::engine::amg::{ArchitectureModelGraph, WorkerAnalysisResult, SnapshotType};
+use crate::engine::project_config::ProjectConfigManager;
+use crate::engine::history::HistoryManager;
+use crate::engine::rules::RulesEngine;
 
 const BATCH_CHUNK_SIZE: usize = 50;
 const MAX_FILE_SIZE_BYTES: u64 = 1_048_576; // 1 MB
@@ -132,7 +135,10 @@ pub fn scan_project_directory(path: &str) -> (Vec<String>, Vec<SkippedFile>, usi
     let mut node_files_count = 0;
     let mut python_files_count = 0;
 
-    let walker = WalkBuilder::new(path).build();
+    let effective_ignores = ProjectConfigManager::get_effective_ignore_patterns(path);
+    let mut builder = WalkBuilder::new(path);
+    builder.add_custom_ignore_filename(".saacignore");
+    let walker = builder.build();
 
     for result in walker {
         match result {
@@ -141,11 +147,16 @@ pub fn scan_project_directory(path: &str) -> (Vec<String>, Vec<SkippedFile>, usi
                     let p = entry.path();
                     let path_str = p.to_string_lossy().replace('\\', "/");
                     
-                    // Exclusiones explícitas
+                    // Exclusiones explícitas y patrones configurados
                     if path_str.contains("/node_modules/")
                         || path_str.contains("/target/")
                         || path_str.contains("/.venv/")
                         || path_str.contains("/.git/")
+                        || path_str.contains("/.saac/")
+                        || effective_ignores.iter().any(|pattern| {
+                            let clean_pat = pattern.trim_matches('*').trim_matches('/');
+                            !clean_pat.is_empty() && path_str.contains(clean_pat)
+                        })
                     {
                         continue;
                     }
@@ -518,6 +529,20 @@ pub async fn analyze_project(
         if let Some(ref cache_mgr) = cache {
             let _ = cache_mgr.set_latest_amg(&compiled_amg);
         }
+
+        // Evaluar reglas de arquitectura y registrar la ejecución en el historial .saac/history.json
+        let rules_config = RulesEngine::load_rules_config(&path);
+        let fitness_res = RulesEngine::evaluate(&compiled_amg, &rules_config);
+        let _ = HistoryManager::record_run(
+            &path,
+            &compiled_amg.analysis_run_id,
+            total_files,
+            successful,
+            failed,
+            duration_ms,
+            &compiled_amg,
+            fitness_res.fitness_score,
+        );
 
         Some(compiled_amg)
     } else {

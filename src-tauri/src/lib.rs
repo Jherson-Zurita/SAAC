@@ -40,6 +40,22 @@ pub fn build_app() -> tauri::App<tauri::Wry> {
             commands::project::open_project,
             commands::ai::ask_ai,
             commands::ai::check_ai_status,
+            commands::pre_frontend::get_project_config,
+            commands::pre_frontend::update_project_config,
+            commands::pre_frontend::execute_console_command,
+            commands::pre_frontend::load_project_annotations,
+            commands::pre_frontend::add_annotation,
+            commands::pre_frontend::add_adr,
+            commands::pre_frontend::ignore_antipattern,
+            commands::pre_frontend::add_risk,
+            commands::pre_frontend::get_rules_config,
+            commands::pre_frontend::update_rules_config,
+            commands::pre_frontend::evaluate_fitness_rules,
+            commands::pre_frontend::get_analysis_history,
+            commands::pre_frontend::compare_analysis_runs,
+            commands::pre_frontend::get_global_config,
+            commands::pre_frontend::update_global_config,
+            commands::pre_frontend::get_module_code_diagram,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

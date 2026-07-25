@@ -2,6 +2,7 @@
 pub mod analysis;
 pub mod project;
 pub mod ai;
+pub mod pre_frontend;
 
 // Reexportar módulos de engine
 pub use crate::engine::project_detector;
