@@ -96,13 +96,24 @@ pub fn get_analysis_history(project_path: String) -> AnalysisHistory {
 
 #[tauri::command]
 pub fn compare_analysis_runs(
-    _project_path: String,
+    project_path: String,
     run_id_a: String,
-    amg_a: ArchitectureModelGraph,
     run_id_b: String,
-    amg_b: ArchitectureModelGraph,
-) -> AMGDelta {
-    HistoryManager::compute_delta(&run_id_a, &amg_a, &run_id_b, &amg_b)
+) -> Result<AMGDelta, String> {
+    // Los AMGs completos de cada corrida se leen desde disco
+    // (`.saac/runs/<run_id>.json`, persistidos por `HistoryManager::record_run`
+    // en el momento de cada análisis) en vez de recibirse como parámetro del
+    // comando. Antes, este comando exigía que el frontend tuviera ambos AMGs
+    // completos ya cargados en memoria para poder compararlos — lo cual solo
+    // funcionaba para la corrida más reciente (la que el frontend acababa de
+    // recibir de `analyze_project`), no para comparar dos corridas
+    // arbitrarias del historial, que es el caso de uso real de esta función.
+    let amg_a = HistoryManager::load_amg_for_run(&project_path, &run_id_a)
+        .ok_or_else(|| format!("No se encontró el AMG completo de la corrida '{}'. Puede haber sido purgado.", run_id_a))?;
+    let amg_b = HistoryManager::load_amg_for_run(&project_path, &run_id_b)
+        .ok_or_else(|| format!("No se encontró el AMG completo de la corrida '{}'. Puede haber sido purgado.", run_id_b))?;
+
+    Ok(HistoryManager::compute_delta(&run_id_a, &amg_a, &run_id_b, &amg_b))
 }
 
 // ── Comandos Módulo 6: Configuración Global ──

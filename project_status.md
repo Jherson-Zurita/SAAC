@@ -183,10 +183,21 @@ SAAC/
 * **Extracción de `invocations` en los 8 Lenguajes**: Implementado en todos los parsers AST (`python.py`, `java.py`, `kotlin.py`, `csharp.py`, `go.py`, `rust.py`, `swift.py`, `typescript.ts`), resolviendo llamadas implícitas (`this`/`self`), llamadas por nombre de clase/struct y funciones top-level.
 * **Corrección Go/Python**: Ajustes en `parsers/go.py` para imports en una línea y en `parsers/python.py` para tipos de atributos anotados.
 
-### 3. Suite de Pruebas (Python E2E) — **100% Verificado e Integrado**
-
 * **Contratos/Pipeline/Resoluciones/Antipatrones/Diagramas**: Suites completas que validan desde el contrato de workers hasta la generación de diagramas complejos (C4, Paquetes, Herencia, ER, Call Graph, Secuencia, Dinámico, DFD).
 * **Integración de IA**: Validación de `AiClient::ask` real con `isMockFallback`, `providerUsed` y `generatedPrompt`.
+
+### 4. Capa Frontend React — **Fases 0 y 1 Completadas**
+
+* **Fase 0 (Fundaciones)**: `shared/types.ts` sincronizado con Rust, `src/lib/tauri-api.ts` con 24 funciones IPC tipadas, 6 stores Zustand listos, stack visual configurado.
+* **Fase 1 (AppShell - Layout IDE v2.0)**:
+  * `AppShell.tsx`: Estructura de 5 regiones tipo IDE con tema oscuro/claro de alta densidad de información.
+  * `TopBar.tsx`: Barra superior con accesos de proyecto, selector de diagramas y accesos directos.
+  * `Leftbar.tsx`: Panel izquierdo con Explorador de Módulos (con indicador MI de mantenibilidad), Jerarquía C4 y Búsqueda.
+  * `BreadcrumbBar.tsx`: Barra de navegación interactiva C4 (N1 → N2 → N3 → N4).
+  * `Rightbar.tsx`: Inspector de detalles reaccionando a `useSelectionStore` (Métricas Ca/Ce/Instabilidad/MI, clases, antipatrones).
+  * `Downbar.tsx`: Panel inferior con Output de análisis, Problemas, Historial de corridas y Consola interactiva SAAC (`saac> `).
+  * `StatusBar.tsx`: Barra de estado con barra de progreso en vivo, indicador de IA (Ollama) y badge de Fitness Score.
+  * **Verificación**: Build `tsc && vite build` verificado con **0 errores**.
 
 ---
 

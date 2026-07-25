@@ -46,6 +46,53 @@ pub struct AMGDelta {
 pub struct HistoryManager;
 
 impl HistoryManager {
+    /// Directorio donde se persiste el AMG completo de cada corrida,
+    /// un archivo JSON por `run_id` (`.saac/runs/<run_id>.json`).
+    ///
+    /// Se guarda SEPARADO de `history.json` (que solo contiene
+    /// `AnalysisRunSummary`, datos agregados livianos) para que listar el
+    /// historial completo — algo que la UI hace con frecuencia, ej. al
+    /// abrir la pestaña "Historial de Análisis" — no requiera cargar ni
+    /// deserializar potencialmente cientos de AMGs completos de una vez.
+    /// Solo se lee el AMG de una corrida puntual cuando el usuario
+    /// explícitamente pide compararla (`compare_analysis_runs`).
+    fn runs_dir(project_path: &str) -> std::path::PathBuf {
+        Path::new(project_path).join(".saac").join("runs")
+    }
+
+    /// Persiste el AMG completo de una corrida específica.
+    ///
+    /// Llamado desde `record_run` (ver más abajo) para que ambas
+    /// escrituras — el resumen en `history.json` y el AMG completo en
+    /// `.saac/runs/<run_id>.json` — ocurran juntas y con el mismo
+    /// `run_id`, evitando que queden desincronizadas.
+    fn save_amg_for_run(
+        project_path: &str,
+        run_id: &str,
+        amg: &ArchitectureModelGraph,
+    ) -> Result<(), String> {
+        let runs_dir = Self::runs_dir(project_path);
+        if !runs_dir.exists() {
+            fs::create_dir_all(&runs_dir).map_err(|e| e.to_string())?;
+        }
+        let file_path = runs_dir.join(format!("{}.json", run_id));
+        let content = serde_json::to_string(amg).map_err(|e| e.to_string())?;
+        fs::write(file_path, content).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    /// Carga el AMG completo de una corrida específica por su `run_id`.
+    ///
+    /// Devuelve `None` si la corrida no existe o su archivo fue purgado
+    /// (ver política de purga en `.saac/config.yaml`, fuera del alcance de
+    /// este módulo) — el llamador (`compare_analysis_runs`) debe manejar
+    /// ese caso devolviendo un error claro al frontend, no un pánico.
+    pub fn load_amg_for_run(project_path: &str, run_id: &str) -> Option<ArchitectureModelGraph> {
+        let file_path = Self::runs_dir(project_path).join(format!("{}.json", run_id));
+        let content = fs::read_to_string(file_path).ok()?;
+        serde_json::from_str(&content).ok()
+    }
+
     /// Carga el historial de corridas desde `.saac/history.json`.
     pub fn load_history(project_path: &str) -> AnalysisHistory {
         let path = Path::new(project_path).join(".saac").join("history.json");
@@ -59,7 +106,13 @@ impl HistoryManager {
         AnalysisHistory::default()
     }
 
-    /// Guarda una corrida en el historial `.saac/history.json`.
+    /// Guarda una corrida en el historial `.saac/history.json` Y persiste
+    /// su AMG completo en `.saac/runs/<run_id>.json` (ver `save_amg_for_run`).
+    ///
+    /// Si la escritura del AMG completo falla (ej. disco lleno), la corrida
+    /// igual queda registrada en `history.json` — se prioriza no perder el
+    /// resumen liviano aunque el detalle completo no se haya podido
+    /// persistir; el error se propaga igual para que el llamador lo loguee.
     pub fn record_run(
         project_path: &str,
         run_id: &str,
@@ -94,6 +147,14 @@ impl HistoryManager {
         let file_path = saac_dir.join("history.json");
         let content = serde_json::to_string_pretty(&history).map_err(|e| e.to_string())?;
         fs::write(file_path, content).map_err(|e| e.to_string())?;
+
+        // Persistir el AMG completo de esta corrida. Se hace DESPUÉS de
+        // escribir history.json a propósito: si esto falla, el resumen
+        // liviano ya quedó guardado (degradación aceptable — la corrida
+        // sigue apareciendo en el historial, solo no será comparable en
+        // detalle), en vez de perder el registro completo por un fallo
+        // aislado al guardar el AMG.
+        Self::save_amg_for_run(project_path, run_id, amg)?;
 
         Ok(history)
     }

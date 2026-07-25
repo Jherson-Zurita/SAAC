@@ -163,23 +163,23 @@ src/
 
 ## 3. Fases de Implementación
 
-### Fase 0 — Fundaciones (bloqueante para todo lo demás)
+### Fase 0 — Fundaciones (bloqueante para todo lo demás) — **✅ 100% COMPLETADO**
 
-1. Auditar y corregir `shared/types.ts` contra los tipos Rust reales.
-2. Construir `lib/tauri-api.ts` con todas las funciones tipadas.
-3. Crear los 6 stores de Zustand vacíos con su forma de estado definida.
-4. Exponer `generate_module_code_diagram` como comando Tauri (`#[tauri::command] get_module_code_diagram(moduleId: string) -> C4DiagramData`) — necesario para el drill-down a Nivel 4 en Fase 3.
+1. ✅ Auditar y corregir `shared/types.ts` contra los tipos Rust reales (AMG, Módulos 1-6, Nivel 4, IA, etc.).
+2. ✅ Construir `src/lib/tauri-api.ts` con todas las 24 funciones `invoke` y `listen` fuertemente tipadas.
+3. ✅ Crear los 6 stores de Zustand (`useProjectStore`, `useSelectionStore`, `useUiStore`, `useDiagramStore`, `useAiStore`, `useAnalysisHistoryStore`).
+4. ✅ Exponer y probar `get_module_code_diagram` como comando Tauri IPC en `commands/pre_frontend.rs`.
+5. ✅ Instalar dependencias UI (`zustand`, `@xyflow/react`, `@dagrejs/dagre`, `@tanstack/react-table`, `lucide-react`, `tailwindcss`) y verificar build limpio.
 
-### Fase 1 — AppShell (layout tipo IDE vacío, sin datos)
+### Fase 1 — AppShell (layout tipo IDE vacío, sin datos) — **✅ 100% COMPLETADO**
 
-Construir la estructura completa de §5.1 con paneles colapsables/redimensionables pero sin conectar a datos reales todavía — valida el layout y la interacción de paneles antes de rellenarlo.
-
-1. `AppShell.tsx` con grid de 5 regiones (Topbar/Leftbar/Canvas/Rightbar/Downbar) + `StatusBar`.
-2. `MenuBar` y `Toolbar` con los ítems de §5.1.1/§5.1.2 (algunos deshabilitados según brecha 0.3).
-3. Leftbar con las dos pestañas (Explorer/Navigation) navegables pero con contenido placeholder.
-4. Rightbar contextual reaccionando a `useSelectionStore` (vacío al inicio → `ProjectSummaryPanel` vacío).
-5. Downbar con pestañas Output/Problems/AnalysisHistory (sin Terminal, ver brecha 0.3).
-6. Tema claro/oscuro vía Tailwind + `useUiStore`.
+1. ✅ `AppShell.tsx` con grid de 5 regiones de especificación (Topbar, Leftbar, MainCanvas, Rightbar, Downbar) + `StatusBar`.
+2. ✅ `TopBar.tsx` con accesos de proyecto (Abrir, Analizar, Detener), selectores C4 N1-N3, desplegable de diagramas suplementarios, métricas, antipatrones, ADRs, toggles de paneles y cambio de tema.
+3. ✅ `Leftbar.tsx` con 3 pestañas funcionales (Explorer con árbol de módulos e indicador visual de mantenibilidad MI, Jerarquía C4 y Búsqueda).
+4. ✅ `BreadcrumbBar.tsx` con barra de navegación interactiva C4 (Contexto → Contenedor → Componente → Código).
+5. ✅ `Rightbar.tsx` con inspector de detalles contextual para Módulos, Métricas de Acoplamiento, Antipatrones, Clases y Resumen de Proyecto / Fitness Score.
+6. ✅ `Downbar.tsx` con pestañas Output (logs), Problemas (antipatrones), Historial (corridas pasadas) y Consola interactiva SAAC (`saac> `).
+7. ✅ `StatusBar.tsx` con barra de progreso de análisis en vivo (`ProjectProgressEvent`), estado de IA (Ollama/Mock), badge de Fitness Score e indicador de antipatrones.
 
 ### Fase 2 — Flujo de Análisis End-to-End
 
