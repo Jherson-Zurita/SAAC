@@ -197,6 +197,7 @@ SAAC/
   * `Rightbar.tsx`: Inspector de detalles reaccionando a `useSelectionStore` (Métricas Ca/Ce/Instabilidad/MI, clases, antipatrones).
   * `Downbar.tsx`: Panel inferior con Output de análisis, Problemas, Historial de corridas y Consola interactiva SAAC (`saac> `).
   * `StatusBar.tsx`: Barra de estado con barra de progreso en vivo, indicador de IA (Ollama) y badge de Fitness Score.
+  * **Diseño Hallmark (.agents/skills/hallmark)**: Aplicado sistema tipográfico de alta densidad con *Inter* + *JetBrains Mono*, OKLCH/dark design tokens, microinteracciones táctiles, glassmorphic panels y ausencia total de cursivas o fake chrome.
   * **Verificación**: Build `tsc && vite build` verificado con **0 errores**.
 
 ---
