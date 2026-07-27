@@ -14,6 +14,7 @@ import {
   evaluateFitnessRules,
   getAnalysisHistory,
 } from './lib/tauri-api';
+import { open as openDialog } from '@tauri-apps/plugin-dialog';
 
 export function App() {
   const {
@@ -36,7 +37,7 @@ export function App() {
     let unlisten: (() => void) | undefined;
 
     async function initListeners() {
-      // 1. Escuchar eventos de progreso de análisis desde Rust
+      // 1. Escuchar eventos de progreso de análisis desde Rust (project://progress)
       unlisten = await onProjectProgress((event) => {
         setProgress(event);
       });
@@ -55,22 +56,40 @@ export function App() {
     return () => {
       if (unlisten) unlisten();
     };
-  }, []);
+  }, [setProgress, setAiStatus]);
 
-  // Manejador para abrir diálogo de carpeta de proyecto
+  // Manejador para abrir diálogo nativo de selección de carpeta
   const handleOpenProject = async () => {
-    const prompted = window.prompt(
-      'Ingrese la ruta absoluta del directorio del proyecto a analizar:',
-      projectPath || 'd:/Elvis/Semestre 2-2026/SAAC'
-    );
-    if (!prompted) return;
-    const targetPath = prompted.trim();
+    let targetPath: string | null = null;
+
+    try {
+      const selected = await openDialog({
+        directory: true,
+        multiple: false,
+        title: 'Seleccionar Carpeta de Proyecto para Análisis SAAC v2.0',
+      });
+
+      if (typeof selected === 'string') {
+        targetPath = selected;
+      }
+    } catch {
+      // Fallback si dialog nativo no está disponible en entorno web
+      const prompted = window.prompt(
+        'Ingrese la ruta absoluta del directorio del proyecto a analizar:',
+        projectPath || 'd:/Elvis/Semestre 2-2026/SAAC'
+      );
+      if (prompted) {
+        targetPath = prompted.trim();
+      }
+    }
+
+    if (!targetPath) return;
 
     try {
       const res = await openProject(targetPath);
       if (res.success) {
         setProjectPath(targetPath);
-        // Cargar configuraciones del proyecto
+        // Cargar metadatos y configuraciones del proyecto
         try {
           const config = await getProjectConfig(targetPath);
           setProjectConfig(config);
@@ -126,7 +145,7 @@ export function App() {
     }
   };
 
-  // Manejador para cancelar análisis
+  // Manejador para cancelar análisis activo
   const handleCancelAnalysis = async () => {
     try {
       await cancelAnalysis();

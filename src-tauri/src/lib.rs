@@ -31,6 +31,7 @@ fn greet(name: &str) -> String {
 pub fn build_app() -> tauri::App<tauri::Wry> {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             greet,
             commands::analysis::analyze_project,

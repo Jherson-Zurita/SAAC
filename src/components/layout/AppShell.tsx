@@ -5,6 +5,8 @@ import { Rightbar } from './Rightbar';
 import { Downbar } from './Downbar';
 import { StatusBar } from './StatusBar';
 import { BreadcrumbBar } from './BreadcrumbBar';
+import { Dashboard } from '../dashboard';
+import { MetricsPanel } from '../metrics';
 import { useUiStore } from '../../stores/useUiStore';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { FolderOpen, Sparkles, LayoutDashboard, Layers, ShieldCheck } from 'lucide-react';
@@ -113,6 +115,10 @@ export const AppShell: React.FC<AppShellProps> = ({
                 </div>
               </div>
             </div>
+          ) : activeMainTab === 'dashboard' ? (
+            <Dashboard />
+          ) : activeMainTab === 'metrics' ? (
+            <MetricsPanel />
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-gray-400">
               <p>Pestaña Activa: <span className="font-bold text-cyan-400 uppercase">{activeMainTab}</span></p>

@@ -186,18 +186,16 @@ SAAC/
 * **Contratos/Pipeline/Resoluciones/Antipatrones/Diagramas**: Suites completas que validan desde el contrato de workers hasta la generación de diagramas complejos (C4, Paquetes, Herencia, ER, Call Graph, Secuencia, Dinámico, DFD).
 * **Integración de IA**: Validación de `AiClient::ask` real con `isMockFallback`, `providerUsed` y `generatedPrompt`.
 
-### 4. Capa Frontend React — **Fases 0 y 1 Completadas**
+### 4. Capa Frontend React — **Fases 0, 1, 2 y 3 Completadas**
 
 * **Fase 0 (Fundaciones)**: `shared/types.ts` sincronizado con Rust, `src/lib/tauri-api.ts` con 24 funciones IPC tipadas, 6 stores Zustand listos, stack visual configurado.
-* **Fase 1 (AppShell - Layout IDE v2.0)**:
-  * `AppShell.tsx`: Estructura de 5 regiones tipo IDE con tema oscuro/claro de alta densidad de información.
-  * `TopBar.tsx`: Barra superior con accesos de proyecto, selector de diagramas y accesos directos.
-  * `Leftbar.tsx`: Panel izquierdo con Explorador de Módulos (con indicador MI de mantenibilidad), Jerarquía C4 y Búsqueda.
-  * `BreadcrumbBar.tsx`: Barra de navegación interactiva C4 (N1 → N2 → N3 → N4).
-  * `Rightbar.tsx`: Inspector de detalles reaccionando a `useSelectionStore` (Métricas Ca/Ce/Instabilidad/MI, clases, antipatrones).
-  * `Downbar.tsx`: Panel inferior con Output de análisis, Problemas, Historial de corridas y Consola interactiva SAAC (`saac> `).
-  * `StatusBar.tsx`: Barra de estado con barra de progreso en vivo, indicador de IA (Ollama) y badge de Fitness Score.
-  * **Diseño Hallmark (.agents/skills/hallmark)**: Aplicado sistema tipográfico de alta densidad con *Inter* + *JetBrains Mono*, OKLCH/dark design tokens, microinteracciones táctiles, glassmorphic panels y ausencia total de cursivas o fake chrome.
+* **Fase 1 (AppShell - Layout IDE v2.0)**: Estructura de 5 regiones tipo IDE acorde con el sistema de diseño de `design.md`.
+* **Fase 2 (Flujo de Análisis End-to-End)**: Diálogo nativo de carpetas (`@tauri-apps/plugin-dialog`), eventos en vivo (`project://progress`), cancelación segura y explorador de archivos jerárquico.
+* **Fase 3 (Dashboard y Métricas)**:
+  * `ProjectSummaryCard.tsx`: Resumen de proyecto, estilo arquitectónico detectado y métricas agregadas ($Ca, Ce, I, A, D, MI$).
+  * `MetricsRadarChart.tsx`: Gráfico radial SVG de salud arquitectónica evaluando 6 dimensiones normalizadas.
+  * `DependencyGraphOverview.tsx`: Grafo general de dependencias en ReactFlow + Dagre con coloreado MI.
+  * `MetricsPanel/index.tsx`: Tablas TanStack Table v8 para Módulos, Clases y Funciones, ordenables, con filtros por umbral y exportación a CSV/JSON.
   * **Verificación**: Build `tsc && vite build` verificado con **0 errores**.
 
 ---

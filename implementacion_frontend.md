@@ -181,20 +181,20 @@ src/
 6. ✅ `Downbar.tsx` con pestañas Output (logs), Problemas (antipatrones), Historial (corridas pasadas) y Consola interactiva SAAC (`saac> `).
 7. ✅ `StatusBar.tsx` con barra de progreso de análisis en vivo (`ProjectProgressEvent`), estado de IA (Ollama/Mock), badge de Fitness Score e indicador de antipatrones.
 
-### Fase 2 — Flujo de Análisis End-to-End
+### Fase 2 — Flujo de Análisis End-to-End — **✅ 100% COMPLETADO**
 
-1. **Abrir proyecto**: diálogo nativo de selección de carpeta (`@tauri-apps/plugin-dialog`) → dispara `analyze_project`.
-2. **Progreso en tiempo real**: `useAnalysisProgress` suscrito a `project://progress`, alimenta barra de progreso de la Status Bar y el log de `OutputTab`.
-3. **Cancelación**: botón ⏹ en el Toolbar llama `cancel_analysis`; UI debe reflejar `cancelled: true` y outcomes parciales sin romperse (ya verificado en backend).
-4. **Resultado**: al completar, `ArchitectureModelGraph` se guarda en `useProjectStore`, dispara render del Dashboard (Fase 3).
-5. **Leftbar Explorer**: árbol de archivos real construido desde `amg.modules[].id`, con badge de lenguaje y color por `maintainabilityIndex`.
+1. ✅ **Abrir proyecto**: diálogo nativo de selección de carpeta de Tauri (`@tauri-apps/plugin-dialog`) integrado y registrado en Rust (`tauri_plugin_dialog`).
+2. ✅ **Progreso en tiempo real**: `useAnalysisProgress` / `onProjectProgress` suscrito a `project://progress`, alimentando la Status Bar y el log de `OutputTab`.
+3. ✅ **Cancelación**: botón ⏹ en TopBar invocando `cancel_analysis` con reflejo de `cancelled: true` y retención de resultados parciales.
+4. ✅ **Resultado**: `ArchitectureModelGraph` completo almacenado en `useProjectStore`, disparando renderizado y actualización de metadatos/historial.
+5. ✅ **Leftbar Explorer**: árbol jerárquico de archivos/carpetas construido desde `amg.modules[].id`, con badges de lenguaje y badges de Mantenibilidad (MI) coloreados (Emerald ≥ 80, Amber ≥ 60, Rose < 60) según `design.md`.
 
-### Fase 3 — Dashboard y Métricas (§5.3, §5.5)
+### Fase 3 — Dashboard y Métricas (§5.3, §5.5) — **✅ 100% COMPLETADO**
 
-1. `ProjectSummaryCard`: nombre, tipo detectado, estilo detectado + confianza, totales (módulos, dependencias).
-2. `MetricsRadarChart`: radar de métricas agregadas de `ProjectMetrics` (D3 o Recharts sobre los promedios ya calculados por el aggregator).
-3. `DependencyGraphOverview`: vista general en ReactFlow de `amg.dependencies`, con clustering básico y layout Dagre.
-4. `MetricsPanel` con las 3 vistas TanStack Table (Módulo/Clase/Función), ordenación, filtros por umbral, heatmap condicional, exportación CSV/JSON.
+1. ✅ `ProjectSummaryCard.tsx`: Muestra nombre, tipo de proyecto, estilo detectado + % de confianza, total de módulos, dependencias, ciclos, complejidad ciclomática promedio, líneas LOC y Fitness Score.
+2. ✅ `MetricsRadarChart.tsx`: Gráfico SVG de radar concéntrico evaluando 6 dimensiones normalizadas (Mantenibilidad MI, Simplicidad 1/CC, Estabilidad 1-I, Abstracción A, Secuencia Principal 1-D y Fitness Score).
+3. ✅ `DependencyGraphOverview.tsx`: Vista general interactiva del grafo de dependencias en `@xyflow/react` con auto-layout Dagre, coloreado según Mantenibilidad (MI).
+4. ✅ `MetricsPanel/index.tsx`: Tablas interactivas TanStack Table v8 para Módulos, Clases y Funciones, con ordenamiento por columna, búsqueda global, filtros rápidos por umbrales (MI < 60, Inestabilidad > 0.8) y exportación a CSV/JSON.
 
 ### Fase 4 — Visualizador C4 (§5.4) y Diagramas Suplementarios
 
