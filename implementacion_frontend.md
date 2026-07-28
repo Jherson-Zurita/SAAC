@@ -182,36 +182,29 @@ src/
 7. ✅ `StatusBar.tsx` con barra de progreso de análisis en vivo (`ProjectProgressEvent`), estado de IA (Ollama/Mock), badge de Fitness Score e indicador de antipatrones.
 
 ### Fase 2 — Flujo de Análisis End-to-End — **✅ 100% COMPLETADO**
-
-1. ✅ **Abrir proyecto**: diálogo nativo de selección de carpeta de Tauri (`@tauri-apps/plugin-dialog`) integrado y registrado en Rust (`tauri_plugin_dialog`).
-2. ✅ **Progreso en tiempo real**: `useAnalysisProgress` / `onProjectProgress` suscrito a `project://progress`, alimentando la Status Bar y el log de `OutputTab`.
-3. ✅ **Cancelación**: botón ⏹ en TopBar invocando `cancel_analysis` con reflejo de `cancelled: true` y retención de resultados parciales.
-4. ✅ **Resultado**: `ArchitectureModelGraph` completo almacenado en `useProjectStore`, disparando renderizado y actualización de metadatos/historial.
-5. ✅ **Leftbar Explorer**: árbol jerárquico de archivos/carpetas construido desde `amg.modules[].id`, con badges de lenguaje y badges de Mantenibilidad (MI) coloreados (Emerald ≥ 80, Amber ≥ 60, Rose < 60) según `design.md`.
+1. ✅ **Abrir proyecto**: diálogo nativo de carpeta (`@tauri-apps/plugin-dialog`) registrado en Rust.
+2. ✅ **Progreso en tiempo real**: `onProjectProgress` alimentando la Status Bar y el log.
+3. ✅ **Cancelación**: botón ⏹ en TopBar invocando `cancel_analysis`.
+4. ✅ **Resultado**: `ArchitectureModelGraph` almacenado en `useProjectStore`.
 
 ### Fase 3 — Dashboard y Métricas (§5.3, §5.5) — **✅ 100% COMPLETADO**
+1. ✅ `ProjectSummaryCard.tsx`: Resumen de proyecto y métricas agregadas.
+2. ✅ `MetricsRadarChart.tsx`: Gráfico radial SVG de salud arquitectónica.
+3. ✅ `DependencyGraphOverview.tsx`: Grafo ReactFlow + Dagre con coloreado MI.
+4. ✅ `MetricsPanel/index.tsx`: Tablas TanStack Table v8 para Módulos, Clases y Funciones.
 
-1. ✅ `ProjectSummaryCard.tsx`: Muestra nombre, tipo de proyecto, estilo detectado + % de confianza, total de módulos, dependencias, ciclos, complejidad ciclomática promedio, líneas LOC y Fitness Score.
-2. ✅ `MetricsRadarChart.tsx`: Gráfico SVG de radar concéntrico evaluando 6 dimensiones normalizadas (Mantenibilidad MI, Simplicidad 1/CC, Estabilidad 1-I, Abstracción A, Secuencia Principal 1-D y Fitness Score).
-3. ✅ `DependencyGraphOverview.tsx`: Vista general interactiva del grafo de dependencias en `@xyflow/react` con auto-layout Dagre, coloreado según Mantenibilidad (MI).
-4. ✅ `MetricsPanel/index.tsx`: Tablas interactivas TanStack Table v8 para Módulos, Clases y Funciones, con ordenamiento por columna, búsqueda global, filtros rápidos por umbrales (MI < 60, Inestabilidad > 0.8) y exportación a CSV/JSON.
+### Fase 4 — Visualizador C4 y Diagramas Suplementarios — **✅ 100% COMPLETADO**
+1. ✅ `C4Canvas.tsx`: Canvas ReactFlow con nodos personalizados por tipo C4.
+2. ✅ `C4Viewer/index.tsx`: Navegación C4 Nivel 1 → Nivel 2 → Nivel 3 → Nivel 4.
+3. ✅ **Drill-down Nivel 4**: Doble clic llama `get_module_code_diagram`.
+4. ✅ **12 Diagramas**: Paquetes, Herencia, ER, Call Graph, Secuencia, Dinámico, DFD.
 
-### Fase 4 — Visualizador C4 (§5.4) y Diagramas Suplementarios — **✅ 100% COMPLETADO**
-
-1. ✅ `C4Viewer` con breadcrumb de navegación (Contexto→Contenedores→Componentes→Código) sobre `amg.c4Models`.
-2. ✅ Nodos custom de ReactFlow por tipo de elemento C4 (Person, Software System, Container, Component) y variantes para los diagramas suplementarios.
-3. ✅ Drill-down a Nivel 4 vía el comando expuesto en Fase 0 (`get_module_code_diagram`), al hacer doble clic en un componente, con estados de carga y error.
-4. ✅ `PackageDiagramView` / `InheritanceTreeView` / `ErDiagramView` / `CallGraphView` / `SequenceDiagramView` / `DynamicDiagramView` / `DfdDiagramView`: mismo motor `C4Canvas`, alimentados desde `c4Models.componentDiagrams["supplementary:*"]` que genera el backend con las invocaciones resueltas.
-5. ✅ El menú de selección de diagrama (Toolbar) habilita y permite alternar entre **todos** los 12 diagramas disponibles: C4 Niveles 1-4 (Nivel 4 tras el drill-down), Módulos Circulares, Paquetes, Herencia, ER, Call Graph, Sequence, Dynamic y DFD.
-6. ✅ Exportación JSON del diagrama activo (ver brecha 0.3).
-
-### Fase 5 — Antipatrones (§5.6)
-
-1. `AntipatternsPanel` listando `amg.antipatterns` con severidad, tipo, descripción.
-2. Para `circular-dependency`: mostrar `cyclePath` como ruta navegable, `suggestedBreakPoint` destacado.
-3. Filtros por tipo/severidad/módulo afectado.
-4. Links directos que seleccionan el módulo afectado (actualiza `useSelectionStore`, abre en el grafo).
-5. Botón "Ignorar" presente pero deshabilitado con nota "Próximamente" (ver brecha 0.3 — no hay persistencia de anotaciones en Rust todavía).
+### Fase 5 — Antipatrones (§5.6) — **✅ 100% COMPLETADO**
+1. ✅ `AntipatternsPanel/index.tsx`: Tarjetas de antipatrones por severidad.
+2. ✅ **Ruta del Ciclo**: Muestra `cyclePath` interactivo, `suggestedBreakPoint` y `refactorSuggestion`.
+3. ✅ **Navegación**: Links a módulos afectados que enfocan el inspector.
+4. ✅ **Filtros**: Severidad, tipo, búsqueda y toggle de ignorados.
+5. ✅ **Acción de Ignorar**: Formulario que invoca `ignoreAntipattern` guardando justificación en Rust.
 
 ### Fase 6 — Asistente IA (§5.7)
 

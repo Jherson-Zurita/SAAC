@@ -13,6 +13,8 @@ import { useUiStore } from '../../stores/useUiStore';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { FolderOpen, Sparkles, LayoutDashboard, Layers, ShieldCheck } from 'lucide-react';
 
+import { AntipatternsPanel } from '../antipatterns';
+
 interface AppShellProps {
   onOpenProject: () => void;
   onAnalyzeProject: () => void;
@@ -121,6 +123,8 @@ export const AppShell: React.FC<AppShellProps> = ({
             <Dashboard />
           ) : activeMainTab === 'metrics' ? (
             <MetricsPanel />
+          ) : activeMainTab === 'antipatterns' ? (
+            <AntipatternsPanel />
           ) : isDiagramTab(activeMainTab) ? (
             <C4Viewer activeTab={activeMainTab} />
           ) : (
