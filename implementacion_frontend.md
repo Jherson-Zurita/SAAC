@@ -206,13 +206,13 @@ src/
 4. ✅ **Filtros**: Severidad, tipo, búsqueda y toggle de ignorados.
 5. ✅ **Acción de Ignorar**: Formulario que invoca `ignoreAntipattern` guardando justificación en Rust.
 
-### Fase 6 — Asistente IA (§5.7)
+### Fase 6 — Asistente IA (§5.7) — **✅ 100% COMPLETADO**
 
-1. `AiStatusIndicator`: llama `check_ai_status` al montar y periódicamente; refleja online/offline/mock en la Status Bar y el Toolbar.
-2. `AiChatPanel`: interfaz de chat con `ask_ai`, usando `AiContextType::FullAmg` por defecto.
-3. Comandos especiales (`/diagram`, `/metrics`, `/explain`) parseados en `slash-commands.ts`, disparando `AiContextType::ModuleDetail`/`AntipatternDetail` según corresponda.
-4. Indicador explícito de fallback: si `isMockFallback: true`, la burbuja de respuesta lo marca visualmente (ej. borde ámbar + ícono), coherente con "Modo offline visible" de §5.7.
-5. Exportación del chat como Markdown (solo esto, sin persistencia entre sesiones en esta fase).
+1. ✅ `AiStatusIndicator.tsx`: Consulta `check_ai_status` al montar y al hacer clic; muestra badge interactivo de estado (Ollama Online en verde vs IA Mock Fallback en ámbar).
+2. ✅ `AiChatPanel.tsx`: Interfaz de chat conversacional integrada en la pestaña "Asistente IA" del `Rightbar.tsx`.
+3. ✅ **Comandos Slash (`slash-commands.ts`)**: Parser de `/explain`, `/refactor`, `/metrics`, `/diagram` que extrae automáticamente el contexto (`ModuleDetail`, `AntipatternDetail`, `FullAmg`) y el target seleccionado en `useSelectionStore`.
+4. ✅ **Indicador de Fallback**: Cada respuesta devuelta que proviene de la IA local/Mock se diferencia visualmente con un badge "Mock Fallback".
+5. ✅ **Exportación a Markdown**: Botón dedicado que genera y descarga `saac_chat_<timestamp>.md` con el transcript completo de la conversación.
 
 ### Fase 7 — Historial de Análisis (versión reducida, ver brecha 0.3)
 

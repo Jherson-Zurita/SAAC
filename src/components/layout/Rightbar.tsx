@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   X,
   FileCode,
@@ -7,16 +7,20 @@ import {
   ShieldCheck,
   Zap,
   Info,
+  Bot,
 } from 'lucide-react';
 import { useUiStore } from '../../stores/useUiStore';
 import { useSelectionStore } from '../../stores/useSelectionStore';
 import { useProjectStore } from '../../stores/useProjectStore';
+import { AiChatPanel } from '../ai/AiChatPanel';
 import type { Module, Antipattern, ClassInfo } from '../../../shared/types';
 
 export const Rightbar: React.FC = () => {
   const { rightbarOpen } = useUiStore();
   const { selectedId, selectedType, selectedData, clearSelection } = useSelectionStore();
   const { amg, fitnessResult } = useProjectStore();
+
+  const [rightTab, setRightTab] = useState<'inspector' | 'ai'>('inspector');
 
   if (!rightbarOpen) return null;
 
@@ -150,100 +154,119 @@ export const Rightbar: React.FC = () => {
   };
 
   return (
-    <aside className="w-72 bg-[#12151e] border-l border-[#232838] flex flex-col h-full select-none">
-      {/* Header del Rightbar */}
-      <div className="h-10 px-3 border-b border-[#232838] flex items-center justify-between bg-[#0d0f16]">
-        <div className="flex items-center space-x-2 text-xs font-semibold text-gray-200">
-          <Activity className="w-4 h-4 text-blue-400" />
-          <span>Inspector de Detalles</span>
-        </div>
+    <aside className="w-80 bg-[#12151e] border-l border-[#232838] flex flex-col h-full select-none">
+      {/* Header Pestañas Rightbar (Inspector vs IA) */}
+      <div className="flex items-center border-b border-[#232838] bg-[#0d0f16]">
+        <button
+          onClick={() => setRightTab('inspector')}
+          className={`flex-1 py-2 flex items-center justify-center space-x-1.5 text-xs font-semibold border-b-2 transition ${
+            rightTab === 'inspector'
+              ? 'border-blue-500 text-blue-400 bg-[#161a26]'
+              : 'border-transparent text-gray-400 hover:text-gray-200'
+          }`}
+        >
+          <Activity className="w-3.5 h-3.5" />
+          <span>Inspector</span>
+        </button>
 
-        <div className="flex items-center space-x-1">
-          {selectedId && (
-            <button
-              onClick={clearSelection}
-              className="p-1 text-gray-400 hover:text-white hover:bg-[#1f2433] rounded"
-              title="Limpiar selección"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-      </div>
+        <button
+          onClick={() => setRightTab('ai')}
+          className={`flex-1 py-2 flex items-center justify-center space-x-1.5 text-xs font-semibold border-b-2 transition ${
+            rightTab === 'ai'
+              ? 'border-cyan-500 text-cyan-400 bg-[#161a26]'
+              : 'border-transparent text-gray-400 hover:text-gray-200'
+          }`}
+        >
+          <Bot className="w-3.5 h-3.5" />
+          <span>Asistente IA</span>
+        </button>
 
-      {/* Cuerpo del Rightbar */}
-      <div className="flex-1 overflow-y-auto p-3 text-xs">
-        {selectedId && selectedData ? (
-          <div>
-            {selectedType === 'module' && renderModuleDetails(selectedData as Module)}
-            {selectedType === 'antipattern' && renderAntipatternDetails(selectedData as Antipattern)}
-            {selectedType !== 'module' && selectedType !== 'antipattern' && (
-              <div className="bg-[#181c2a] p-3 rounded-lg border border-[#232a3e] space-y-2">
-                <div className="font-semibold text-blue-400 uppercase">{selectedType}</div>
-                <div className="font-mono text-gray-300 break-all">{selectedId}</div>
-                <pre className="text-[10px] text-gray-400 bg-[#0c0e15] p-2 rounded overflow-x-auto">
-                  {JSON.stringify(selectedData, null, 2)}
-                </pre>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {/* Resumen del Proyecto si no hay nada seleccionado */}
-            {amg ? (
-              <div className="space-y-3">
-                <div className="bg-[#181c2a] p-3 rounded-lg border border-[#232a3e]">
-                  <h3 className="font-bold text-sm text-gray-100 mb-1">{amg.projectName}</h3>
-                  <div className="flex items-center space-x-2 text-xs text-cyan-400 mb-3">
-                    <Zap className="w-3.5 h-3.5" />
-                    <span>Estilo: {amg.detectedStyle} ({Math.round(amg.styleConfidence * 100)}%)</span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="bg-[#10131d] p-2 rounded">
-                      <span className="text-gray-500 text-[10px]">Módulos</span>
-                      <p className="font-bold text-blue-400">{amg.modules.length}</p>
-                    </div>
-                    <div className="bg-[#10131d] p-2 rounded">
-                      <span className="text-gray-500 text-[10px]">Dependencias</span>
-                      <p className="font-bold text-purple-400">{amg.dependencies.length}</p>
-                    </div>
-                    <div className="bg-[#10131d] p-2 rounded">
-                      <span className="text-gray-500 text-[10px]">Antipatrones</span>
-                      <p className="font-bold text-amber-400">{amg.antipatterns.length}</p>
-                    </div>
-                    <div className="bg-[#10131d] p-2 rounded">
-                      <span className="text-gray-500 text-[10px]">Líneas LOC</span>
-                      <p className="font-bold text-emerald-400">{amg.metrics.totalLoc}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Fitness Score Badge */}
-                {fitnessResult && (
-                  <div className="bg-[#141b2b] p-3 rounded-lg border border-blue-500/30 flex items-center justify-between">
-                    <div>
-                      <span className="text-[11px] text-gray-400 font-medium">Fitness Score Global</span>
-                      <div className="text-lg font-extrabold text-blue-400">
-                        {fitnessResult.fitnessScore} / 100
-                      </div>
-                    </div>
-                    <ShieldCheck className="w-8 h-8 text-blue-400/60" />
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-48 text-center text-gray-500 space-y-2">
-                <Info className="w-8 h-8 opacity-40 text-blue-400" />
-                <p>Ningún elemento seleccionado.</p>
-                <p className="text-[11px] text-gray-600">
-                  Haga clic en un nodo o módulo del canvas para inspeccionar sus métricas.
-                </p>
-              </div>
-            )}
-          </div>
+        {selectedId && rightTab === 'inspector' && (
+          <button
+            onClick={clearSelection}
+            className="px-2 text-gray-400 hover:text-white"
+            title="Limpiar selección"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         )}
       </div>
+
+      {/* Cuerpo de Pestaña Activa */}
+      {rightTab === 'ai' ? (
+        <AiChatPanel />
+      ) : (
+        <div className="flex-1 overflow-y-auto p-3 text-xs">
+          {selectedId && selectedData ? (
+            <div>
+              {selectedType === 'module' && renderModuleDetails(selectedData as Module)}
+              {selectedType === 'antipattern' && renderAntipatternDetails(selectedData as Antipattern)}
+              {selectedType !== 'module' && selectedType !== 'antipattern' && (
+                <div className="bg-[#181c2a] p-3 rounded-lg border border-[#232a3e] space-y-2">
+                  <div className="font-semibold text-blue-400 uppercase">{selectedType}</div>
+                  <div className="font-mono text-gray-300 break-all">{selectedId}</div>
+                  <pre className="text-[10px] text-gray-400 bg-[#0c0e15] p-2 rounded overflow-x-auto">
+                    {JSON.stringify(selectedData, null, 2)}
+                  </pre>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {amg ? (
+                <div className="space-y-3">
+                  <div className="bg-[#181c2a] p-3 rounded-lg border border-[#232a3e]">
+                    <h3 className="font-bold text-sm text-gray-100 mb-1">{amg.projectName}</h3>
+                    <div className="flex items-center space-x-2 text-xs text-cyan-400 mb-3">
+                      <Zap className="w-3.5 h-3.5" />
+                      <span>Estilo: {amg.detectedStyle} ({Math.round(amg.styleConfidence * 100)}%)</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="bg-[#10131d] p-2 rounded">
+                        <span className="text-gray-500 text-[10px]">Módulos</span>
+                        <p className="font-bold text-blue-400">{amg.modules.length}</p>
+                      </div>
+                      <div className="bg-[#10131d] p-2 rounded">
+                        <span className="text-gray-500 text-[10px]">Dependencias</span>
+                        <p className="font-bold text-purple-400">{amg.dependencies.length}</p>
+                      </div>
+                      <div className="bg-[#10131d] p-2 rounded">
+                        <span className="text-gray-500 text-[10px]">Antipatrones</span>
+                        <p className="font-bold text-amber-400">{amg.antipatterns.length}</p>
+                      </div>
+                      <div className="bg-[#10131d] p-2 rounded">
+                        <span className="text-gray-500 text-[10px]">Líneas LOC</span>
+                        <p className="font-bold text-emerald-400">{amg.metrics.totalLoc}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {fitnessResult && (
+                    <div className="bg-[#141b2b] p-3 rounded-lg border border-blue-500/30 flex items-center justify-between">
+                      <div>
+                        <span className="text-[11px] text-gray-400 font-medium">Fitness Score Global</span>
+                        <div className="text-lg font-extrabold text-blue-400">
+                          {fitnessResult.fitnessScore} / 100
+                        </div>
+                      </div>
+                      <ShieldCheck className="w-8 h-8 text-blue-400/60" />
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-48 text-center text-gray-500 space-y-2">
+                  <Info className="w-8 h-8 opacity-40 text-blue-400" />
+                  <p>Ningún elemento seleccionado.</p>
+                  <p className="text-[11px] text-gray-600">
+                    Haga clic en un nodo o módulo del canvas para inspeccionar sus métricas.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </aside>
   );
 };

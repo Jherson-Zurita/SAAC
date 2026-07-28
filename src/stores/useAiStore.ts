@@ -6,6 +6,8 @@ export interface ChatMessage {
   sender: 'user' | 'assistant';
   text: string;
   timestamp: string;
+  isMockFallback?: boolean;
+  tokensUsed?: number;
 }
 
 interface AiState {
@@ -13,7 +15,11 @@ interface AiState {
   isThinking: boolean;
   aiStatus: AiStatusResult | null;
 
-  addMessage: (sender: 'user' | 'assistant', text: string) => void;
+  addMessage: (
+    sender: 'user' | 'assistant',
+    text: string,
+    meta?: { isMockFallback?: boolean; tokensUsed?: number }
+  ) => void;
   setIsThinking: (isThinking: boolean) => void;
   setAiStatus: (status: AiStatusResult | null) => void;
   clearChat: () => void;
@@ -24,7 +30,7 @@ export const useAiStore = create<AiState>((set) => ({
   isThinking: false,
   aiStatus: null,
 
-  addMessage: (sender, text) =>
+  addMessage: (sender, text, meta) =>
     set((state) => ({
       messages: [
         ...state.messages,
@@ -33,6 +39,8 @@ export const useAiStore = create<AiState>((set) => ({
           sender,
           text,
           timestamp: new Date().toLocaleTimeString(),
+          isMockFallback: meta?.isMockFallback,
+          tokensUsed: meta?.tokensUsed,
         },
       ],
     })),
