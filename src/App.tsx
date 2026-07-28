@@ -16,6 +16,7 @@ import {
   getAnalysisHistory,
 } from './lib/tauri-api';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 
 export function App() {
   const {
@@ -156,6 +157,12 @@ export function App() {
       console.error('Error al cancelar:', err);
     }
   };
+
+  // Registrar atajos de teclado globales del IDE (Ctrl+O, Ctrl+Shift+A, Ctrl+B, Esc, etc.)
+  useKeyboardShortcuts({
+    onOpenProject: handleOpenProject,
+    onAnalyzeProject: handleAnalyzeProject,
+  });
 
   return (
     <AppShell

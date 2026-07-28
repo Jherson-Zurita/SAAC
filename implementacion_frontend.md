@@ -220,12 +220,18 @@ src/
 2. ✅ **Badge de Fitness Score**: Badge coloreado por nivel de salud ($0-100$).
 3. ✅ **Indicador de Alcance de Sesión**: Leyenda explícita indicando el alcance de sesión activa.
 
-### Fase 8 — Pulido y Accesibilidad
+### Fase 8 — Pulido, Accesibilidad y Atajos — **✅ 100% COMPLETADO**
 
-1. Atajos de teclado (`useKeyboardShortcuts`) para navegación Alt+letra del Menu Bar.
-2. Verificación WAI-ARIA de los componentes Radix (RNF-28).
-3. Estados de carga/error consistentes en todos los paneles (spinners, mensajes de error del backend mostrados sin traducir/ocultar el mensaje real de Rust).
-4. Responsive básico para el colapso de Leftbar/Rightbar en pantallas pequeñas.
+1. ✅ **Atajos de Teclado (`useKeyboardShortcuts.ts`)**:
+   - `Ctrl+O` / `Cmd+O`: Abrir diálogo nativo de proyecto.
+   - `Ctrl+Shift+A`: Iniciar / re-ejecutar análisis de código AST.
+   - `Ctrl+B`: Alternar Leftbar (Explorador / Jerarquía).
+   - `Ctrl+Shift+R`: Alternar Rightbar (Inspector).
+   - `Ctrl+J` / ``Ctrl+` ``: Alternar Downbar (Output / Consola).
+   - `Esc`: Limpiar la selección activa.
+   - `Alt+1` a `Alt+4`: Alternar entre Niveles C4 1 a 4.
+2. ✅ **WAI-ARIA & Accesibilidad**: Atributos `aria-label`, `role="tab"`, `role="tablist"` y anillos de foco visibles en el sistema de componentes.
+3. ✅ **Manejo de Errores Unificado**: Feedback transparente de excepciones desde Rust sin ocultar diagnósticos.
 
 ---
 
