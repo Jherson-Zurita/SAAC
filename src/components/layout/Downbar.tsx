@@ -159,24 +159,58 @@ export const Downbar: React.FC = () => {
 
         {/* Pestaña History */}
         {activeDownbarTab === 'history' && (
-          <div className="h-full overflow-y-auto space-y-1 p-1">
-            {history?.runs.map((run) => (
-              <div
-                key={run.runId}
-                className="p-2 rounded bg-[#141724] border border-[#232838] flex items-center justify-between text-gray-300"
-              >
-                <div>
-                  <span className="font-bold text-blue-400">{run.runId}</span> - {run.timestamp}
-                  <div className="text-[10px] text-gray-400">
-                    Archivos: {run.totalFiles} | Módulos: {run.moduleCount} | Antipatrones: {run.antipatternCount}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className="font-mono text-emerald-400 font-bold">FS: {run.fitnessScore}</span>
-                  <div className="text-[10px] text-gray-500">{run.durationMs} ms</div>
-                </div>
+          <div className="h-full overflow-y-auto space-y-1.5 p-1">
+            <div className="flex items-center justify-between text-[10px] text-gray-500 pb-1 border-b border-[#1e2333]">
+              <span>Historial de ejecuciones en la sesión actual ({history?.runs.length || 0} corridas)</span>
+              <span className="text-gray-600 italic">Sesión activa (no persistente entre reinicios)</span>
+            </div>
+
+            {!history || history.runs.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-32 text-center text-gray-500">
+                <History className="w-8 h-8 opacity-40 text-purple-400 mb-1" />
+                <p className="italic">Sin historial de ejecuciones guardado.</p>
+                <p className="text-[10px] text-gray-600">Ejecute un análisis de código para registrar entradas.</p>
               </div>
-            )) || <p className="text-gray-500 italic">Sin historial de ejecuciones guardado.</p>}
+            ) : (
+              history.runs.map((run, idx) => {
+                const fsColor =
+                  run.fitnessScore >= 80
+                    ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10'
+                    : run.fitnessScore >= 60
+                    ? 'text-amber-400 border-amber-500/30 bg-amber-500/10'
+                    : 'text-rose-400 border-rose-500/30 bg-rose-500/10';
+
+                return (
+                  <div
+                    key={run.runId || idx}
+                    className="p-2.5 rounded-lg bg-[#141724] border border-[#232838] hover:border-purple-500/40 flex items-center justify-between text-gray-300 transition"
+                  >
+                    <div className="space-y-0.5">
+                      <div className="flex items-center space-x-2">
+                        <span className="font-bold font-mono text-purple-400">#{run.runId}</span>
+                        <span className="text-[10px] text-gray-400">{run.timestamp}</span>
+                      </div>
+                      <div className="text-[11px] text-gray-400 flex items-center space-x-3 font-mono">
+                        <span>Archivos: <strong className="text-gray-200">{run.totalFiles}</strong> ({run.successful} ok)</span>
+                        <span>•</span>
+                        <span>Módulos: <strong className="text-cyan-400">{run.moduleCount}</strong></span>
+                        <span>•</span>
+                        <span>Dependencias: <strong className="text-purple-400">{run.dependencyCount}</strong></span>
+                        <span>•</span>
+                        <span>Antipatrones: <strong className={run.antipatternCount > 0 ? 'text-amber-400' : 'text-emerald-400'}>{run.antipatternCount}</strong></span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-3">
+                      <div className={`px-2.5 py-1 rounded border text-xs font-mono font-bold ${fsColor}`}>
+                        Fitness: {run.fitnessScore}/100
+                      </div>
+                      <span className="text-[10px] text-gray-500 font-mono">{run.durationMs} ms</span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         )}
 

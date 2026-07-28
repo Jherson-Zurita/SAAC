@@ -214,10 +214,11 @@ src/
 4. ✅ **Indicador de Fallback**: Cada respuesta devuelta que proviene de la IA local/Mock se diferencia visualmente con un badge "Mock Fallback".
 5. ✅ **Exportación a Markdown**: Botón dedicado que genera y descarga `saac_chat_<timestamp>.md` con el transcript completo de la conversación.
 
-### Fase 7 — Historial de Análisis (versión reducida, ver brecha 0.3)
+### Fase 7 — Historial de Análisis — **✅ 100% COMPLETADO**
 
-1. `AnalysisHistoryTab` en el Downbar: lista de análisis corridos en la sesión actual (desde `useAnalysisHistoryStore`), con timestamp y resumen (módulos, antipatrones, duración).
-2. Sin comparación de versiones ni persistencia entre reinicios de la app — documentado como limitación de esta fase, no como bug.
+1. ✅ `Downbar.tsx` (`Pestaña Historial`): Renderiza la lista completa de ejecuciones en la sesión actual (`useAnalysisHistoryStore` / `getAnalysisHistory`), mostrando ID de corrida (`#runId`), timestamp, archivos procesados, total de módulos, dependencias, antipatrones detectados y duración en milisegundos.
+2. ✅ **Badge de Fitness Score**: Badge coloreado por nivel de salud ($0-100$).
+3. ✅ **Indicador de Alcance de Sesión**: Leyenda explícita indicando el alcance de sesión activa.
 
 ### Fase 8 — Pulido y Accesibilidad
 

@@ -186,7 +186,7 @@ SAAC/
 * **Contratos/Pipeline/Resoluciones/Antipatrones/Diagramas**: Suites completas que validan desde el contrato de workers hasta la generación de diagramas complejos (C4, Paquetes, Herencia, ER, Call Graph, Secuencia, Dinámico, DFD).
 * **Integración de IA**: Validación de `AiClient::ask` real con `isMockFallback`, `providerUsed` y `generatedPrompt`.
 
-### 4. Capa Frontend React — **Fases 0, 1, 2, 3, 4, 5 y 6 Completadas**
+### 4. Capa Frontend React — **Fases 0, 1, 2, 3, 4, 5, 6 y 7 Completadas**
 
 * **Fase 0 (Fundaciones)**: `shared/types.ts` sincronizado con Rust, `src/lib/tauri-api.ts` con 24 funciones IPC tipadas, 6 stores Zustand listos, stack visual configurado.
 * **Fase 1 (AppShell - Layout IDE v2.0)**: Estructura de 5 regiones tipo IDE acorde con el sistema de diseño de `design.md`.
@@ -195,6 +195,7 @@ SAAC/
 * **Fase 4 (Visualizador C4 y Diagramas Suplementarios)**: `C4Canvas` con ReactFlow + Dagre, navegación C4 Niveles 1-3, drill-down a Nivel 4 (código UML) y 12 diagramas suplementarios.
 * **Fase 5 (Antipatrones §5.6)**: `AntipatternsPanel` y `AntipatternCard` con visualización interactiva de rutas de ciclo (`cyclePath`), punto de ruptura (`suggestedBreakPoint`), módulos afectados enlazados, filtros y acción de ignorar antipatrón vía IPC.
 * **Fase 6 (Asistente IA §5.7)**: `AiChatPanel` y `AiStatusIndicator` con soporte para Ollama/Mock, comandos slash (`/explain`, `/refactor`, `/metrics`, `/diagram`), visualización de respuestas mock y exportación a Markdown.
+* **Fase 7 (Historial de Análisis)**: Pestaña `Historial` en el `Downbar` alimentada por `useAnalysisHistoryStore` con detalle de ejecuciones en la sesión actual (ID, timestamp, módulos, antipatrones, duración ms y badge de Fitness Score).
 * **Verificación**: Build `tsc && vite build` verificado con **0 errores**.
 
 ---
