@@ -196,14 +196,14 @@ src/
 3. ✅ `DependencyGraphOverview.tsx`: Vista general interactiva del grafo de dependencias en `@xyflow/react` con auto-layout Dagre, coloreado según Mantenibilidad (MI).
 4. ✅ `MetricsPanel/index.tsx`: Tablas interactivas TanStack Table v8 para Módulos, Clases y Funciones, con ordenamiento por columna, búsqueda global, filtros rápidos por umbrales (MI < 60, Inestabilidad > 0.8) y exportación a CSV/JSON.
 
-### Fase 4 — Visualizador C4 (§5.4) y Diagramas Suplementarios
+### Fase 4 — Visualizador C4 (§5.4) y Diagramas Suplementarios — **✅ 100% COMPLETADO**
 
-1. `C4Viewer` con breadcrumb de navegación (Contexto→Contenedores→Componentes→Código) sobre `amg.c4Models`.
-2. Nodos custom de ReactFlow por tipo de elemento C4 (Person, Software System, Container, Component).
-3. Drill-down a Nivel 4 vía el comando expuesto en Fase 0 (`get_module_code_diagram`), al hacer doble clic en un componente.
-4. `PackageDiagramView` / `InheritanceTreeView` / `ErDiagramView` / `CallGraphView` / `SequenceDiagramView` / `DynamicDiagramView` / `DfdDiagramView`: mismo motor `C4Canvas`, alimentados desde `c4Models.componentDiagrams["supplementary:*"]` que genera el backend con las invocaciones resueltas.
-5. El menú de selección de diagrama (Toolbar) habilita y permite alternar entre **todos** los 12 diagramas de backend disponibles (C4 Niveles 1-3, Módulos Circulares, Paquetes, Herencia, ER, Call Graph, Sequence, Dynamic y DFD).
-6. Exportación: solo JSON del diagrama activo en esta fase (ver brecha 0.3).
+1. ✅ `C4Viewer` con breadcrumb de navegación (Contexto→Contenedores→Componentes→Código) sobre `amg.c4Models`.
+2. ✅ Nodos custom de ReactFlow por tipo de elemento C4 (Person, Software System, Container, Component) y variantes para los diagramas suplementarios.
+3. ✅ Drill-down a Nivel 4 vía el comando expuesto en Fase 0 (`get_module_code_diagram`), al hacer doble clic en un componente, con estados de carga y error.
+4. ✅ `PackageDiagramView` / `InheritanceTreeView` / `ErDiagramView` / `CallGraphView` / `SequenceDiagramView` / `DynamicDiagramView` / `DfdDiagramView`: mismo motor `C4Canvas`, alimentados desde `c4Models.componentDiagrams["supplementary:*"]` que genera el backend con las invocaciones resueltas.
+5. ✅ El menú de selección de diagrama (Toolbar) habilita y permite alternar entre **todos** los 12 diagramas disponibles: C4 Niveles 1-4 (Nivel 4 tras el drill-down), Módulos Circulares, Paquetes, Herencia, ER, Call Graph, Sequence, Dynamic y DFD.
+6. ✅ Exportación JSON del diagrama activo (ver brecha 0.3).
 
 ### Fase 5 — Antipatrones (§5.6)
 

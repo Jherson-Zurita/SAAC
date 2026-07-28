@@ -17,9 +17,13 @@ interface DiagramState {
   codeDiagramData: C4DiagramData | null;
   breadcrumbs: BreadcrumbItem[];
   zoom: number;
+  isLoadingCodeDiagram: boolean;
+  codeDiagramError: string | null;
 
   setC4Level: (level: C4Level, containerId?: string | null, moduleId?: string | null, label?: string) => void;
   setCodeDiagramData: (data: C4DiagramData | null) => void;
+  setCodeDiagramLoading: (loading: boolean) => void;
+  setCodeDiagramError: (error: string | null) => void;
   navigateToBreadcrumb: (index: number) => void;
   setZoom: (zoom: number) => void;
   resetDiagram: () => void;
@@ -30,42 +34,51 @@ export const useDiagramStore = create<DiagramState>((set) => ({
   activeContainerId: null,
   activeModuleId: null,
   codeDiagramData: null,
-  breadcrumbs: [{ level: 1, label: 'Contexto (Nivel 1)' }],
+  breadcrumbs: [{ level: 1, label: 'Contexto' }],
   zoom: 1,
+  isLoadingCodeDiagram: false,
+  codeDiagramError: null,
 
   setC4Level: (level, containerId = null, moduleId = null, label) =>
     set((state) => {
-      let defaultLabel = `Nivel ${level}`;
-      if (level === 1) defaultLabel = 'Contexto (Nivel 1)';
-      if (level === 2) defaultLabel = 'Contenedores (Nivel 2)';
-      if (level === 3) defaultLabel = `Componentes (${containerId || 'Contenedor'})`;
-      if (level === 4) defaultLabel = `Código (${moduleId || 'Módulo'})`;
-
-      const newBreadcrumb: BreadcrumbItem = {
-        level,
-        label: label || defaultLabel,
+      const context: BreadcrumbItem = { level: 1, label: 'Contexto' };
+      const containers: BreadcrumbItem = { level: 2, label: 'Contenedores' };
+      const components: BreadcrumbItem = {
+        level: 3,
+        label: level === 3 && label ? label : `Componentes${containerId ? `: ${containerId}` : ''}`,
         containerId: containerId || undefined,
+      };
+      const code: BreadcrumbItem = {
+        level: 4,
+        label: label || `Código${moduleId ? `: ${moduleId}` : ''}`,
+        containerId: containerId || state.activeContainerId || undefined,
         moduleId: moduleId || undefined,
       };
 
-      // Recortar o extender breadcrumb
-      const existingIdx = state.breadcrumbs.findIndex((b) => b.level === level);
-      let newBreadcrumbs: BreadcrumbItem[];
-      if (existingIdx >= 0) {
-        newBreadcrumbs = [...state.breadcrumbs.slice(0, existingIdx), newBreadcrumb];
+      let breadcrumbs: BreadcrumbItem[];
+      if (level === 1) {
+        breadcrumbs = [context];
+      } else if (level === 2) {
+        breadcrumbs = [context, { ...containers, label: label || containers.label }];
+      } else if (level === 3) {
+        breadcrumbs = [context, containers, components];
       } else {
-        newBreadcrumbs = [...state.breadcrumbs, newBreadcrumb];
+        const existingComponents = state.breadcrumbs.find((item) => item.level === 3) || components;
+        breadcrumbs = [context, containers, existingComponents, code];
       }
 
       return {
         c4Level: level,
-        activeContainerId: containerId,
-        activeModuleId: moduleId,
-        breadcrumbs: newBreadcrumbs,
+        activeContainerId: level <= 2 ? null : containerId ?? state.activeContainerId,
+        activeModuleId: level === 4 ? moduleId : null,
+        breadcrumbs,
+        codeDiagramError: null,
       };
     }),
 
   setCodeDiagramData: (codeDiagramData) => set({ codeDiagramData }),
+  setCodeDiagramLoading: (isLoadingCodeDiagram) => set({ isLoadingCodeDiagram }),
+  setCodeDiagramError: (codeDiagramError) => set({ codeDiagramError }),
 
   navigateToBreadcrumb: (index) =>
     set((state) => {
@@ -73,9 +86,10 @@ export const useDiagramStore = create<DiagramState>((set) => ({
       if (!target) return state;
       return {
         c4Level: target.level,
-        activeContainerId: target.containerId || null,
+        activeContainerId: target.containerId || (target.level >= 3 ? state.activeContainerId : null),
         activeModuleId: target.moduleId || null,
         breadcrumbs: state.breadcrumbs.slice(0, index + 1),
+        codeDiagramError: null,
       };
     }),
 
@@ -87,7 +101,9 @@ export const useDiagramStore = create<DiagramState>((set) => ({
       activeContainerId: null,
       activeModuleId: null,
       codeDiagramData: null,
-      breadcrumbs: [{ level: 1, label: 'Contexto (Nivel 1)' }],
+      breadcrumbs: [{ level: 1, label: 'Contexto' }],
       zoom: 1,
+      isLoadingCodeDiagram: false,
+      codeDiagramError: null,
     }),
 }));

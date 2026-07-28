@@ -3,6 +3,7 @@ import { AppShell } from './components/layout/AppShell';
 import { useProjectStore } from './stores/useProjectStore';
 import { useAiStore } from './stores/useAiStore';
 import { useAnalysisHistoryStore } from './stores/useAnalysisHistoryStore';
+import { useDiagramStore } from './stores/useDiagramStore';
 import {
   analyzeProject,
   cancelAnalysis,
@@ -31,6 +32,7 @@ export function App() {
 
   const { setAiStatus } = useAiStore();
   const { setHistory } = useAnalysisHistoryStore();
+  const { resetDiagram } = useDiagramStore();
 
   // Suscripción a eventos de progreso en tiempo real y chequeo de IA
   useEffect(() => {
@@ -119,6 +121,7 @@ export function App() {
       setLastAnalysisResult(result);
 
       if (result.amg) {
+        resetDiagram();
         setAmg(result.amg);
 
         // Evaluar reglas de arquitectura y actualizar Fitness Score

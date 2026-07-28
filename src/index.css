@@ -16,6 +16,12 @@
     --text-primary: #f3f4f6;
     --text-secondary: #9ca3af;
     --text-muted: #6b7280;
+    --diagram-canvas: #0d0f17;
+    --diagram-grid: #1e2333;
+    --diagram-node-bg: #161a26;
+    --diagram-toolbar-bg: rgba(18, 21, 32, 0.92);
+    --diagram-minimap-mask: rgba(9, 11, 16, 0.82);
+    --diagram-overlay-bg: rgba(9, 11, 16, 0.72);
   }
 
   body {
@@ -74,4 +80,355 @@ button:active:not(:disabled) {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #3b4663;
+}
+
+/* Visualizador C4 y diagramas suplementarios */
+.diagram-viewer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  padding: 12px;
+}
+
+.c4-canvas {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: var(--diagram-canvas);
+}
+
+.c4-canvas__heading,
+.c4-canvas__export {
+  position: absolute;
+  top: 12px;
+  z-index: 10;
+  border: 1px solid var(--panel-border);
+  background: var(--diagram-toolbar-bg);
+  backdrop-filter: blur(12px);
+}
+
+.c4-canvas__heading {
+  left: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 120px);
+  padding: 6px 10px;
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.c4-canvas__count {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  font-size: 10px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.c4-canvas__export {
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+  transition: color 160ms ease-out, border-color 160ms ease-out, background-color 160ms ease-out;
+}
+
+.c4-canvas__export svg {
+  width: 13px;
+  height: 13px;
+}
+
+.c4-canvas__export:hover {
+  border-color: var(--accent-cyan);
+  color: var(--text-primary);
+}
+
+.c4-canvas__export:focus-visible,
+.react-flow__node:focus-visible .c4-node {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+}
+
+.c4-node {
+  --node-accent: var(--text-muted);
+  min-width: 180px;
+  max-width: 260px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--node-accent) 62%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--node-accent) 13%, var(--diagram-node-bg));
+  color: var(--text-secondary);
+  cursor: default;
+  user-select: none;
+  transition: transform 160ms ease-out, border-color 160ms ease-out, background-color 160ms ease-out;
+}
+
+.c4-node.is-drillable {
+  cursor: pointer;
+}
+
+.c4-node.is-drillable:hover {
+  transform: translateY(-1px);
+  border-color: var(--node-accent);
+  background: color-mix(in srgb, var(--node-accent) 18%, var(--diagram-node-bg));
+}
+
+.c4-node.is-selected {
+  border-color: var(--node-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--node-accent) 24%, transparent);
+}
+
+.c4-node--person,
+.c4-node--container {
+  --node-accent: var(--accent-blue);
+}
+
+.c4-node--system,
+.c4-node--package,
+.c4-node--dynamic,
+.c4-node--participant {
+  --node-accent: var(--accent-cyan);
+}
+
+.c4-node--component,
+.c4-node--class {
+  --node-accent: var(--accent-purple);
+}
+
+.c4-node--interface,
+.c4-node--code,
+.c4-node--process {
+  --node-accent: var(--accent-emerald);
+}
+
+.c4-node--entity {
+  --node-accent: var(--accent-amber);
+}
+
+.c4-node--external {
+  --node-accent: var(--text-secondary);
+}
+
+.c4-node__heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  color: color-mix(in srgb, var(--node-accent) 76%, var(--text-primary));
+}
+
+.c4-node__icon {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+
+.c4-node__label {
+  overflow: hidden;
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.c4-node__type {
+  margin-bottom: 4px;
+  color: var(--node-accent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.c4-node__technology {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.c4-node__description {
+  display: -webkit-box;
+  margin-top: 5px;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 10px;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.c4-node__hint {
+  margin-top: 7px;
+  color: color-mix(in srgb, var(--node-accent) 72%, var(--text-secondary));
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.c4-node__handle {
+  width: 7px !important;
+  height: 7px !important;
+  border: 0 !important;
+  background: var(--node-accent) !important;
+}
+
+.c4-flow-control,
+.c4-flow-minimap {
+  overflow: hidden;
+  border: 1px solid var(--panel-border) !important;
+  border-radius: 8px !important;
+  background: var(--panel-dark) !important;
+}
+
+.c4-flow-control button {
+  border-bottom-color: var(--panel-border) !important;
+  background: var(--panel-dark) !important;
+  fill: var(--text-secondary) !important;
+}
+
+.c4-flow-control button:hover {
+  background: var(--panel-border) !important;
+  fill: var(--text-primary) !important;
+}
+
+.diagram-empty-state {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 24px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.diagram-empty-state > svg {
+  width: 38px;
+  height: 38px;
+  margin-bottom: 2px;
+  color: var(--accent-cyan);
+  opacity: 0.42;
+}
+
+.diagram-empty-state p {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.diagram-empty-state span {
+  max-width: 440px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.diagram-status-overlay {
+  position: absolute;
+  inset: 12px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border-radius: 12px;
+  background: var(--diagram-overlay-bg);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 700;
+  backdrop-filter: blur(4px);
+}
+
+.diagram-status-overlay__spinner {
+  width: 18px;
+  height: 18px;
+  color: var(--accent-cyan);
+  animation: diagram-spin 800ms linear infinite;
+}
+
+.diagram-error {
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  left: 24px;
+  z-index: 21;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 1px solid color-mix(in srgb, var(--accent-rose) 48%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent-rose) 12%, var(--panel-dark));
+  color: var(--text-primary);
+  font-size: 11px;
+}
+
+.diagram-error > svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  color: var(--accent-rose);
+}
+
+.diagram-error span {
+  min-width: 0;
+  flex: 1;
+}
+
+.diagram-error button {
+  flex: none;
+  padding: 4px 7px;
+  border-radius: 6px;
+  color: var(--accent-rose);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.diagram-error button:hover,
+.diagram-error button:focus-visible {
+  background: color-mix(in srgb, var(--accent-rose) 16%, transparent);
+  color: var(--text-primary);
+}
+
+@keyframes diagram-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .c4-node,
+  .c4-canvas__export {
+    transition-duration: 0ms;
+  }
+
+  .c4-node.is-drillable:hover {
+    transform: none;
+  }
+
+  .diagram-status-overlay__spinner {
+    animation: none;
+  }
+
+  .react-flow__edge.animated path {
+    animation: none !important;
+  }
 }

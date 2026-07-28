@@ -1,15 +1,20 @@
 import { create } from 'zustand';
 
-export type MainTab =
-  | 'dashboard'
-  | 'c4'
+export type SupplementaryDiagramTab =
+  | 'circular'
   | 'package'
   | 'inheritance'
   | 'er'
   | 'callgraph'
   | 'sequence'
   | 'dynamic'
-  | 'dfd'
+  | 'dfd';
+
+export type DiagramTab = 'c4' | SupplementaryDiagramTab;
+
+export type MainTab =
+  | 'dashboard'
+  | DiagramTab
   | 'metrics'
   | 'antipatterns'
   | 'adrs';

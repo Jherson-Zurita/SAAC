@@ -23,7 +23,10 @@ export const BreadcrumbBar: React.FC = () => {
   };
 
   return (
-    <nav className="h-8 bg-[#0e1017] border-b border-[#1f2433] px-3 flex items-center space-x-1.5 text-xs select-none">
+    <nav
+      className="h-8 bg-[#0e1017] border-b border-[#1f2433] px-3 flex items-center space-x-1.5 text-xs select-none overflow-hidden"
+      aria-label="Navegación jerárquica C4"
+    >
       <div className="flex items-center space-x-1 text-gray-500 font-semibold uppercase tracking-wider text-[10px] mr-2">
         <span>Navegación C4:</span>
       </div>
@@ -34,15 +37,17 @@ export const BreadcrumbBar: React.FC = () => {
         return (
           <React.Fragment key={idx}>
             <button
+              type="button"
               onClick={() => navigateToBreadcrumb(idx)}
-              className={`flex items-center space-x-1 px-2 py-0.5 rounded transition ${
+              aria-current={isLast ? 'page' : undefined}
+              className={`flex min-w-0 items-center space-x-1 px-2 py-0.5 rounded transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60 ${
                 isLast
                   ? 'bg-blue-600/20 text-blue-300 font-semibold border border-blue-500/30'
                   : 'text-gray-400 hover:text-white hover:bg-[#1a1e2c]'
               }`}
             >
               {getIconForLevel(item.level)}
-              <span>{item.label}</span>
+              <span className="truncate whitespace-nowrap">{item.label}</span>
             </button>
 
             {!isLast && <ChevronRight className="w-3.5 h-3.5 text-gray-600" />}

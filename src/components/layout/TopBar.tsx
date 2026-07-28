@@ -16,9 +16,13 @@ import {
   Terminal,
   ChevronDown,
 } from 'lucide-react';
-import { useUiStore, MainTab } from '../../stores/useUiStore';
+import { useUiStore, type MainTab } from '../../stores/useUiStore';
 import { useProjectStore } from '../../stores/useProjectStore';
-import { useDiagramStore } from '../../stores/useDiagramStore';
+import { useDiagramStore, type C4Level } from '../../stores/useDiagramStore';
+import {
+  isSupplementaryDiagramTab,
+  supplementaryDiagramDefinitions,
+} from '../c4viewer/diagram-registry';
 
 interface TopBarProps {
   onOpenProject: () => void;
@@ -46,20 +50,53 @@ export const TopBar: React.FC<TopBarProps> = ({
     setDownbarOpen,
   } = useUiStore();
 
-  const { projectPath, isAnalyzing } = useProjectStore();
-  const { c4Level, setC4Level } = useDiagramStore();
+  const { projectPath, isAnalyzing, amg } = useProjectStore();
+  const {
+    c4Level,
+    activeContainerId,
+    activeModuleId,
+    codeDiagramData,
+    setC4Level,
+  } = useDiagramStore();
 
   const handleTabChange = (tab: MainTab) => {
     setActiveMainTab(tab);
-    if (tab === 'c4' && c4Level > 2) {
-      setC4Level(1);
-    }
   };
 
-  const handleC4LevelSelect = (level: 1 | 2 | 3) => {
-    setActiveMainTab('c4');
-    setC4Level(level);
+  const handleDiagramSelect = (value: string) => {
+    if (value.startsWith('c4:')) {
+      const level = Number(value.slice(3)) as C4Level;
+      if (level === 4 && !codeDiagramData) return;
+
+      setActiveMainTab('c4');
+      if (level === 3) {
+        const container =
+          amg?.containers.find((item) => item.id === activeContainerId) ||
+          amg?.containers.find((item) => Boolean(amg.c4Models.componentDiagrams[item.id]));
+        setC4Level(
+          3,
+          container?.id || null,
+          null,
+          container ? `Componentes: ${container.name}` : 'Componentes'
+        );
+      } else if (level === 4) {
+        setC4Level(4, activeContainerId, activeModuleId);
+      } else {
+        setC4Level(level);
+      }
+      return;
+    }
+
+    const tab = value.replace('supplementary:', '') as MainTab;
+    if (isSupplementaryDiagramTab(tab)) setActiveMainTab(tab);
   };
+
+  const activeDiagramValue =
+    activeMainTab === 'c4'
+      ? `c4:${c4Level}`
+      : isSupplementaryDiagramTab(activeMainTab)
+        ? `supplementary:${activeMainTab}`
+        : '';
 
   return (
     <header className="h-12 bg-[#0e111a]/95 backdrop-blur-md border-b border-[#1e2333] flex items-center justify-between px-3 select-none z-30 shadow-md">
@@ -125,60 +162,35 @@ export const TopBar: React.FC<TopBarProps> = ({
           <span>Dashboard</span>
         </button>
 
-        {/* C4 Level Navigation Pills */}
-        <div className="flex items-center border-l border-r border-[#1e2333] px-1 space-x-1">
-          <button
-            onClick={() => handleC4LevelSelect(1)}
-            className={`px-2.5 py-1 text-xs font-semibold rounded-md transition ${
-              activeMainTab === 'c4' && c4Level === 1
-                ? 'bg-cyan-600 text-white shadow-sm shadow-cyan-500/30 font-bold'
-                : 'text-gray-400 hover:text-gray-200 hover:bg-[#161a26]'
-            }`}
-            title="C4 Nivel 1: Contexto del Sistema"
-          >
-            C4 N1
-          </button>
-          <button
-            onClick={() => handleC4LevelSelect(2)}
-            className={`px-2.5 py-1 text-xs font-semibold rounded-md transition ${
-              activeMainTab === 'c4' && c4Level === 2
-                ? 'bg-cyan-600 text-white shadow-sm shadow-cyan-500/30 font-bold'
-                : 'text-gray-400 hover:text-gray-200 hover:bg-[#161a26]'
-            }`}
-            title="C4 Nivel 2: Contenedores"
-          >
-            C4 N2
-          </button>
-          <button
-            onClick={() => handleC4LevelSelect(3)}
-            className={`px-2.5 py-1 text-xs font-semibold rounded-md transition ${
-              activeMainTab === 'c4' && c4Level === 3
-                ? 'bg-cyan-600 text-white shadow-sm shadow-cyan-500/30 font-bold'
-                : 'text-gray-400 hover:text-gray-200 hover:bg-[#161a26]'
-            }`}
-            title="C4 Nivel 3: Componentes"
-          >
-            C4 N3
-          </button>
-        </div>
-
-        {/* Dropdown de Diagramas Suplementarios */}
-        <div className="relative inline-block">
+        {/* Selector unificado: 4 niveles C4 + 8 vistas suplementarias */}
+        <div className="relative inline-block border-l border-r border-[#1e2333] px-1">
           <select
-            value={['package', 'inheritance', 'er', 'callgraph', 'sequence', 'dynamic', 'dfd'].includes(activeMainTab) ? activeMainTab : ''}
-            onChange={(e) => e.target.value && handleTabChange(e.target.value as MainTab)}
-            className="bg-[#121520] text-xs font-semibold text-gray-200 border border-[#232a3e] rounded-md px-2.5 py-1 pr-6 focus:outline-none focus:border-cyan-500 appearance-none cursor-pointer"
+            value={activeDiagramValue}
+            onChange={(event) => handleDiagramSelect(event.target.value)}
+            className="min-w-48 bg-[#121520] text-xs font-semibold text-gray-200 border border-[#232a3e] rounded-md px-2.5 py-1 pr-7 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60 appearance-none cursor-pointer"
+            aria-label="Seleccionar diagrama arquitectónico"
           >
-            <option value="" disabled>📐 Diagramas Suplementarios...</option>
-            <option value="package">📦 Paquetes</option>
-            <option value="inheritance">🌳 Árbol de Herencia</option>
-            <option value="er">🗄️ Entidad-Relación (ER)</option>
-            <option value="callgraph">📞 Grafo de Llamadas (Call Graph)</option>
-            <option value="sequence">⏱️ Diagrama de Secuencia</option>
-            <option value="dynamic">⚡ Diagrama Dinámico C4</option>
-            <option value="dfd">🔄 Flujo de Datos (DFD)</option>
+            <option value="" disabled>Seleccionar diagrama…</option>
+            <optgroup label="Modelo C4">
+              <option value="c4:1">C4 N1 · Contexto</option>
+              <option value="c4:2">C4 N2 · Contenedores</option>
+              <option value="c4:3">C4 N3 · Componentes</option>
+              <option value="c4:4" disabled={!codeDiagramData}>
+                C4 N4 · Código {codeDiagramData ? '' : '(doble clic en un componente)'}
+              </option>
+            </optgroup>
+            <optgroup label="Diagramas suplementarios">
+              {supplementaryDiagramDefinitions.map((definition) => (
+                <option
+                  key={definition.tab}
+                  value={`supplementary:${definition.tab}`}
+                >
+                  {definition.shortLabel}
+                </option>
+              ))}
+            </optgroup>
           </select>
-          <ChevronDown className="w-3 h-3 text-gray-400 absolute right-2 top-2 pointer-events-none" />
+          <ChevronDown className="w-3 h-3 text-gray-400 absolute right-3 top-2 pointer-events-none" />
         </div>
 
         {/* Tablas & Informes */}
