@@ -34,8 +34,8 @@ export async function cancelAnalysis(): Promise<void> {
   await invoke('cancel_analysis');
 }
 
-export async function openProject(path: string): Promise<{ success: boolean; path: string }> {
-  return await invoke<{ success: boolean; path: string }>('open_project', { path });
+export async function openProject(path: string): Promise<string> {
+  return await invoke<string>('open_project', { path });
 }
 
 export function onProjectProgress(callback: (event: ProjectProgressEvent) => void): Promise<UnlistenFn> {

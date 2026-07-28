@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { AppShell } from './components/layout/AppShell';
 import { useProjectStore } from './stores/useProjectStore';
 import { useAiStore } from './stores/useAiStore';
+import { useUiStore } from './stores/useUiStore';
 import { useAnalysisHistoryStore } from './stores/useAnalysisHistoryStore';
 import { useDiagramStore } from './stores/useDiagramStore';
 import {
@@ -32,8 +33,21 @@ export function App() {
   } = useProjectStore();
 
   const { setAiStatus } = useAiStore();
+  const { theme } = useUiStore();
   const { setHistory } = useAnalysisHistoryStore();
   const { resetDiagram } = useDiagramStore();
+
+  // Aplicar tema al documento root
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'light') {
+      root.classList.add('light');
+      root.classList.remove('dark');
+    } else {
+      root.classList.add('dark');
+      root.classList.remove('light');
+    }
+  }, [theme]);
 
   // Suscripción a eventos de progreso en tiempo real y chequeo de IA
   useEffect(() => {
@@ -89,22 +103,22 @@ export function App() {
     if (!targetPath) return;
 
     try {
-      const res = await openProject(targetPath);
-      if (res.success) {
-        setProjectPath(targetPath);
-        // Cargar metadatos y configuraciones del proyecto
-        try {
-          const config = await getProjectConfig(targetPath);
-          setProjectConfig(config);
+      // open_project devuelve un String desde Rust, no un objeto
+      await openProject(targetPath);
+      setProjectPath(targetPath);
 
-          const annotations = await loadProjectAnnotations(targetPath);
-          setAnnotations(annotations);
+      // Cargar metadatos y configuraciones del proyecto
+      try {
+        const config = await getProjectConfig(targetPath);
+        setProjectConfig(config);
 
-          const historyData = await getAnalysisHistory(targetPath);
-          setHistory(historyData);
-        } catch (e) {
-          console.warn('Error al cargar metadatos pre-frontend:', e);
-        }
+        const annotations = await loadProjectAnnotations(targetPath);
+        setAnnotations(annotations);
+
+        const historyData = await getAnalysisHistory(targetPath);
+        setHistory(historyData);
+      } catch (e) {
+        console.warn('Error al cargar metadatos pre-frontend:', e);
       }
     } catch (err) {
       console.error('Error al abrir proyecto:', err);

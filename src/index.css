@@ -24,6 +24,23 @@
     --diagram-overlay-bg: rgba(9, 11, 16, 0.72);
   }
 
+  /* Tema claro — se activa cuando <html class="light"> */
+  :root.light {
+    --bg-dark: #f5f6fa;
+    --panel-dark: #ffffff;
+    --panel-border: #e2e5ed;
+    --panel-border-light: #d1d5e0;
+    --text-primary: #1a1d28;
+    --text-secondary: #4b5563;
+    --text-muted: #9ca3af;
+    --diagram-canvas: #f0f2f8;
+    --diagram-grid: #e2e5ed;
+    --diagram-node-bg: #ffffff;
+    --diagram-toolbar-bg: rgba(255, 255, 255, 0.92);
+    --diagram-minimap-mask: rgba(245, 246, 250, 0.82);
+    --diagram-overlay-bg: rgba(245, 246, 250, 0.72);
+  }
+
   body {
     background-color: var(--bg-dark);
     color: var(--text-primary);
@@ -37,6 +54,62 @@
   code, pre, .font-mono {
     font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
   }
+}
+
+/* ============================================================
+   Mapeo de tema light a clases Tailwind
+   Reemplaza los fondos y bordes hardcodeados del dark theme.
+   ============================================================ */
+
+.light {
+  /* Fondos principales */
+  & .bg-\[\#090b10\] { background-color: #f5f6fa !important; }
+  & .bg-\[\#0d0f17\] { background-color: #eef0f6 !important; }
+  & .bg-\[\#0e111a\] { background-color: #ffffff !important; }
+  & .bg-\[\#0e111a\]\/95 { background-color: rgba(255,255,255,0.95) !important; }
+  & .bg-\[\#10131d\] { background-color: #f0f2f8 !important; }
+  & .bg-\[\#12151e\] { background-color: #ffffff !important; }
+  & .bg-\[\#121520\] { background-color: #ffffff !important; }
+  & .bg-\[\#121520\]\/90 { background-color: rgba(255,255,255,0.9) !important; }
+  & .bg-\[\#141724\] { background-color: #f5f6fa !important; }
+  & .bg-\[\#141b2b\] { background-color: #f0f4ff !important; }
+  & .bg-\[\#161a26\] { background-color: #f0f2f8 !important; }
+  & .bg-\[\#181c2a\] { background-color: #f0f2f8 !important; }
+  & .bg-\[\#191f2e\] { background-color: #e8ebf2 !important; }
+  & .bg-\[\#1f2638\] { background-color: #e2e5f0 !important; }
+  & .bg-\[\#0c0e15\] { background-color: #f5f6fa !important; }
+  & .bg-\[\#090b10\] { background-color: #f5f6fa !important; }
+  & .bg-\[\#090a0f\] { background-color: #f8f9fc !important; }
+  & .bg-\[\#0d0f16\] { background-color: #f0f2f8 !important; }
+  & .bg-\[\#1c1822\] { background-color: #fef9f0 !important; }
+  & .bg-\[\#18151f\] { background-color: #fef6ee !important; }
+  & .bg-\[\#120f18\] { background-color: #fef9f0 !important; }
+
+  /* Bordes */
+  & .border-\[\#1e2333\] { border-color: #e2e5ed !important; }
+  & .border-\[\#232838\] { border-color: #d8dce8 !important; }
+  & .border-\[\#232a3e\] { border-color: #d8dce8 !important; }
+  & .border-\[\#252c40\] { border-color: #d0d4e0 !important; }
+  & .border-\[\#1c2130\] { border-color: #e2e5ed !important; }
+  & .border-\[\#1b1f2c\] { border-color: #e2e5ed !important; }
+  & .border-\[\#2a3147\] { border-color: #c8cdd8 !important; }
+
+  /* Textos */
+  & .text-gray-100 { color: #1a1d28 !important; }
+  & .text-gray-200 { color: #374151 !important; }
+  & .text-gray-300 { color: #4b5563 !important; }
+  & .text-gray-400 { color: #6b7280 !important; }
+  & .text-gray-500 { color: #9ca3af !important; }
+  & .text-gray-600 { color: #6b7280 !important; }
+  & .text-white { color: #111827 !important; }
+
+  /* Scrollbar */
+  & ::-webkit-scrollbar-track { background: #f0f2f8 !important; }
+  & ::-webkit-scrollbar-thumb { background: #c8cdd8 !important; }
+
+  /* Sombras más suaves */
+  & .shadow-lg { box-shadow: 0 4px 12px -2px rgba(0,0,0,0.08) !important; }
+  & .shadow-md { box-shadow: 0 2px 8px -1px rgba(0,0,0,0.06) !important; }
 }
 
 /* Glassmorphism & Micro-animations */
