@@ -5,6 +5,7 @@ import { useAiStore } from './stores/useAiStore';
 import { useUiStore } from './stores/useUiStore';
 import { useAnalysisHistoryStore } from './stores/useAnalysisHistoryStore';
 import { useDiagramStore } from './stores/useDiagramStore';
+import { useRecentProjectsStore } from './stores/useRecentProjectsStore';
 import {
   analyzeProject,
   cancelAnalysis,
@@ -30,12 +31,14 @@ export function App() {
     setProjectConfig,
     setAnnotations,
     setFitnessResult,
+    resetProject,
   } = useProjectStore();
 
   const { setAiStatus } = useAiStore();
   const { theme } = useUiStore();
   const { setHistory } = useAnalysisHistoryStore();
   const { resetDiagram } = useDiagramStore();
+  const { addRecentProject } = useRecentProjectsStore();
 
   // Aplicar tema al documento root
   useEffect(() => {
@@ -75,6 +78,95 @@ export function App() {
     };
   }, [setProgress, setAiStatus]);
 
+  // Ejecutar el análisis AST para una ruta específica
+  const runAnalysisForPath = async (targetPath: string) => {
+    if (!targetPath) return;
+
+    setIsAnalyzing(true);
+    try {
+      const result = await analyzeProject(targetPath);
+      setLastAnalysisResult(result);
+
+      if (result.amg) {
+        resetDiagram();
+        setAmg(result.amg);
+
+        let calculatedFitnessScore: number | undefined;
+
+        // Evaluar reglas de arquitectura y actualizar Fitness Score
+        try {
+          const fitness = await evaluateFitnessRules(targetPath, result.amg);
+          setFitnessResult(fitness);
+          calculatedFitnessScore = fitness.fitnessScore;
+        } catch (e) {
+          console.warn('Error al evaluar reglas:', e);
+        }
+
+        // Actualizar historial
+        try {
+          const updatedHistory = await getAnalysisHistory(targetPath);
+          setHistory(updatedHistory);
+        } catch (e) {
+          console.warn('Error al actualizar historial:', e);
+        }
+
+        // Actualizar registro en useRecentProjectsStore con métricas
+        addRecentProject({
+          path: targetPath,
+          name: result.amg.projectName,
+          fitnessScore: calculatedFitnessScore ?? result.amg.metrics.fitnessScore,
+          moduleCount: result.amg.modules.length,
+          loc: result.amg.metrics.totalLoc,
+          antipatternCount: result.amg.antipatterns.length,
+        });
+      }
+    } catch (err) {
+      console.error('Error durante el análisis del proyecto:', err);
+      alert(`Error en el análisis: ${err}`);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  // Abrir proyecto desde una ruta específica (con análisis automático para cargar vista completa)
+  const handleOpenProjectByPath = async (targetPath: string, autoAnalyze = true) => {
+    if (!targetPath) return;
+
+    try {
+      await openProject(targetPath);
+      setProjectPath(targetPath);
+
+      // Guardar inmediatamente en el historial de proyectos recientes
+      const projectName = targetPath.split(/[/\\]/).pop() || 'Proyecto';
+      addRecentProject({
+        path: targetPath,
+        name: projectName,
+      });
+
+      // Cargar metadatos y configuraciones del proyecto
+      try {
+        const config = await getProjectConfig(targetPath);
+        setProjectConfig(config);
+
+        const annotations = await loadProjectAnnotations(targetPath);
+        setAnnotations(annotations);
+
+        const historyData = await getAnalysisHistory(targetPath);
+        setHistory(historyData);
+      } catch (e) {
+        console.warn('Error al cargar metadatos pre-frontend:', e);
+      }
+
+      // Ejecutar análisis para cargar el AMG y mostrar el Dashboard/Diagramas
+      if (autoAnalyze) {
+        await runAnalysisForPath(targetPath);
+      }
+    } catch (err) {
+      console.error('Error al abrir proyecto:', err);
+      alert(`No se pudo abrir la ruta: ${targetPath}`);
+    }
+  };
+
   // Manejador para abrir diálogo nativo de selección de carpeta
   const handleOpenProject = async () => {
     let targetPath: string | null = null;
@@ -100,67 +192,21 @@ export function App() {
       }
     }
 
-    if (!targetPath) return;
-
-    try {
-      // open_project devuelve un String desde Rust, no un objeto
-      await openProject(targetPath);
-      setProjectPath(targetPath);
-
-      // Cargar metadatos y configuraciones del proyecto
-      try {
-        const config = await getProjectConfig(targetPath);
-        setProjectConfig(config);
-
-        const annotations = await loadProjectAnnotations(targetPath);
-        setAnnotations(annotations);
-
-        const historyData = await getAnalysisHistory(targetPath);
-        setHistory(historyData);
-      } catch (e) {
-        console.warn('Error al cargar metadatos pre-frontend:', e);
-      }
-    } catch (err) {
-      console.error('Error al abrir proyecto:', err);
-      alert(`No se pudo abrir la ruta: ${targetPath}`);
+    if (targetPath) {
+      await handleOpenProjectByPath(targetPath, true);
     }
   };
 
-  // Manejador para ejecutar el análisis AST end-to-end
+  // Manejador para cerrar el proyecto actual y volver a la pantalla de bienvenida
+  const handleCloseProject = () => {
+    resetProject();
+    resetDiagram();
+  };
+
+  // Manejador para re-ejecutar el análisis AST manualmente desde la TopBar
   const handleAnalyzeProject = async () => {
     if (!projectPath) return;
-
-    setIsAnalyzing(true);
-    try {
-      const result = await analyzeProject(projectPath);
-      setLastAnalysisResult(result);
-
-      if (result.amg) {
-        resetDiagram();
-        setAmg(result.amg);
-
-        // Evaluar reglas de arquitectura y actualizar Fitness Score
-        try {
-          const fitness = await evaluateFitnessRules(projectPath, result.amg);
-          setFitnessResult(fitness);
-        } catch (e) {
-          console.warn('Error al evaluar reglas:', e);
-        }
-
-        // Actualizar historial
-        try {
-          const updatedHistory = await getAnalysisHistory(projectPath);
-          setHistory(updatedHistory);
-        } catch (e) {
-          console.warn('Error al actualizar historial:', e);
-        }
-      }
-    } catch (err) {
-      console.error('Error durante el análisis del proyecto:', err);
-      alert(`Error en el análisis: ${err}`);
-    } finally {
-      setIsAnalyzing(false);
-    }
+    await runAnalysisForPath(projectPath);
   };
 
   // Manejador para cancelar análisis activo
@@ -181,6 +227,8 @@ export function App() {
   return (
     <AppShell
       onOpenProject={handleOpenProject}
+      onOpenProjectByPath={(path) => handleOpenProjectByPath(path, true)}
+      onCloseProject={handleCloseProject}
       onAnalyzeProject={handleAnalyzeProject}
       onCancelAnalysis={handleCancelAnalysis}
     />

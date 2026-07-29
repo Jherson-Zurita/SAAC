@@ -15,6 +15,7 @@ import {
   Sparkles,
   Terminal,
   ChevronDown,
+  XCircle,
 } from 'lucide-react';
 import { useUiStore, type MainTab } from '../../stores/useUiStore';
 import { useProjectStore } from '../../stores/useProjectStore';
@@ -28,12 +29,14 @@ interface TopBarProps {
   onOpenProject: () => void;
   onAnalyzeProject: () => void;
   onCancelAnalysis: () => void;
+  onCloseProject?: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
   onOpenProject,
   onAnalyzeProject,
   onCancelAnalysis,
+  onCloseProject,
 }) => {
   const {
     theme,
@@ -134,6 +137,17 @@ export const TopBar: React.FC<TopBarProps> = ({
             <Play className="w-3.5 h-3.5 fill-current" />
             <span>{isAnalyzing ? 'Analizando...' : 'Analizar'}</span>
           </button>
+
+          {projectPath && !isAnalyzing && onCloseProject && (
+            <button
+              onClick={onCloseProject}
+              className="flex items-center space-x-1 px-2 py-1.5 text-xs font-semibold text-gray-400 hover:text-rose-400 bg-[#161a26] hover:bg-[#231a20] border border-[#252c40] hover:border-rose-500/30 rounded-md transition"
+              title="Cerrar proyecto y volver a la pantalla inicial"
+            >
+              <XCircle className="w-3.5 h-3.5" />
+              <span>Cerrar</span>
+            </button>
+          )}
 
           {isAnalyzing && (
             <button
