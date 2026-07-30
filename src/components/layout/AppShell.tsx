@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 
 import { AntipatternsPanel } from '../antipatterns';
+import { AdrsPanel } from '../adrs';
 
 interface AppShellProps {
   onOpenProject: () => void;
@@ -226,6 +227,8 @@ export const AppShell: React.FC<AppShellProps> = ({
             <MetricsPanel />
           ) : activeMainTab === 'antipatterns' ? (
             <AntipatternsPanel />
+          ) : activeMainTab === 'adrs' ? (
+            <AdrsPanel />
           ) : isDiagramTab(activeMainTab) ? (
             <C4Viewer activeTab={activeMainTab} />
           ) : (

@@ -208,26 +208,26 @@ SAAC/
 
 ## 🗺️ Estado del Roadmap de Diagramas (§4.4.1–§4.4.9, 19 vistas totales)
 
-| #   | Diagrama                                          | Estado                                                             |
-| -----| ---------------------------------------------------| -------------------------------------------------------------------|
-| 1   | Contexto del Sistema (C4 Nivel 1)                 | ✅ Backend                                                         |
-| 2   | Contenedores (C4 Nivel 2)                         | ✅ Backend                                                         |
-| 3   | Componentes (C4 Nivel 3)                          | ✅ Backend                                                         |
-| 4   | Código / UML de Módulo (C4 Nivel 4, bajo demanda) | ✅ Backend                                                         |
-| 5   | Módulos Circulares                                | ✅ Backend                                                         |
-| 6   | Diagrama de Paquetes                              | ✅ Backend                                                         |
-| 7   | Árbol de Herencia                                 | ✅ Backend                                                         |
-| 8   | Diagrama Entidad-Relación                         | ✅ Backend                                                         |
-| 9   | Mapa de Calor de Acoplamiento (Coupling Matrix)   | ❓ Por confirmar si ya existe una fuente de datos dedicada         |
-| 10  | Deployment Diagram                                | ❓ Alcanzable con datos actuales (`docker-compose.yml`/k8s), sin decisión tomada aún |
-| 11  | Árbol de Directorios (File Tree)                  | 🎨 Frontend puro, sin trabajo de Rust pendiente                    |
-| 12  | Mapa de Carpetas (Treemap D3)                     | 🎨 Frontend puro                                                   |
-| 13  | Línea de Tiempo de Evolución                      | 🎨 Frontend + snapshots ya cacheados en sled                       |
-| 14  | Mapa de Calor de Contribuciones (Ownership)       | 🎨 Frontend + `git log`/`git blame`                                |
-| 15  | Dynamic Diagram                                   | ✅ Backend (`supplementary:dynamic-diagram` vía `invocations`)     |
-| 16  | Call Graph                                        | ✅ Backend (`supplementary:call-graph` vía `invocations`)          |
-| 17  | Diagrama de Secuencia                             | ✅ Backend (`supplementary:sequence-diagram` vía `invocations`)    |
-| 18  | Diagrama de Flujo de Datos (DFD)                  | ✅ Backend (`supplementary:dfd-diagram` vía `invocations`)         |
+| #   | Diagrama                                          | Estado　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　 |
+| -----| ---------------------------------------------------| --------------------------------------------------------------------------------------------------|
+| 1   | Contexto del Sistema (C4 Nivel 1)                 | ✅ Backend　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　|
+| 2   | Contenedores (C4 Nivel 2)                         | ✅ Backend　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　|
+| 3   | Componentes (C4 Nivel 3)                          | ✅ Backend　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　|
+| 4   | Código / UML de Módulo (C4 Nivel 4, bajo demanda) | ✅ Backend　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　|
+| 5   | Módulos Circulares                                | ✅ Backend　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　|
+| 6   | Diagrama de Paquetes                              | ✅ Backend　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　|
+| 7   | Árbol de Herencia                                 | ✅ Backend　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　|
+| 8   | Diagrama Entidad-Relación                         | ✅ Backend　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　|
+| 9   | Mapa de Calor de Acoplamiento (Coupling Matrix)   | ❓ Por confirmar si ya existe una fuente de datos dedicada　　　　　　　　　　　　　　　　　　　　|
+| 10  | Deployment Diagram                                | ❓ Alcanzable con datos actuales (`docker-compose.yml`/k8s), sin decisión tomada aún　　　　　　　|
+| 11  | Árbol de Directorios (File Tree)                  | 🎨 Frontend puro, sin trabajo de Rust pendiente　　　　　　　　　　　　　　　　　　　　　　　　　|
+| 12  | Mapa de Carpetas (Treemap D3)                     | 🎨 Frontend puro　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　 |
+| 13  | Línea de Tiempo de Evolución                      | 🎨 Frontend + snapshots ya cacheados en sled　　　　　　　　　　　　　　　　　　　　　　　　　　 |
+| 14  | Mapa de Calor de Contribuciones (Ownership)       | 🎨 Frontend + `git log`/`git blame`　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　|
+| 15  | Dynamic Diagram                                   | ✅ Backend (`supplementary:dynamic-diagram` vía `invocations`)　　　　　　　　　　　　　　　　　　|
+| 16  | Call Graph                                        | ✅ Backend (`supplementary:call-graph` vía `invocations`)　　　　　　　　　　　　　　　　　　　　 |
+| 17  | Diagrama de Secuencia                             | ✅ Backend (`supplementary:sequence-diagram` vía `invocations`)　　　　　　　　　　　　　　　　　 |
+| 18  | Diagrama de Flujo de Datos (DFD)                  | ✅ Backend (`supplementary:dfd-diagram` vía `invocations`)　　　　　　　　　　　　　　　　　　　　|
 | 19  | System Landscape                                  | ❓ Requiere soporte multi-proyecto, no implementado en `analyze_project` (recibe un único `path`) |
 
 ---
