@@ -16,6 +16,7 @@ import {
   Terminal,
   ChevronDown,
   XCircle,
+  RotateCw,
 } from 'lucide-react';
 import { useUiStore, type MainTab } from '../../stores/useUiStore';
 import { useProjectStore } from '../../stores/useProjectStore';
@@ -132,10 +133,14 @@ export const TopBar: React.FC<TopBarProps> = ({
             onClick={onAnalyzeProject}
             disabled={!projectPath || isAnalyzing}
             className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-md transition shadow-md shadow-blue-600/20 disabled:opacity-40"
-            title="Iniciar análisis sintáctico AST"
+            title={amg ? 'Volver a analizar código AST del proyecto' : 'Iniciar análisis sintáctico AST'}
           >
-            <Play className="w-3.5 h-3.5 fill-current" />
-            <span>{isAnalyzing ? 'Analizando...' : 'Analizar'}</span>
+            {amg ? (
+              <RotateCw className={`w-3.5 h-3.5 ${isAnalyzing ? 'animate-spin' : ''}`} />
+            ) : (
+              <Play className="w-3.5 h-3.5 fill-current" />
+            )}
+            <span>{isAnalyzing ? 'Analizando...' : amg ? 'Reanalizar' : 'Analizar'}</span>
           </button>
 
           {projectPath && !isAnalyzing && onCloseProject && (

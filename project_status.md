@@ -197,7 +197,8 @@ SAAC/
 * **Fase 6 (Asistente IA §5.7)**: `AiChatPanel` y `AiStatusIndicator` con soporte para Ollama/Mock, comandos slash (`/explain`, `/refactor`, `/metrics`, `/diagram`), visualización de respuestas mock y exportación a Markdown.
 * **Fase 7 (Historial de Análisis)**: Pestaña `Historial` en el `Downbar` alimentada por `useAnalysisHistoryStore` con detalle de ejecuciones en la sesión actual.
 * **Fase 8 (Pulido y Atajos IDE)**: `useKeyboardShortcuts.ts` integrando atajos profesionales del IDE (`Ctrl+O`, `Ctrl+Shift+A`, `Ctrl+B`, `Ctrl+J`, `Esc`, `Alt+1..4`), accesibilidad WAI-ARIA y eliminación de advertencias.
-* **Pantalla de Proyectos y Análisis Recientes (Estilo VS Code)**: `useRecentProjectsStore.ts` con persistencia en `localStorage`, catálogo interactivo en la pantalla inicial para abrir y cargar análisis de proyectos previos con 1 clic (transición directa a Dashboard/C4), botón "Cerrar" en `TopBar` y registro de métricas clave (Fitness Score, Módulos, LOC).
+* **Pantalla de Proyectos y Análisis Recientes (Estilo VS Code)**: `useRecentProjectsStore.ts` y `project-cache.ts` con persistencia en `localStorage`. Al hacer clic en un proyecto del historial reciente se cargan al instante los datos guardados (`amg`, `fitnessResult`, métricas) en 0 ms sin volver a escanear los archivos.
+* **Botón Reanalizar**: Cuando un proyecto tiene su análisis cargado/guardado, el botón de la `TopBar` cambia dinámicamente su texto e ícono a **"Reanalizar"** (🔄), permitiendo refrescar el análisis AST a solicitud.
 * **Corrección de Bugs**:
   1. **Tema Light / Dark**: Mapeo completo de clases y CSS variables con activación dinámica mediante `<html class="light|dark">`.
   2. **Habilitación de Botón Analizar**: Corrección del deserializador IPC para `openProject` permitiendo abrir la ruta seleccionada y habilitar inmediatamente el botón "Analizar".

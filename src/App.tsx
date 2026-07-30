@@ -19,6 +19,7 @@ import {
 } from './lib/tauri-api';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { saveCachedProjectData, loadCachedProjectData } from './lib/project-cache';
 
 export function App() {
   const {
@@ -92,15 +93,19 @@ export function App() {
         setAmg(result.amg);
 
         let calculatedFitnessScore: number | undefined;
+        let fitnessData = null;
 
         // Evaluar reglas de arquitectura y actualizar Fitness Score
         try {
-          const fitness = await evaluateFitnessRules(targetPath, result.amg);
-          setFitnessResult(fitness);
-          calculatedFitnessScore = fitness.fitnessScore;
+          fitnessData = await evaluateFitnessRules(targetPath, result.amg);
+          setFitnessResult(fitnessData);
+          calculatedFitnessScore = fitnessData.fitnessScore;
         } catch (e) {
           console.warn('Error al evaluar reglas:', e);
         }
+
+        // Guardar resultado del análisis en la caché local
+        saveCachedProjectData(targetPath, result.amg, fitnessData);
 
         // Actualizar historial
         try {
@@ -128,20 +133,13 @@ export function App() {
     }
   };
 
-  // Abrir proyecto desde una ruta específica (con análisis automático para cargar vista completa)
-  const handleOpenProjectByPath = async (targetPath: string, autoAnalyze = true) => {
+  // Abrir proyecto desde una ruta específica (cargando caché si existe o analizando si no)
+  const handleOpenProjectByPath = async (targetPath: string) => {
     if (!targetPath) return;
 
     try {
       await openProject(targetPath);
       setProjectPath(targetPath);
-
-      // Guardar inmediatamente en el historial de proyectos recientes
-      const projectName = targetPath.split(/[/\\]/).pop() || 'Proyecto';
-      addRecentProject({
-        path: targetPath,
-        name: projectName,
-      });
 
       // Cargar metadatos y configuraciones del proyecto
       try {
@@ -157,8 +155,24 @@ export function App() {
         console.warn('Error al cargar metadatos pre-frontend:', e);
       }
 
-      // Ejecutar análisis para cargar el AMG y mostrar el Dashboard/Diagramas
-      if (autoAnalyze) {
+      // 1. Intentar cargar el análisis guardado previamente en caché
+      const cached = loadCachedProjectData(targetPath);
+      if (cached.amg) {
+        resetDiagram();
+        setAmg(cached.amg);
+        if (cached.fitnessResult) {
+          setFitnessResult(cached.fitnessResult);
+        }
+        addRecentProject({
+          path: targetPath,
+          name: cached.amg.projectName,
+          fitnessScore: cached.fitnessResult?.fitnessScore ?? cached.amg.metrics.fitnessScore,
+          moduleCount: cached.amg.modules.length,
+          loc: cached.amg.metrics.totalLoc,
+          antipatternCount: cached.amg.antipatterns.length,
+        });
+      } else {
+        // 2. Si no hay análisis previo guardado para este proyecto, ejecutar análisis AST
         await runAnalysisForPath(targetPath);
       }
     } catch (err) {
@@ -193,7 +207,7 @@ export function App() {
     }
 
     if (targetPath) {
-      await handleOpenProjectByPath(targetPath, true);
+      await handleOpenProjectByPath(targetPath);
     }
   };
 
@@ -227,7 +241,7 @@ export function App() {
   return (
     <AppShell
       onOpenProject={handleOpenProject}
-      onOpenProjectByPath={(path) => handleOpenProjectByPath(path, true)}
+      onOpenProjectByPath={handleOpenProjectByPath}
       onCloseProject={handleCloseProject}
       onAnalyzeProject={handleAnalyzeProject}
       onCancelAnalysis={handleCancelAnalysis}
