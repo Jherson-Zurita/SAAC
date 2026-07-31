@@ -65,7 +65,9 @@ pub struct AnnotationsManager;
 impl AnnotationsManager {
     /// Carga las anotaciones desde `.saac/annotations.json`.
     pub fn load_annotations(project_path: &str) -> ProjectAnnotations {
-        let path = Path::new(project_path).join(".saac").join("annotations.json");
+        let path = Path::new(project_path)
+            .join(".saac")
+            .join("annotations.json");
         if path.exists() {
             if let Ok(content) = fs::read_to_string(&path) {
                 if let Ok(data) = serde_json::from_str::<ProjectAnnotations>(&content) {
@@ -89,7 +91,10 @@ impl AnnotationsManager {
     }
 
     /// Añade o actualiza una anotación.
-    pub fn add_annotation(project_path: &str, annotation: Annotation) -> Result<ProjectAnnotations, String> {
+    pub fn add_annotation(
+        project_path: &str,
+        annotation: Annotation,
+    ) -> Result<ProjectAnnotations, String> {
         let mut data = Self::load_annotations(project_path);
         data.annotations.retain(|a| a.id != annotation.id);
         data.annotations.push(annotation);
@@ -114,7 +119,8 @@ impl AnnotationsManager {
         author: &str,
     ) -> Result<ProjectAnnotations, String> {
         let mut data = Self::load_annotations(project_path);
-        data.ignored_antipatterns.retain(|i| i.antipattern_id != antipattern_id);
+        data.ignored_antipatterns
+            .retain(|i| i.antipattern_id != antipattern_id);
         data.ignored_antipatterns.push(IgnoredAntipattern {
             antipattern_id: antipattern_id.to_string(),
             ignored_at: chrono::Utc::now().to_rfc3339(),

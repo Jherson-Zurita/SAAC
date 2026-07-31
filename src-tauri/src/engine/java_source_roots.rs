@@ -138,7 +138,9 @@ fn extract_maven_source_dirs(xml_content: &str) -> Vec<String> {
                 // para no confundir con homónimos dentro de <profile> o <pluginManagement>.
                 if name == "sourceDirectory" && matches_path(&tag_stack, &["project", "build"]) {
                     capturing_tag = Some("main");
-                } else if name == "testSourceDirectory" && matches_path(&tag_stack, &["project", "build"]) {
+                } else if name == "testSourceDirectory"
+                    && matches_path(&tag_stack, &["project", "build"])
+                {
                     capturing_tag = Some("test");
                 }
                 tag_stack.push(name);

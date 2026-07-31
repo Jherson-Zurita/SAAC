@@ -45,7 +45,12 @@ use crate::engine::amg::{Language, ProjectType};
 const MARKER_SEARCH_MAX_DEPTH: usize = 4;
 
 const EXCLUDED_DIR_SEGMENTS: &[&str] = &[
-    "/node_modules/", "/target/", "/.venv/", "/.git/", "/dist/", "/build/",
+    "/node_modules/",
+    "/target/",
+    "/.venv/",
+    "/.git/",
+    "/dist/",
+    "/build/",
 ];
 
 #[derive(Debug, Clone, Serialize)]
@@ -98,7 +103,10 @@ impl ProjectDetector {
                 continue;
             }
             let dir_str = entry.path().to_string_lossy().replace('\\', "/");
-            if EXCLUDED_DIR_SEGMENTS.iter().any(|seg| dir_str.contains(seg)) {
+            if EXCLUDED_DIR_SEGMENTS
+                .iter()
+                .any(|seg| dir_str.contains(seg))
+            {
                 continue;
             }
             let dir_owned = entry.path().to_string_lossy().into_owned();
@@ -168,7 +176,10 @@ impl ProjectDetector {
                 return ProjectType::Desktop;
             }
         }
-        if contains_any(&markers.java_deps, &["com.android.application", "com.android.library"]) {
+        if contains_any(
+            &markers.java_deps,
+            &["com.android.application", "com.android.library"],
+        ) {
             return ProjectType::Mobile;
         }
 
@@ -177,15 +188,36 @@ impl ProjectDetector {
         let mut web_signals = 0u32;
 
         if let Some(pkg) = &markers.package_json {
-            if contains_any(pkg, &["\"express\"", "\"fastify\"", "\"koa\"", "\"@nestjs/core\"", "\"hapi\""]) {
+            if contains_any(
+                pkg,
+                &[
+                    "\"express\"",
+                    "\"fastify\"",
+                    "\"koa\"",
+                    "\"@nestjs/core\"",
+                    "\"hapi\"",
+                ],
+            ) {
                 server_signals += 1;
             }
-            if contains_any(pkg, &["\"react\"", "\"vue\"", "\"next\"", "\"@angular/core\"", "\"svelte\""]) {
+            if contains_any(
+                pkg,
+                &[
+                    "\"react\"",
+                    "\"vue\"",
+                    "\"next\"",
+                    "\"@angular/core\"",
+                    "\"svelte\"",
+                ],
+            ) {
                 web_signals += 1;
             }
         }
         if markers.python_project
-            && contains_any(&markers.python_deps, &["flask", "django", "fastapi", "starlette"])
+            && contains_any(
+                &markers.python_deps,
+                &["flask", "django", "fastapi", "starlette"],
+            )
         {
             server_signals += 1;
         }
@@ -239,7 +271,10 @@ impl ProjectDetector {
                 continue;
             }
             let path_str = entry.path().to_string_lossy().replace('\\', "/");
-            if EXCLUDED_DIR_SEGMENTS.iter().any(|seg| path_str.contains(seg)) {
+            if EXCLUDED_DIR_SEGMENTS
+                .iter()
+                .any(|seg| path_str.contains(seg))
+            {
                 continue;
             }
             if let Some(lang) = language_from_extension(entry.path()) {

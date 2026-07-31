@@ -22,6 +22,13 @@ import type {
   GlobalConfig,
   C4DiagramData,
   AiStatusResult,
+  ProposedArchitecture,
+  ProposedArchitectureSummary,
+  ProposedNode,
+  ProposedNodeType,
+  NodePosition,
+  ComparisonReport,
+  ExportFormat,
 } from '../../shared/types';
 
 // ── Análises y Proyecto ──
@@ -161,4 +168,97 @@ export async function getModuleCodeDiagram(
   amg: ArchitectureModelGraph
 ): Promise<C4DiagramData> {
   return await invoke<C4DiagramData>('get_module_code_diagram', { moduleId, amg });
+}
+
+// ── Módulo de Diseño Arquitectónico ──
+
+export async function createProposedArchitecture(
+  projectPath: string,
+  name: string,
+  basedOnAnalysisRunId: string | null = null,
+  description: string | null = null
+): Promise<ProposedArchitecture> {
+  return await invoke<ProposedArchitecture>('create_proposed_architecture', {
+    projectPath,
+    name,
+    basedOnRunId: basedOnAnalysisRunId,
+    description,
+  });
+}
+
+export async function listProposedArchitectures(
+  projectPath: string
+): Promise<ProposedArchitectureSummary[]> {
+  return await invoke<ProposedArchitectureSummary[]>('list_proposed_architectures', {
+    projectPath,
+  });
+}
+
+export async function getProposedArchitecture(
+  projectPath: string,
+  designId: string
+): Promise<ProposedArchitecture> {
+  return await invoke<ProposedArchitecture>('get_proposed_architecture', {
+    projectPath,
+    designId,
+  });
+}
+
+export async function updateProposedArchitecture(
+  projectPath: string,
+  designId: string,
+  architecture: ProposedArchitecture
+): Promise<ProposedArchitecture> {
+  return await invoke<ProposedArchitecture>('update_proposed_architecture', {
+    projectPath,
+    designId,
+    architecture,
+  });
+}
+
+export async function addProposedNode(
+  projectPath: string,
+  designId: string,
+  nodeType: ProposedNodeType,
+  label: string,
+  position: NodePosition
+): Promise<ProposedNode> {
+  return await invoke<ProposedNode>('add_proposed_node', {
+    projectPath,
+    designId,
+    nodeType,
+    label,
+    position,
+  });
+}
+
+export async function deleteProposedArchitecture(
+  projectPath: string,
+  designId: string
+): Promise<void> {
+  await invoke('delete_proposed_architecture', { projectPath, designId });
+}
+
+export async function compareProposedArchitecture(
+  projectPath: string,
+  designId: string,
+  againstRunId: string
+): Promise<ComparisonReport> {
+  return await invoke<ComparisonReport>('compare_proposed_architecture', {
+    projectPath,
+    designId,
+    againstRunId,
+  });
+}
+
+export async function exportProposedArchitecture(
+  projectPath: string,
+  designId: string,
+  format: ExportFormat
+): Promise<string> {
+  return await invoke<string>('export_proposed_architecture', {
+    projectPath,
+    designId,
+    format,
+  });
 }

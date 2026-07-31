@@ -176,11 +176,20 @@ mod tests {
     fn detect_finds_module_and_dir() {
         let tmp = std::env::temp_dir().join(format!("saac_go_test2_{}", std::process::id()));
         let _ = fs::create_dir_all(&tmp);
-        fs::write(tmp.join("go.mod"), "module github.com/user/myproject\n\ngo 1.22\n").unwrap();
+        fs::write(
+            tmp.join("go.mod"),
+            "module github.com/user/myproject\n\ngo 1.22\n",
+        )
+        .unwrap();
         let modules = detect_go_modules(&tmp);
         assert_eq!(modules.len(), 1);
         assert_eq!(modules[0].module_path, "github.com/user/myproject");
-        assert!(modules[0].dir.replace('\\', "/").ends_with(&tmp.file_name().unwrap().to_string_lossy().replace('\\', "/")));
+        assert!(modules[0].dir.replace('\\', "/").ends_with(
+            &tmp.file_name()
+                .unwrap()
+                .to_string_lossy()
+                .replace('\\', "/")
+        ));
         let _ = fs::remove_dir_all(&tmp);
     }
 }

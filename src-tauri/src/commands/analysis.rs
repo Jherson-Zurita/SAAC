@@ -1,26 +1,27 @@
+use crate::engine::aggregator::Aggregator;
+use crate::engine::amg::{ArchitectureModelGraph, SnapshotType, WorkerAnalysisResult};
+use crate::engine::cache::CacheManager;
+use crate::engine::go_module_roots::detect_go_modules;
+use crate::engine::history::HistoryManager;
+use crate::engine::java_source_roots::detect_java_source_roots;
+use crate::engine::project_config::ProjectConfigManager;
+use crate::engine::project_detector::ProjectDetector;
+use crate::engine::rules::RulesEngine;
+use crate::engine::rust_crate_roots::detect_rust_crates;
 use crate::workers::node_worker::NodeWorkerManager;
 use crate::workers::python_worker::PythonWorkerManager;
 use crate::workers::types::{
-    FileAnalysisOutcome, AnalysisFileStatus, ProjectAnalysisResult, SkippedFile, ProjectProgressEvent
+    AnalysisFileStatus, FileAnalysisOutcome, ProjectAnalysisResult, ProjectProgressEvent,
+    SkippedFile,
 };
-use tauri::{State, Emitter};
 use ignore::WalkBuilder;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Mutex;
-use std::path::Path;
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 use std::io::Read;
-use crate::engine::cache::CacheManager;
-use crate::engine::aggregator::Aggregator;
-use crate::engine::project_detector::ProjectDetector;
-use crate::engine::java_source_roots::detect_java_source_roots;
-use crate::engine::go_module_roots::detect_go_modules;
-use crate::engine::rust_crate_roots::detect_rust_crates;
-use crate::engine::amg::{ArchitectureModelGraph, WorkerAnalysisResult, SnapshotType};
-use crate::engine::project_config::ProjectConfigManager;
-use crate::engine::history::HistoryManager;
-use crate::engine::rules::RulesEngine;
+use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::sync::Mutex;
+use tauri::{Emitter, State};
 
 const BATCH_CHUNK_SIZE: usize = 50;
 const MAX_FILE_SIZE_BYTES: u64 = 1_048_576; // 1 MB
@@ -43,7 +44,10 @@ impl CancellationRegistry {
     /// reemplazando cualquier flag anterior (que, si existía, ya debería
     /// haber finalizado — `analyze_project` limpia su propio flag al salir).
     fn register(&self, flag: Arc<AtomicBool>) {
-        let mut guard = self.current.lock().expect("CancellationRegistry mutex envenenado");
+        let mut guard = self
+            .current
+            .lock()
+            .expect("CancellationRegistry mutex envenenado");
         *guard = Some(flag);
     }
 
@@ -51,14 +55,20 @@ impl CancellationRegistry {
     /// `analyze_project`, tanto en éxito como en cancelación, para que un
     /// `cancel_analysis` posterior no actúe sobre un análisis ya terminado.
     fn clear(&self) {
-        let mut guard = self.current.lock().expect("CancellationRegistry mutex envenenado");
+        let mut guard = self
+            .current
+            .lock()
+            .expect("CancellationRegistry mutex envenenado");
         *guard = None;
     }
 
     /// Solicita la cancelación del análisis activo, si lo hay.
     /// Devuelve `true` si había un análisis en curso al que señalizar.
     fn request_cancel(&self) -> bool {
-        let guard = self.current.lock().expect("CancellationRegistry mutex envenenado");
+        let guard = self
+            .current
+            .lock()
+            .expect("CancellationRegistry mutex envenenado");
         if let Some(flag) = guard.as_ref() {
             flag.store(true, Ordering::SeqCst);
             true
@@ -79,7 +89,9 @@ struct ProgressReporter<'a> {
 
 impl<'a> ProgressReporter<'a> {
     fn report(&self, current_file: Option<String>) {
-        let completed = self.completed_files.load(std::sync::atomic::Ordering::SeqCst);
+        let completed = self
+            .completed_files
+            .load(std::sync::atomic::Ordering::SeqCst);
         let event = ProjectProgressEvent {
             phase: if completed >= self.total_files - self.skipped_files {
                 "done".to_string()
@@ -146,7 +158,7 @@ pub fn scan_project_directory(path: &str) -> (Vec<String>, Vec<SkippedFile>, usi
                 if entry.file_type().map(|ft| ft.is_file()).unwrap_or(false) {
                     let p = entry.path();
                     let path_str = p.to_string_lossy().replace('\\', "/");
-                    
+
                     // Exclusiones explícitas y patrones configurados
                     if path_str.contains("/node_modules/")
                         || path_str.contains("/target/")
@@ -188,7 +200,12 @@ pub fn scan_project_directory(path: &str) -> (Vec<String>, Vec<SkippedFile>, usi
         }
     }
 
-    (file_paths, skipped_files, node_files_count, python_files_count)
+    (
+        file_paths,
+        skipped_files,
+        node_files_count,
+        python_files_count,
+    )
 }
 
 // Helper interno para analizar un conjunto de archivos separándolos por worker con chunking.
@@ -228,7 +245,11 @@ async fn analyze_files_internal(
         }
     }
 
-    let is_cancelled = || cancel_flag.map(|f| f.load(Ordering::SeqCst)).unwrap_or(false);
+    let is_cancelled = || {
+        cancel_flag
+            .map(|f| f.load(Ordering::SeqCst))
+            .unwrap_or(false)
+    };
 
     // Procesar chunks de Node en un bucle secuencial, verificando cancelación
     // antes de cada chunk (no a mitad de uno ya en vuelo).
@@ -246,7 +267,8 @@ async fn analyze_files_internal(
 
             if let Some(rep) = reporter {
                 let last_file = chunk_outcomes.last().map(|o| o.file_path.clone());
-                rep.completed_files.fetch_add(chunk_len, std::sync::atomic::Ordering::SeqCst);
+                rep.completed_files
+                    .fetch_add(chunk_len, std::sync::atomic::Ordering::SeqCst);
                 rep.report(last_file);
             }
             results.append(&mut chunk_outcomes);
@@ -269,7 +291,8 @@ async fn analyze_files_internal(
 
             if let Some(rep) = reporter {
                 let last_file = chunk_outcomes.last().map(|o| o.file_path.clone());
-                rep.completed_files.fetch_add(chunk_len, std::sync::atomic::Ordering::SeqCst);
+                rep.completed_files
+                    .fetch_add(chunk_len, std::sync::atomic::Ordering::SeqCst);
                 rep.report(last_file);
             }
             results.append(&mut chunk_outcomes);
@@ -318,7 +341,8 @@ pub async fn analyze_project(
     path: String,
 ) -> Result<ProjectAnalysisResult, String> {
     let start_time = std::time::Instant::now();
-    let (file_paths, skipped_files, node_files_count, python_files_count) = scan_project_directory(&path);
+    let (file_paths, skipped_files, node_files_count, python_files_count) =
+        scan_project_directory(&path);
 
     let total_files = file_paths.len() + skipped_files.len();
 
@@ -364,7 +388,11 @@ pub async fn analyze_project(
     let cache = match CacheManager::open(&path) {
         Ok(c) => Some(c),
         Err(e) => {
-            tracing::warn!("No se pudo abrir la base de datos de caché en {}: {}", path, e);
+            tracing::warn!(
+                "No se pudo abrir la base de datos de caché en {}: {}",
+                path,
+                e
+            );
             None
         }
     };
@@ -377,7 +405,7 @@ pub async fn analyze_project(
     for file_path in file_paths {
         if let Ok(hash) = calculate_file_hash(&file_path) {
             file_hashes.insert(file_path.clone(), hash.clone());
-            
+
             let mut found_in_cache = false;
             if let Some(ref cache_mgr) = cache {
                 if let Some(cached_result) = cache_mgr.get_file_analysis(&file_path, &hash) {
@@ -431,9 +459,15 @@ pub async fn analyze_project(
             for outcome in &new_outcomes {
                 if outcome.status == AnalysisFileStatus::Success {
                     if let Some(result_val) = &outcome.result {
-                        if let Ok(worker_res) = serde_json::from_value::<WorkerAnalysisResult>(result_val.clone()) {
+                        if let Ok(worker_res) =
+                            serde_json::from_value::<WorkerAnalysisResult>(result_val.clone())
+                        {
                             if let Some(hash) = file_hashes.get(&outcome.file_path) {
-                                let _ = cache_mgr.set_file_analysis(&outcome.file_path, hash, &worker_res);
+                                let _ = cache_mgr.set_file_analysis(
+                                    &outcome.file_path,
+                                    hash,
+                                    &worker_res,
+                                );
                             }
                         }
                     }
@@ -468,7 +502,11 @@ pub async fn analyze_project(
 
     // Fase 3: Emitir progreso finalizado (o cancelado)
     let final_event = ProjectProgressEvent {
-        phase: if was_cancelled { "cancelled".to_string() } else { "done".to_string() },
+        phase: if was_cancelled {
+            "cancelled".to_string()
+        } else {
+            "done".to_string()
+        },
         total_files,
         completed_files: completed_files.load(Ordering::SeqCst),
         node_files: node_files_count,
@@ -492,17 +530,31 @@ pub async fn analyze_project(
         let go_modules = detect_go_modules(Path::new(&path));
         let rust_crates = detect_rust_crates(Path::new(&path));
 
-        let aggregated = Aggregator::aggregate(worker_results, &java_source_roots, &go_modules, &rust_crates);
+        let aggregated = Aggregator::aggregate(
+            worker_results,
+            &java_source_roots,
+            &go_modules,
+            &rust_crates,
+        );
         let project_detection = ProjectDetector::detect(&path);
-        
-        let amg_id = format!("{:x}-{:x}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos(), std::process::id());
+
+        let amg_id = format!(
+            "{:x}-{:x}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos(),
+            std::process::id()
+        );
         let analysis_run_id = amg_id.clone();
         let project_name = Path::new(&path)
             .file_name()
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_else(|| "Unknown Project".to_string());
-        
-        let parent_amg_id = cache.as_ref().and_then(|c| c.get_latest_amg().map(|a| a.amg_id));
+
+        let parent_amg_id = cache
+            .as_ref()
+            .and_then(|c| c.get_latest_amg().map(|a| a.amg_id));
 
         let compiled_amg = ArchitectureModelGraph {
             amg_id,
@@ -585,10 +637,14 @@ pub async fn analyze_file(
     file_hash: String,
 ) -> Result<FileAnalysisOutcome, String> {
     if is_node_file(&file_path) {
-        let outcome = node_manager.send_parse_request(file_path, language, file_hash).await;
+        let outcome = node_manager
+            .send_parse_request(file_path, language, file_hash)
+            .await;
         Ok(outcome)
     } else if is_python_file(&file_path) {
-        let outcome = python_manager.send_parse_request(file_path, language, file_hash).await;
+        let outcome = python_manager
+            .send_parse_request(file_path, language, file_hash)
+            .await;
         Ok(outcome)
     } else {
         Ok(FileAnalysisOutcome {

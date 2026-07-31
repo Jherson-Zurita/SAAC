@@ -81,9 +81,7 @@ pub enum AiContextType {
 impl AiContextType {
     pub fn from_str_opt(ctx_type: Option<&str>, target_id: Option<&str>) -> Self {
         match ctx_type.unwrap_or("amg") {
-            "module" => {
-                AiContextType::ModuleDetail(target_id.unwrap_or_default().to_string())
-            }
+            "module" => AiContextType::ModuleDetail(target_id.unwrap_or_default().to_string()),
             "antipattern" => {
                 AiContextType::AntipatternDetail(target_id.unwrap_or_default().to_string())
             }
@@ -328,7 +326,10 @@ impl AiClient {
             _ => "### CONTEXTO GENERAL: No hay AMG cargado.".to_string(),
         };
 
-        let full_user_message = format!("{}\n### CONSULTA DEL USUARIO:\n{}", context_str, user_prompt);
+        let full_user_message = format!(
+            "{}\n### CONSULTA DEL USUARIO:\n{}",
+            context_str, user_prompt
+        );
         (system_message, full_user_message)
     }
 
@@ -356,12 +357,8 @@ impl AiClient {
         let status = Self::check_status(config).await;
         if !status.is_online {
             // Fallback elegante cuando el servidor local no está disponible
-            let mut mock_resp = Self::make_mock_response(
-                user_prompt,
-                &system_msg,
-                &full_user_msg,
-                config,
-            );
+            let mut mock_resp =
+                Self::make_mock_response(user_prompt, &system_msg, &full_user_msg, config);
             mock_resp.content = format!(
                 "⚠️ [MODO OFFLINE DE IA - FALLBACK ELEGANTE]\n\n\
                  No se detectó un servidor LLM en ejecución en '{}'. {}\n\n\
@@ -418,7 +415,10 @@ impl AiClient {
                     .map_err(|e| format!("Error en petición HTTP a Ollama: {}", e))?;
 
                 if !resp.status().is_success() {
-                    return Err(format!("Ollama devolvió código de error HTTP {}", resp.status()));
+                    return Err(format!(
+                        "Ollama devolvió código de error HTTP {}",
+                        resp.status()
+                    ));
                 }
 
                 #[derive(Deserialize)]
@@ -453,7 +453,10 @@ impl AiClient {
                 })
             }
             AiProvider::OpenAiCompatible => {
-                let chat_url = format!("{}/chat/completions", config.endpoint_url.trim_end_matches('/'));
+                let chat_url = format!(
+                    "{}/chat/completions",
+                    config.endpoint_url.trim_end_matches('/')
+                );
 
                 #[derive(Serialize)]
                 struct Message {
@@ -493,7 +496,10 @@ impl AiClient {
                     .map_err(|e| format!("Error en petición HTTP OpenAI: {}", e))?;
 
                 if !resp.status().is_success() {
-                    return Err(format!("OpenAI API devolvió código de error HTTP {}", resp.status()));
+                    return Err(format!(
+                        "OpenAI API devolvió código de error HTTP {}",
+                        resp.status()
+                    ));
                 }
 
                 #[derive(Deserialize)]
@@ -522,7 +528,13 @@ impl AiClient {
 
                 let content = chat_out
                     .choices
-                    .and_then(|mut c| if !c.is_empty() { c.remove(0).message } else { None })
+                    .and_then(|mut c| {
+                        if !c.is_empty() {
+                            c.remove(0).message
+                        } else {
+                            None
+                        }
+                    })
                     .map(|m| m.content)
                     .unwrap_or_else(|| "Sin respuesta de texto.".to_string());
 

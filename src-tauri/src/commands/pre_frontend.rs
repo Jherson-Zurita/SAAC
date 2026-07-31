@@ -17,7 +17,10 @@ pub fn get_project_config(project_path: String) -> ProjectConfig {
 }
 
 #[tauri::command]
-pub fn update_project_config(project_path: String, config: ProjectConfig) -> Result<ProjectConfig, String> {
+pub fn update_project_config(
+    project_path: String,
+    config: ProjectConfig,
+) -> Result<ProjectConfig, String> {
     ProjectConfigManager::save_config(&project_path, &config)?;
     Ok(config)
 }
@@ -25,7 +28,10 @@ pub fn update_project_config(project_path: String, config: ProjectConfig) -> Res
 // ── Comandos Módulo 2: Consola SAAC ──
 
 #[tauri::command]
-pub fn execute_console_command(input: String, project_path: Option<String>) -> ConsoleCommandOutput {
+pub fn execute_console_command(
+    input: String,
+    project_path: Option<String>,
+) -> ConsoleCommandOutput {
     ConsoleManager::execute_command(&input, project_path.as_deref())
 }
 
@@ -37,7 +43,10 @@ pub fn load_project_annotations(project_path: String) -> ProjectAnnotations {
 }
 
 #[tauri::command]
-pub fn add_annotation(project_path: String, annotation: Annotation) -> Result<ProjectAnnotations, String> {
+pub fn add_annotation(
+    project_path: String,
+    annotation: Annotation,
+) -> Result<ProjectAnnotations, String> {
     AnnotationsManager::add_annotation(&project_path, annotation)
 }
 
@@ -108,12 +117,22 @@ pub fn compare_analysis_runs(
     // funcionaba para la corrida más reciente (la que el frontend acababa de
     // recibir de `analyze_project`), no para comparar dos corridas
     // arbitrarias del historial, que es el caso de uso real de esta función.
-    let amg_a = HistoryManager::load_amg_for_run(&project_path, &run_id_a)
-        .ok_or_else(|| format!("No se encontró el AMG completo de la corrida '{}'. Puede haber sido purgado.", run_id_a))?;
-    let amg_b = HistoryManager::load_amg_for_run(&project_path, &run_id_b)
-        .ok_or_else(|| format!("No se encontró el AMG completo de la corrida '{}'. Puede haber sido purgado.", run_id_b))?;
+    let amg_a = HistoryManager::load_amg_for_run(&project_path, &run_id_a).ok_or_else(|| {
+        format!(
+            "No se encontró el AMG completo de la corrida '{}'. Puede haber sido purgado.",
+            run_id_a
+        )
+    })?;
+    let amg_b = HistoryManager::load_amg_for_run(&project_path, &run_id_b).ok_or_else(|| {
+        format!(
+            "No se encontró el AMG completo de la corrida '{}'. Puede haber sido purgado.",
+            run_id_b
+        )
+    })?;
 
-    Ok(HistoryManager::compute_delta(&run_id_a, &amg_a, &run_id_b, &amg_b))
+    Ok(HistoryManager::compute_delta(
+        &run_id_a, &amg_a, &run_id_b, &amg_b,
+    ))
 }
 
 // ── Comandos Módulo 6: Configuración Global ──
@@ -132,7 +151,10 @@ pub fn update_global_config(config: GlobalConfig) -> Result<GlobalConfig, String
 // ── Comando Adicional Nivel 4 (Drill-Down C4 Código) ──
 
 #[tauri::command]
-pub fn get_module_code_diagram(module_id: String, amg: ArchitectureModelGraph) -> Result<C4DiagramData, String> {
+pub fn get_module_code_diagram(
+    module_id: String,
+    amg: ArchitectureModelGraph,
+) -> Result<C4DiagramData, String> {
     let module = amg
         .modules
         .iter()

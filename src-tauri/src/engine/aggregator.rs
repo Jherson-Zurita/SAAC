@@ -201,37 +201,40 @@ impl Aggregator {
                 // Cada rama produce 0, 1 (caso general) o N targets (solo
                 // Go, por su semántica de import a nivel de paquete/
                 // directorio — ver docstring del módulo).
-                let resolved_targets: Vec<String> = if dep.target.starts_with("./") || dep.target.starts_with("../") {
-                    resolve_relative_import(&dep.source, &dep.target, &known_ids)
-                        .into_iter()
-                        .collect()
-                } else if is_java_source {
-                    resolve_java_package_import(&dep.target, &by_java_suffix)
-                        .map(|s| vec![s])
-                        .unwrap_or_else(|| {
-                            resolve_by_basename(&dep.target, &by_basename)
-                                .map(|s| vec![s.to_string()])
-                                .unwrap_or_default()
-                        })
-                } else if is_go_source {
-                    resolve_go_package_import(&dep.target, &by_go_package_dir).unwrap_or_else(|| {
+                let resolved_targets: Vec<String> =
+                    if dep.target.starts_with("./") || dep.target.starts_with("../") {
+                        resolve_relative_import(&dep.source, &dep.target, &known_ids)
+                            .into_iter()
+                            .collect()
+                    } else if is_java_source {
+                        resolve_java_package_import(&dep.target, &by_java_suffix)
+                            .map(|s| vec![s])
+                            .unwrap_or_else(|| {
+                                resolve_by_basename(&dep.target, &by_basename)
+                                    .map(|s| vec![s.to_string()])
+                                    .unwrap_or_default()
+                            })
+                    } else if is_go_source {
+                        resolve_go_package_import(&dep.target, &by_go_package_dir).unwrap_or_else(
+                            || {
+                                resolve_by_basename(&dep.target, &by_basename)
+                                    .map(|s| vec![s.to_string()])
+                                    .unwrap_or_default()
+                            },
+                        )
+                    } else if is_rust_source {
+                        resolve_rust_use_import(&dep.target, &dep.source, rust_crates, &known_ids)
+                            .map(|s| vec![s])
+                            .unwrap_or_else(|| {
+                                resolve_by_basename(&dep.target, &by_basename)
+                                    .map(|s| vec![s.to_string()])
+                                    .unwrap_or_default()
+                            })
+                    } else {
                         resolve_by_basename(&dep.target, &by_basename)
                             .map(|s| vec![s.to_string()])
                             .unwrap_or_default()
-                    })
-                } else if is_rust_source {
-                    resolve_rust_use_import(&dep.target, &dep.source, rust_crates, &known_ids)
-                        .map(|s| vec![s])
-                        .unwrap_or_else(|| {
-                            resolve_by_basename(&dep.target, &by_basename)
-                                .map(|s| vec![s.to_string()])
-                                .unwrap_or_default()
-                        })
-                } else {
-                    resolve_by_basename(&dep.target, &by_basename)
-                        .map(|s| vec![s.to_string()])
-                        .unwrap_or_default()
-                };
+                    };
 
                 // Descarta self-imports espurios (un target resuelto que
                 // apunta al propio módulo origen).
@@ -476,7 +479,11 @@ impl Aggregator {
 /// usada por los 6 parsers Python; se asume que el worker Node sigue la
 /// misma, sin auditar su código en este pase). Prueba también con `/index`
 /// añadido (`./utils` -> `.../utils/index`), caso común en TS/JS.
-fn resolve_relative_import(source_id: &str, target: &str, known_ids: &HashSet<&str>) -> Option<String> {
+fn resolve_relative_import(
+    source_id: &str,
+    target: &str,
+    known_ids: &HashSet<&str>,
+) -> Option<String> {
     let source_dir = match source_id.rfind('/') {
         Some(idx) => &source_id[..idx],
         None => "",
@@ -515,7 +522,10 @@ fn resolve_relative_import(source_id: &str, target: &str, known_ids: &HashSet<&s
 /// módulos conocidos. Solo resuelve si hay EXACTAMENTE un candidato — con
 /// dos o más (basenames ambiguos como `utils`/`index`/`types`) devuelve
 /// `None` en vez de adivinar.
-fn resolve_by_basename<'a>(target: &str, by_basename: &HashMap<&'a str, Vec<&'a str>>) -> Option<&'a str> {
+fn resolve_by_basename<'a>(
+    target: &str,
+    by_basename: &HashMap<&'a str, Vec<&'a str>>,
+) -> Option<&'a str> {
     let normalized = target.trim_start_matches("./").trim_start_matches("../");
     let last_segment = normalized
         .split(|c: char| c == '/' || c == '.' || c == ':')
@@ -579,7 +589,10 @@ fn find_path_segment(haystack: &str, needle: &str) -> Option<usize> {
 /// que distingue correctamente `com.example.service.UserRepository` de
 /// `com.other.UserRepository` aunque ambos compartan el basename
 /// `UserRepository`. Solo resuelve con EXACTAMENTE un candidato.
-fn resolve_java_package_import(target: &str, by_java_suffix: &HashMap<String, Vec<&str>>) -> Option<String> {
+fn resolve_java_package_import(
+    target: &str,
+    by_java_suffix: &HashMap<String, Vec<&str>>,
+) -> Option<String> {
     let as_path = target.replace('.', "/");
     match by_java_suffix.get(as_path.as_str()) {
         Some(candidates) if candidates.len() == 1 => Some(candidates[0].to_string()),
@@ -625,7 +638,10 @@ fn go_import_path_for_module(module_id: &str, go_modules: &[GoModuleInfo]) -> Op
 /// paquete (semántica real de Go: se importa el paquete completo, no un
 /// archivo), o `None` si el import no matchea ningún paquete interno
 /// conocido (librería externa, o paquete no incluido en el análisis).
-fn resolve_go_package_import(target: &str, by_go_package_dir: &HashMap<String, Vec<&str>>) -> Option<Vec<String>> {
+fn resolve_go_package_import(
+    target: &str,
+    by_go_package_dir: &HashMap<String, Vec<&str>>,
+) -> Option<Vec<String>> {
     by_go_package_dir
         .get(target)
         .map(|files| files.iter().map(|s| s.to_string()).collect())
@@ -675,7 +691,9 @@ fn resolve_rust_use_import(
     candidates.push(format!("{}/{}", src_root, as_path));
     candidates.push(format!("{}/{}/mod", src_root, as_path));
 
-    candidates.into_iter().find(|c| known_ids.contains(c.as_str()))
+    candidates
+        .into_iter()
+        .find(|c| known_ids.contains(c.as_str()))
 }
 
 // ============================================================================
@@ -730,9 +748,7 @@ fn detect_god_modules(modules: &[Module], total_dependencies: u32) -> Vec<Antipa
 /// usando DFS. Cada ciclo detectado se normaliza (rotación para empezar por
 /// el id lexicográficamente menor) para evitar reportar el mismo ciclo
 /// múltiples veces con diferentes puntos de entrada.
-fn detect_circular_dependencies(
-    graph: &HashMap<String, HashSet<String>>,
-) -> Vec<Antipattern> {
+fn detect_circular_dependencies(graph: &HashMap<String, HashSet<String>>) -> Vec<Antipattern> {
     let mut unique_cycles: HashSet<Vec<String>> = HashSet::new();
     let mut visited: HashSet<String> = HashSet::new();
     let mut stack: Vec<String> = Vec::new();
@@ -754,10 +770,7 @@ fn detect_circular_dependencies(
                 if in_stack.contains(neighbor.as_str()) {
                     // Encontrado un ciclo: extraer la ruta desde `neighbor`
                     // hasta el final del stack, y cerrar con `neighbor`.
-                    let cycle_start = stack
-                        .iter()
-                        .position(|n| n == neighbor)
-                        .unwrap_or(0);
+                    let cycle_start = stack.iter().position(|n| n == neighbor).unwrap_or(0);
                     let mut cycle: Vec<String> = stack[cycle_start..].to_vec();
                     cycle.push(neighbor.clone()); // cerrar el ciclo
 
@@ -771,9 +784,7 @@ fn detect_circular_dependencies(
                     {
                         let mut normalized: Vec<String> = Vec::with_capacity(cycle.len());
                         for i in 0..cycle_body.len() {
-                            normalized.push(
-                                cycle_body[(min_pos + i) % cycle_body.len()].clone(),
-                            );
+                            normalized.push(cycle_body[(min_pos + i) % cycle_body.len()].clone());
                         }
                         normalized.push(normalized[0].clone()); // cerrar
                         unique_cycles.insert(normalized);
@@ -797,7 +808,14 @@ fn detect_circular_dependencies(
 
     for node in &all_nodes {
         if !visited.contains(node) {
-            dfs(node, graph, &mut visited, &mut stack, &mut in_stack, &mut unique_cycles);
+            dfs(
+                node,
+                graph,
+                &mut visited,
+                &mut stack,
+                &mut in_stack,
+                &mut unique_cycles,
+            );
         }
     }
 
@@ -982,10 +1000,7 @@ fn detect_layer_violations(
                 let src_short = dep.source.rsplit('/').next().unwrap_or(&dep.source);
                 let tgt_short = dep.target.rsplit('/').next().unwrap_or(&dep.target);
                 violations.push(Antipattern {
-                    id: format!(
-                        "antipattern:layer-violation:{}-to-{}",
-                        src_short, tgt_short
-                    ),
+                    id: format!("antipattern:layer-violation:{}-to-{}", src_short, tgt_short),
                     antipattern_type: AntipatternType::LayerViolation,
                     name: "Layer Violation".to_string(),
                     severity: Severity::High,
@@ -1054,11 +1069,13 @@ fn count_cyclic_dependencies(graph: &HashMap<String, HashSet<String>>) -> u32 {
                         self.strongconnect(neighbor);
                         let neighbor_low = self.lowlink[neighbor];
                         let node_low = self.lowlink[node];
-                        self.lowlink.insert(node.to_string(), node_low.min(neighbor_low));
+                        self.lowlink
+                            .insert(node.to_string(), node_low.min(neighbor_low));
                     } else if self.on_stack.contains(neighbor) {
                         let neighbor_idx = self.indices[neighbor];
                         let node_low = self.lowlink[node];
-                        self.lowlink.insert(node.to_string(), node_low.min(neighbor_idx));
+                        self.lowlink
+                            .insert(node.to_string(), node_low.min(neighbor_idx));
                     }
                 }
             }
@@ -1066,7 +1083,10 @@ fn count_cyclic_dependencies(graph: &HashMap<String, HashSet<String>>) -> u32 {
             if self.lowlink[node] == self.indices[node] {
                 let mut scc_size = 0;
                 loop {
-                    let w = self.stack.pop().expect("stack de Tarjan vacío inesperadamente");
+                    let w = self
+                        .stack
+                        .pop()
+                        .expect("stack de Tarjan vacío inesperadamente");
                     self.on_stack.remove(&w);
                     scc_size += 1;
                     if w == node {
@@ -1167,7 +1187,11 @@ fn detect_architecture_style(modules: &[Module]) -> (ArchStyle, f64) {
         candidates.push((ArchStyle::Cqrs, &["commands"], &["queries"]));
     }
     if has(&["plugins", "extensions"]) && has(&["core"]) {
-        candidates.push((ArchStyle::Microkernel, &["plugins", "extensions"], &["core"]));
+        candidates.push((
+            ArchStyle::Microkernel,
+            &["plugins", "extensions"],
+            &["core"],
+        ));
     }
 
     if candidates.is_empty() {
@@ -1191,7 +1215,10 @@ fn detect_architecture_style(modules: &[Module]) -> (ArchStyle, f64) {
             })
             .count() as u32;
 
-        if best.map(|(_, count)| matching_modules > count).unwrap_or(true) {
+        if best
+            .map(|(_, count)| matching_modules > count)
+            .unwrap_or(true)
+        {
             best = Some((*style, matching_modules));
         }
     }

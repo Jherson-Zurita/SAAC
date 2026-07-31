@@ -1,8 +1,6 @@
 // src-tauri/src/commands/ai.rs — Comandos Tauri IPC para Inteligencia Artificial Local.
 
-use crate::engine::ai_client::{
-    AiClient, AiConfig, AiContextType, AiResponse, AiStatusResult,
-};
+use crate::engine::ai_client::{AiClient, AiConfig, AiContextType, AiResponse, AiStatusResult};
 use crate::engine::amg::ArchitectureModelGraph;
 
 #[tauri::command]

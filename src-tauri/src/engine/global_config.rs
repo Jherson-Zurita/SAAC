@@ -7,11 +7,11 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GlobalConfig {
-    pub ai_provider: String,       // "ollama" | "openai" | "mock"
-    pub ai_endpoint: String,       // "http://localhost:11434"
-    pub ai_default_model: String,  // "qwen3:4b"
+    pub ai_provider: String,      // "ollama" | "openai" | "mock"
+    pub ai_endpoint: String,      // "http://localhost:11434"
+    pub ai_default_model: String, // "qwen3:4b"
     pub max_worker_threads: usize,
-    pub default_theme: String,     // "dark" | "light" | "system"
+    pub default_theme: String, // "dark" | "light" | "system"
     pub auto_check_ai: bool,
 }
 

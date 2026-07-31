@@ -309,7 +309,11 @@ impl PythonWorkerManager {
 
         let out_str = String::from_utf8_lossy(&version_output.stdout);
         let err_str = String::from_utf8_lossy(&version_output.stderr);
-        let version_line = if out_str.is_empty() { &err_str } else { &out_str };
+        let version_line = if out_str.is_empty() {
+            &err_str
+        } else {
+            &out_str
+        };
 
         let version_ok = version_line
             .trim()
@@ -326,7 +330,10 @@ impl PythonWorkerManager {
             .unwrap_or(false);
 
         if !version_ok {
-            return Err(format!("versión no soportada o salida malformada: {}", version_line.trim()));
+            return Err(format!(
+                "versión no soportada o salida malformada: {}",
+                version_line.trim()
+            ));
         }
 
         // Segundo chequeo, el que faltaba: ¿puede este intérprete importar
@@ -540,7 +547,10 @@ impl PythonWorkerManager {
             },
         };
 
-        match self.send_and_await(request, self.config.parse_timeout).await {
+        match self
+            .send_and_await(request, self.config.parse_timeout)
+            .await
+        {
             Ok(response) => Self::response_to_outcome(file_path, response),
             Err(WorkerError::Timeout) => {
                 self.cleanup_pending(&request_id).await;
@@ -577,15 +587,12 @@ impl PythonWorkerManager {
     }
 
     /// Envía un request de análisis para un lote de archivos.
-    pub async fn send_analyze_request(
-        &self,
-        file_paths: Vec<String>,
-    ) -> Vec<FileAnalysisOutcome> {
+    pub async fn send_analyze_request(&self, file_paths: Vec<String>) -> Vec<FileAnalysisOutcome> {
         let total = file_paths.len();
         let mut outcomes = Vec::with_capacity(total);
 
-        let batch_timeout = self.config.analyze_min_timeout
-            + self.config.analyze_timeout_per_file * (total as u32);
+        let batch_timeout =
+            self.config.analyze_min_timeout + self.config.analyze_timeout_per_file * (total as u32);
 
         let request_id = uuid_v4();
         let payload = AnalyzePayload {
@@ -605,26 +612,24 @@ impl PythonWorkerManager {
         };
 
         match self.send_and_await(request, batch_timeout).await {
-            Ok(response) => {
-                match Self::batch_response_to_outcomes(&file_paths, response) {
-                    Ok(results) => {
-                        for (i, outcome) in results.iter().enumerate() {
-                            self.emit_progress(&request_id, Some(&outcome.file_path), i + 1, total);
-                        }
-                        outcomes = results;
+            Ok(response) => match Self::batch_response_to_outcomes(&file_paths, response) {
+                Ok(results) => {
+                    for (i, outcome) in results.iter().enumerate() {
+                        self.emit_progress(&request_id, Some(&outcome.file_path), i + 1, total);
                     }
-                    Err(e) => {
-                        for file_path in &file_paths {
-                            outcomes.push(FileAnalysisOutcome {
-                                file_path: file_path.clone(),
-                                status: AnalysisFileStatus::ParseError,
-                                result: None,
-                                error_message: Some(e.to_string()),
-                            });
-                        }
+                    outcomes = results;
+                }
+                Err(e) => {
+                    for file_path in &file_paths {
+                        outcomes.push(FileAnalysisOutcome {
+                            file_path: file_path.clone(),
+                            status: AnalysisFileStatus::ParseError,
+                            result: None,
+                            error_message: Some(e.to_string()),
+                        });
                     }
                 }
-            }
+            },
             Err(WorkerError::Timeout) => {
                 self.cleanup_pending(&request_id).await;
                 tracing::warn!(request_id = %request_id, "Timeout esperando el batch de Python");
@@ -809,7 +814,13 @@ impl PythonWorkerManager {
         }
     }
 
-    fn emit_progress(&self, request_id: &str, file_path: Option<&str>, completed: usize, total: usize) {
+    fn emit_progress(
+        &self,
+        request_id: &str,
+        file_path: Option<&str>,
+        completed: usize,
+        total: usize,
+    ) {
         let event = WorkerProgressEvent {
             request_id: request_id.to_string(),
             file_path: file_path.map(|s| s.to_string()),
@@ -822,10 +833,10 @@ impl PythonWorkerManager {
     }
 
     fn emit_worker_unavailable(&self) {
-        if let Err(e) = self
-            .app_handle
-            .emit("worker://unavailable", &serde_json::json!({ "worker": "python" }))
-        {
+        if let Err(e) = self.app_handle.emit(
+            "worker://unavailable",
+            &serde_json::json!({ "worker": "python" }),
+        ) {
             tracing::warn!(error = %e, "No se pudo emitir worker no disponible");
         }
     }
@@ -850,7 +861,9 @@ impl PythonWorkerManager {
         let items = data
             .get("results")
             .and_then(|v| v.as_array())
-            .ok_or_else(|| WorkerError::ParseError("data.results de batch Python no es un arreglo".into()))?;
+            .ok_or_else(|| {
+                WorkerError::ParseError("data.results de batch Python no es un arreglo".into())
+            })?;
 
         let mut outcomes = Vec::with_capacity(file_paths.len());
         for item in items {
@@ -860,7 +873,10 @@ impl PythonWorkerManager {
                 .unwrap_or("desconocido")
                 .to_string();
 
-            let status_str = item.get("status").and_then(|v| v.as_str()).unwrap_or("error");
+            let status_str = item
+                .get("status")
+                .and_then(|v| v.as_str())
+                .unwrap_or("error");
             let status = if status_str == "success" {
                 AnalysisFileStatus::Success
             } else {
@@ -871,7 +887,10 @@ impl PythonWorkerManager {
                 file_path,
                 status,
                 result: item.get("result").cloned(),
-                error_message: item.get("errorMessage").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                error_message: item
+                    .get("errorMessage")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string()),
             });
         }
 

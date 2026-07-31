@@ -202,7 +202,10 @@ impl ConsoleManager {
             _ => ConsoleCommandOutput {
                 command: trimmed.to_string(),
                 success: false,
-                message: format!("Unknown command: '{}'. Type 'help' for available commands.", cmd),
+                message: format!(
+                    "Unknown command: '{}'. Type 'help' for available commands.",
+                    cmd
+                ),
                 data: None,
             },
         }

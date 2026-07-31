@@ -65,10 +65,7 @@ impl SupplementaryDiagrams {
 // 1. Diagrama de Paquetes (Package Diagram, UML)
 // ============================================================================
 
-fn generate_package_diagram(
-    modules: &[Module],
-    dependencies: &[Dependency],
-) -> C4DiagramData {
+fn generate_package_diagram(modules: &[Module], dependencies: &[Dependency]) -> C4DiagramData {
     let mut nodes = Vec::new();
     let mut edges = Vec::new();
 
@@ -250,11 +247,8 @@ fn generate_er_diagram(modules: &[Module]) -> C4DiagramData {
                     .map(|a| format!("{}: {}", a.name, a.type_name))
                     .collect();
 
-                let attr_types: HashSet<String> = cls
-                    .attributes
-                    .iter()
-                    .map(|a| a.type_name.clone())
-                    .collect();
+                let attr_types: HashSet<String> =
+                    cls.attributes.iter().map(|a| a.type_name.clone()).collect();
 
                 nodes.push(C4Node {
                     id: node_id.clone(),

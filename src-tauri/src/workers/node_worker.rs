@@ -428,7 +428,9 @@ impl NodeWorkerManager {
                 file_path,
                 status: AnalysisFileStatus::WorkerUnavailable,
                 result: None,
-                error_message: Some("El worker no está disponible tras agotar los reintentos".into()),
+                error_message: Some(
+                    "El worker no está disponible tras agotar los reintentos".into(),
+                ),
             },
             Err(other) => FileAnalysisOutcome {
                 file_path,
@@ -442,15 +444,12 @@ impl NodeWorkerManager {
     /// Analiza un batch de archivos, emitiendo eventos de progreso a la UI de
     /// Tauri conforme se completa cada uno. El timeout total escala con la
     /// cantidad de archivos (ver WorkerConfig::analyze_timeout_per_file).
-    pub async fn send_analyze_request(
-        &self,
-        file_paths: Vec<String>,
-    ) -> Vec<FileAnalysisOutcome> {
+    pub async fn send_analyze_request(&self, file_paths: Vec<String>) -> Vec<FileAnalysisOutcome> {
         let total = file_paths.len();
         let mut outcomes = Vec::with_capacity(total);
 
-        let batch_timeout = self.config.analyze_min_timeout
-            + self.config.analyze_timeout_per_file * (total as u32);
+        let batch_timeout =
+            self.config.analyze_min_timeout + self.config.analyze_timeout_per_file * (total as u32);
 
         let request_id = uuid_v4();
         let payload = AnalyzePayload {
@@ -502,7 +501,9 @@ impl NodeWorkerManager {
                         file_path: file_path.clone(),
                         status: AnalysisFileStatus::Timeout,
                         result: None,
-                        error_message: Some("El worker no respondió dentro del tiempo límite".into()),
+                        error_message: Some(
+                            "El worker no respondió dentro del tiempo límite".into(),
+                        ),
                     });
                 }
             }
@@ -719,7 +720,13 @@ impl NodeWorkerManager {
     }
 
     /// Emite un evento de progreso a la ventana principal de la UI.
-    fn emit_progress(&self, request_id: &str, file_path: Option<&str>, completed: usize, total: usize) {
+    fn emit_progress(
+        &self,
+        request_id: &str,
+        file_path: Option<&str>,
+        completed: usize,
+        total: usize,
+    ) {
         let event = WorkerProgressEvent {
             request_id: request_id.to_string(),
             file_path: file_path.map(|s| s.to_string()),
@@ -735,10 +742,10 @@ impl NodeWorkerManager {
     /// reintentos, para que el frontend pueda mostrar el estado y permitir
     /// reintento manual o continuar con otros workers (ej. Python).
     fn emit_worker_unavailable(&self) {
-        if let Err(e) = self
-            .app_handle
-            .emit("worker://unavailable", &serde_json::json!({ "worker": "node" }))
-        {
+        if let Err(e) = self.app_handle.emit(
+            "worker://unavailable",
+            &serde_json::json!({ "worker": "node" }),
+        ) {
             tracing::warn!(error = %e, "No se pudo emitir evento de worker no disponible");
         }
     }
@@ -767,7 +774,9 @@ impl NodeWorkerManager {
         let items = data
             .get("results")
             .and_then(|value| value.as_array())
-            .ok_or_else(|| WorkerError::ParseError("data.results de batch no es un arreglo".into()))?;
+            .ok_or_else(|| {
+                WorkerError::ParseError("data.results de batch no es un arreglo".into())
+            })?;
 
         let mut outcomes = Vec::with_capacity(file_paths.len());
         for item in items {

@@ -32,7 +32,10 @@ fn main() {
 
         // Salida SOLO el JSON en stdout, para que el test pueda hacer json.loads()
         // directo sin tener que filtrar logs de tracing u otro ruido.
-        println!("{}", serde_json::to_string(&output).expect("Fallo al serializar resultado de escaneo"));
+        println!(
+            "{}",
+            serde_json::to_string(&output).expect("Fallo al serializar resultado de escaneo")
+        );
         std::process::exit(0);
     }
 
@@ -75,9 +78,12 @@ fn main() {
             // (que era la causa del panic "state() called before manage()").
             tauri_app_lib::init_workers(&app).await;
 
-            let node_manager = handle.state::<tauri_app_lib::workers::node_worker::NodeWorkerManager>();
-            let python_manager = handle.state::<tauri_app_lib::workers::python_worker::PythonWorkerManager>();
-            let cancellation = handle.state::<tauri_app_lib::commands::analysis::CancellationRegistry>();
+            let node_manager =
+                handle.state::<tauri_app_lib::workers::node_worker::NodeWorkerManager>();
+            let python_manager =
+                handle.state::<tauri_app_lib::workers::python_worker::PythonWorkerManager>();
+            let cancellation =
+                handle.state::<tauri_app_lib::commands::analysis::CancellationRegistry>();
 
             if let Some(delay_ms) = cancel_after_ms {
                 let handle_for_cancel = handle.clone();
@@ -153,8 +159,7 @@ fn main() {
             Ok(response) => {
                 println!(
                     "{}",
-                    serde_json::to_string(&response)
-                        .expect("Fallo al serializar AiResponse")
+                    serde_json::to_string(&response).expect("Fallo al serializar AiResponse")
                 );
                 std::process::exit(0);
             }

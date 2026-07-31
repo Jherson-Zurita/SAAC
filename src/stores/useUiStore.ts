@@ -17,7 +17,8 @@ export type MainTab =
   | DiagramTab
   | 'metrics'
   | 'antipatterns'
-  | 'adrs';
+  | 'adrs'
+  | 'design';
 
 export type LeftbarTab = 'explorer' | 'navigation' | 'search';
 export type DownbarTab = 'output' | 'problems' | 'history' | 'console';

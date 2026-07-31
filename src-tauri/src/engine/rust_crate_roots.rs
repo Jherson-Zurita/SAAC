@@ -151,8 +151,12 @@ mod tests {
 
     #[test]
     fn ignores_name_outside_package_section() {
-        let content = "[dependencies]\nname = \"not-this-one\"\n\n[package]\nname = \"real-crate\"\n";
-        assert_eq!(extract_package_name(content), Some("real-crate".to_string()));
+        let content =
+            "[dependencies]\nname = \"not-this-one\"\n\n[package]\nname = \"real-crate\"\n";
+        assert_eq!(
+            extract_package_name(content),
+            Some("real-crate".to_string())
+        );
     }
 
     #[test]

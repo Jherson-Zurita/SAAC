@@ -173,8 +173,16 @@ impl HistoryManager {
         let removed_modules: Vec<String> = set_a.difference(&set_b).cloned().collect();
         let common_modules: Vec<String> = set_a.intersection(&set_b).cloned().collect();
 
-        let map_a: HashMap<String, u32> = amg_a.modules.iter().map(|m| (m.id.clone(), m.loc)).collect();
-        let map_b: HashMap<String, u32> = amg_b.modules.iter().map(|m| (m.id.clone(), m.loc)).collect();
+        let map_a: HashMap<String, u32> = amg_a
+            .modules
+            .iter()
+            .map(|m| (m.id.clone(), m.loc))
+            .collect();
+        let map_b: HashMap<String, u32> = amg_b
+            .modules
+            .iter()
+            .map(|m| (m.id.clone(), m.loc))
+            .collect();
 
         let mut modified_modules = Vec::new();
         for id in common_modules {

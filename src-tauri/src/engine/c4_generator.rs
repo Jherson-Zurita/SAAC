@@ -60,8 +60,13 @@ impl C4Generator {
             generate_container_diagram(project_name, &actors, &containers, &external_systems);
 
         // 6. Generar Nivel 3: Diagrama de Componentes (por cada contenedor)
-        let component_diagrams =
-            generate_component_diagrams(&containers, modules, dependencies, antipatterns, invocations);
+        let component_diagrams = generate_component_diagrams(
+            &containers,
+            modules,
+            dependencies,
+            antipatterns,
+            invocations,
+        );
 
         let c4_models = C4Models {
             context_diagram,
@@ -99,9 +104,7 @@ fn infer_external_systems(calls: &[ExternalCall]) -> Vec<ExternalSystem> {
             call.external_system_id.clone()
         };
 
-        systems_map
-            .entry(sys_id)
-            .or_insert(call.protocol);
+        systems_map.entry(sys_id).or_insert(call.protocol);
     }
 
     // Si no hay llamadas registradas pero se detectó algo genérico, mantener seguro
@@ -452,8 +455,7 @@ fn generate_component_diagrams(
         }
 
         for dep in dependencies {
-            if target_ids.contains(dep.source.as_str())
-                && target_ids.contains(dep.target.as_str())
+            if target_ids.contains(dep.source.as_str()) && target_ids.contains(dep.target.as_str())
             {
                 edges.push(C4Edge {
                     source: dep.source.clone(),
@@ -471,7 +473,10 @@ fn generate_component_diagrams(
     // desde los antipatrones REALES ya detectados (ver docstring de
     // `generate_circular_dependencies_diagram`).
     let circular_diagram = generate_circular_dependencies_diagram(modules, antipatterns);
-    map.insert("supplementary:circular-dependencies".to_string(), circular_diagram);
+    map.insert(
+        "supplementary:circular-dependencies".to_string(),
+        circular_diagram,
+    );
 
     // Añadir el resto de diagramas suplementarios adicionales (§4.4.5):
     // Package Diagram, Inheritance Tree, ER Diagram, Call Graph, Sequence Diagram,
@@ -522,7 +527,9 @@ fn generate_circular_dependencies_diagram(
         if ap.antipattern_type != AntipatternType::CircularDependency {
             continue;
         }
-        let Some(cycle) = &ap.cycle_path else { continue };
+        let Some(cycle) = &ap.cycle_path else {
+            continue;
+        };
         if cycle.len() < 2 {
             continue;
         }

@@ -1,11 +1,11 @@
 pub mod commands;
 pub mod engine;
-pub mod workers;
 pub mod ollama;
+pub mod workers;
 
+use crate::commands::analysis::CancellationRegistry;
 use crate::workers::node_worker::{NodeWorkerManager, WorkerConfig as NodeConfig};
 use crate::workers::python_worker::{PythonWorkerManager, WorkerConfig as PythonConfig};
-use crate::commands::analysis::CancellationRegistry;
 use tauri::Manager;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -57,6 +57,14 @@ pub fn build_app() -> tauri::App<tauri::Wry> {
             commands::pre_frontend::get_global_config,
             commands::pre_frontend::update_global_config,
             commands::pre_frontend::get_module_code_diagram,
+            commands::design::create_proposed_architecture,
+            commands::design::list_proposed_architectures,
+            commands::design::get_proposed_architecture,
+            commands::design::update_proposed_architecture,
+            commands::design::add_proposed_node,
+            commands::design::delete_proposed_architecture,
+            commands::design::compare_proposed_architecture,
+            commands::design::export_proposed_architecture,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

@@ -5,11 +5,11 @@
 //! de cada archivo (`WorkerAnalysisResult`), lo que permite saltarse por completo
 //! las llamadas a los workers Node/Python para archivos no modificados.
 
-use std::path::Path;
-use sled::Db;
-use serde::{Serialize, Deserialize};
-use crate::engine::amg::{WorkerAnalysisResult, ArchitectureModelGraph};
+use crate::engine::amg::{ArchitectureModelGraph, WorkerAnalysisResult};
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
+use sled::Db;
+use std::path::Path;
 
 pub struct CacheManager {
     db: Db,
@@ -29,7 +29,11 @@ impl CacheManager {
 
     /// Obtiene el resultado de análisis guardado para un archivo basándose en su hash.
     /// Si el hash no coincide con el guardado o la clave no existe, retorna `None`.
-    pub fn get_file_analysis(&self, file_path: &str, file_hash: &str) -> Option<WorkerAnalysisResult> {
+    pub fn get_file_analysis(
+        &self,
+        file_path: &str,
+        file_hash: &str,
+    ) -> Option<WorkerAnalysisResult> {
         let key = format!("file:{}", file_path);
         if let Ok(Some(bytes)) = self.db.get(&key) {
             if let Ok(record) = serde_json::from_slice::<FileCacheRecord>(&bytes) {
@@ -42,7 +46,12 @@ impl CacheManager {
     }
 
     /// Guarda el resultado de análisis de un archivo indexado con su hash.
-    pub fn set_file_analysis(&self, file_path: &str, file_hash: &str, result: &WorkerAnalysisResult) -> Result<()> {
+    pub fn set_file_analysis(
+        &self,
+        file_path: &str,
+        file_hash: &str,
+        result: &WorkerAnalysisResult,
+    ) -> Result<()> {
         let key = format!("file:{}", file_path);
         let record = FileCacheRecord {
             hash: file_hash.to_string(),

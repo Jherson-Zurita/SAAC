@@ -491,3 +491,95 @@ export interface AiStatusResult {
   model: string;
   message: string;
 }
+
+// ── MÓDULO DE DISEÑO ARQUITECTÓNICO ──
+
+export type ProposedNodeOrigin = 'imported' | 'proposed';
+
+export type ProposedNodeType =
+  | 'module'
+  | 'container'
+  | 'external-system'
+  | 'actor';
+
+export type ExportFormat = 'structurizr-dsl' | 'plant-uml' | 'mermaid';
+
+export interface NodePosition {
+  x: number;
+  y: number;
+}
+
+export interface CanvasLayout {
+  viewport: NodePosition;
+  zoom: number;
+}
+
+export interface ProposedNode {
+  id: string;
+  origin: ProposedNodeOrigin;
+  originalNodeId?: string | null;
+  nodeType: ProposedNodeType;
+  label: string;
+  modified: boolean;
+  properties: Record<string, unknown>;
+  position: NodePosition;
+}
+
+export interface ProposedEdge {
+  id: string;
+  origin: ProposedNodeOrigin;
+  originalEdgeId?: string | null;
+  source: string;
+  target: string;
+  edgeType: EdgeType;
+  label?: string | null;
+  modified: boolean;
+  properties: Record<string, unknown>;
+}
+
+export interface ProposedArchitecture {
+  schemaVersion: number;
+  id: string;
+  projectId: string;
+  name: string;
+  description: string | null;
+  basedOnAnalysisRunId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  revision: number;
+  nodes: ProposedNode[];
+  edges: ProposedEdge[];
+  canvasLayout: CanvasLayout;
+}
+
+export interface ProposedArchitectureSummary {
+  schemaVersion: number;
+  id: string;
+  projectId: string;
+  name: string;
+  description: string | null;
+  basedOnAnalysisRunId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  revision: number;
+  nodeCount: number;
+  edgeCount: number;
+}
+
+export interface NodeDiff {
+  nodeId: string;
+  field: string;
+  before: unknown;
+  after: unknown;
+}
+
+export interface ComparisonReport {
+  proposedArchitectureId: string;
+  comparedAgainstRunId: string;
+  nodesAdded: string[];
+  nodesRemoved: string[];
+  nodesModified: NodeDiff[];
+  edgesAdded: string[];
+  edgesRemoved: string[];
+  structuralSummary: string;
+}

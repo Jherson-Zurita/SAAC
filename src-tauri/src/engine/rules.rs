@@ -32,7 +32,8 @@ impl Default for RuleConfig {
                 Rule {
                     id: "no-god-modules".to_string(),
                     name: "Sin Módulos Gigantes (God Modules)".to_string(),
-                    description: "Ningún módulo debe exceder 15 dependencias eferentes (Ce)".to_string(),
+                    description: "Ningún módulo debe exceder 15 dependencias eferentes (Ce)"
+                        .to_string(),
                     severity: "critical".to_string(),
                     weight: 25.0,
                     enabled: true,
@@ -50,7 +51,9 @@ impl Default for RuleConfig {
                 Rule {
                     id: "layer-architecture-integrity".to_string(),
                     name: "Respetar Jerarquía de Capas".to_string(),
-                    description: "Las capas inferiores no deben importar componentes de capas superiores".to_string(),
+                    description:
+                        "Las capas inferiores no deben importar componentes de capas superiores"
+                            .to_string(),
                     severity: "high".to_string(),
                     weight: 20.0,
                     enabled: true,
@@ -59,7 +62,8 @@ impl Default for RuleConfig {
                 Rule {
                     id: "maintainability-threshold".to_string(),
                     name: "Índice de Mantenibilidad Mínimo".to_string(),
-                    description: "El índice de mantenibilidad global debe ser mayor o igual a 60".to_string(),
+                    description: "El índice de mantenibilidad global debe ser mayor o igual a 60"
+                        .to_string(),
                     severity: "medium".to_string(),
                     weight: 20.0,
                     enabled: true,
@@ -131,19 +135,34 @@ impl RulesEngine {
         let circular_antipatterns = amg
             .antipatterns
             .iter()
-            .filter(|a| matches!(a.antipattern_type, crate::engine::amg::AntipatternType::CircularDependency))
+            .filter(|a| {
+                matches!(
+                    a.antipattern_type,
+                    crate::engine::amg::AntipatternType::CircularDependency
+                )
+            })
             .count();
 
         let layer_violations = amg
             .antipatterns
             .iter()
-            .filter(|a| matches!(a.antipattern_type, crate::engine::amg::AntipatternType::LayerViolation))
+            .filter(|a| {
+                matches!(
+                    a.antipattern_type,
+                    crate::engine::amg::AntipatternType::LayerViolation
+                )
+            })
             .count();
 
         let god_modules = amg
             .antipatterns
             .iter()
-            .filter(|a| matches!(a.antipattern_type, crate::engine::amg::AntipatternType::GodModule))
+            .filter(|a| {
+                matches!(
+                    a.antipattern_type,
+                    crate::engine::amg::AntipatternType::GodModule
+                )
+            })
             .count();
 
         for rule in &config.rules {
@@ -157,29 +176,50 @@ impl RulesEngine {
                     if god_modules == 0 {
                         (true, "No se detectaron God Modules.".to_string())
                     } else {
-                        (false, format!("Se detectaron {} God Module(s).", god_modules))
+                        (
+                            false,
+                            format!("Se detectaron {} God Module(s).", god_modules),
+                        )
                     }
                 }
                 "no-circular-dependencies" => {
                     if circular_antipatterns == 0 {
                         (true, "No hay ciclos de dependencia.".to_string())
                     } else {
-                        (false, format!("Se detectaron {} ciclo(s) de dependencia.", circular_antipatterns))
+                        (
+                            false,
+                            format!(
+                                "Se detectaron {} ciclo(s) de dependencia.",
+                                circular_antipatterns
+                            ),
+                        )
                     }
                 }
                 "layer-architecture-integrity" => {
                     if layer_violations == 0 {
                         (true, "Se respeta la jerarquía de capas.".to_string())
                     } else {
-                        (false, format!("Se detectaron {} violación(es) de capa.", layer_violations))
+                        (
+                            false,
+                            format!("Se detectaron {} violación(es) de capa.", layer_violations),
+                        )
                     }
                 }
                 "maintainability-threshold" => {
                     let avg_mi = amg.metrics.maintainability_index_avg;
                     if avg_mi >= 60.0 {
-                        (true, format!("Índice de mantenibilidad aceptable: {:.1}", avg_mi))
+                        (
+                            true,
+                            format!("Índice de mantenibilidad aceptable: {:.1}", avg_mi),
+                        )
                     } else {
-                        (false, format!("Índice de mantenibilidad deficiente: {:.1} (requerido >= 60)", avg_mi))
+                        (
+                            false,
+                            format!(
+                                "Índice de mantenibilidad deficiente: {:.1} (requerido >= 60)",
+                                avg_mi
+                            ),
+                        )
                     }
                 }
                 _ => {
@@ -187,7 +227,10 @@ impl RulesEngine {
                     if amg.antipatterns.is_empty() {
                         (true, "Regla cumplida.".to_string())
                     } else {
-                        (false, "Fallo genérico por presencia de antipatrones.".to_string())
+                        (
+                            false,
+                            "Fallo genérico por presencia de antipatrones.".to_string(),
+                        )
                     }
                 }
             };
