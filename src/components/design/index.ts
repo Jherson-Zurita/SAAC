@@ -1,3 +1,4 @@
+import './design.css';
 export * from './ComparisonPanel';
 export * from './DesignCanvas';
 export * from './DesignInspector';
