@@ -209,9 +209,9 @@ const DesignCanvasInner: React.FC<DesignCanvasProps> = ({ autoLayoutRequest = 0 
           onPaneClick={clearSelection}
           onMoveEnd={handleMoveEnd}
           defaultViewport={{
-            x: currentDesign.canvasLayout.viewport.x,
-            y: currentDesign.canvasLayout.viewport.y,
-            zoom: currentDesign.canvasLayout.zoom,
+            x: Number.isFinite(currentDesign.canvasLayout?.viewport?.x) ? currentDesign.canvasLayout.viewport.x : 0,
+            y: Number.isFinite(currentDesign.canvasLayout?.viewport?.y) ? currentDesign.canvasLayout.viewport.y : 0,
+            zoom: Number.isFinite(currentDesign.canvasLayout?.zoom) && currentDesign.canvasLayout.zoom > 0 ? currentDesign.canvasLayout.zoom : 1,
           }}
           nodesDraggable
           nodesConnectable

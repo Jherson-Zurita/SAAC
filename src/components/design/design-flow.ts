@@ -75,7 +75,10 @@ export function toFlowNodes(
   return nodes.map((node) => ({
     id: node.id,
     type: 'design',
-    position: { ...node.position },
+    position: {
+      x: Number.isFinite(node.position?.x) ? node.position.x : 0,
+      y: Number.isFinite(node.position?.y) ? node.position.y : 0,
+    },
     data: { node },
     selected: selected.has(node.id),
     draggable: true,
