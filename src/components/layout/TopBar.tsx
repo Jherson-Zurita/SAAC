@@ -17,6 +17,7 @@ import {
   ChevronDown,
   XCircle,
   RotateCw,
+  Palette,
 } from 'lucide-react';
 import { useUiStore, type MainTab } from '../../stores/useUiStore';
 import { useProjectStore } from '../../stores/useProjectStore';
@@ -250,6 +251,19 @@ export const TopBar: React.FC<TopBarProps> = ({
         >
           <FileText className="w-3.5 h-3.5 text-emerald-400" />
           <span>ADRs</span>
+        </button>
+
+        <button
+          onClick={() => handleTabChange('design')}
+          className={`flex items-center space-x-1.5 px-2.5 py-1 text-xs font-semibold rounded-md transition ${
+            activeMainTab === 'design'
+              ? 'bg-purple-600 text-white shadow-sm shadow-purple-500/30'
+              : 'text-gray-400 hover:text-gray-200 hover:bg-[#161a26]'
+          }`}
+          title="Módulo de Diseño Arquitectónico Interactivo (Canvas Canvas)"
+        >
+          <Palette className="w-3.5 h-3.5 text-purple-400" />
+          <span>Diseño</span>
         </button>
       </div>
 

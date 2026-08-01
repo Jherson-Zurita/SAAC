@@ -12,6 +12,7 @@ import { isDiagramTab } from '../c4viewer/diagram-registry';
 import { useUiStore } from '../../stores/useUiStore';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useRecentProjectsStore } from '../../stores/useRecentProjectsStore';
+import { useAnalysisHistoryStore } from '../../stores/useAnalysisHistoryStore';
 import {
   FolderOpen,
   Sparkles,
@@ -27,6 +28,7 @@ import {
 
 import { AntipatternsPanel } from '../antipatterns';
 import { AdrsPanel } from '../adrs';
+import { DesignWorkspace } from '../design';
 
 interface AppShellProps {
   onOpenProject: () => void;
@@ -46,7 +48,8 @@ export const AppShell: React.FC<AppShellProps> = ({
   children,
 }) => {
   const { activeMainTab } = useUiStore();
-  const { amg } = useProjectStore();
+  const { amg, projectPath } = useProjectStore();
+  const { history } = useAnalysisHistoryStore();
   const { recentProjects, removeRecentProject, clearRecentProjects } = useRecentProjectsStore();
 
   return (
@@ -229,6 +232,11 @@ export const AppShell: React.FC<AppShellProps> = ({
             <AntipatternsPanel />
           ) : activeMainTab === 'adrs' ? (
             <AdrsPanel />
+          ) : activeMainTab === 'design' ? (
+            <DesignWorkspace
+              projectPath={projectPath || ''}
+              analysisRuns={history?.runs || []}
+            />
           ) : isDiagramTab(activeMainTab) ? (
             <C4Viewer activeTab={activeMainTab} />
           ) : (
