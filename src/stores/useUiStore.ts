@@ -15,7 +15,8 @@ export type SupplementaryDiagramTab =
   | 'treemap'
   | 'ownership'
   | 'landscape'
-  | 'timeline';
+  | 'timeline'
+  | 'force-graph';
 
 export type DiagramTab = 'c4' | SupplementaryDiagramTab;
 

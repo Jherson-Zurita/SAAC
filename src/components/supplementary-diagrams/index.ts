@@ -12,4 +12,5 @@ export * from './FileTreeView';
 export * from './TimelineView';
 export * from './OwnershipMapView';
 export * from './SupplementaryDiagramView';
+export * from './ForceGraphView';
 

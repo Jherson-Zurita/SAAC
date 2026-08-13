@@ -13,6 +13,8 @@ import {
   DfdDiagramView,
   DynamicDiagramView,
   ErDiagramView,
+  FileTreeView,
+  ForceGraphView,
   InheritanceTreeView,
   OwnershipMapView,
   PackageDiagramView,
@@ -45,11 +47,12 @@ const supplementaryViews: Record<
   dfd: DfdDiagramView,
   'coupling-heatmap': CouplingHeatmapView,
   deployment: (props) => <SupplementaryDiagramView tab="deployment" {...props} />,
-  filetree: (props) => <SupplementaryDiagramView tab="filetree" {...props} />,
+  filetree: FileTreeView,
   treemap: TreemapView,
   ownership: OwnershipMapView,
   landscape: (props) => <SupplementaryDiagramView tab="landscape" {...props} />,
   timeline: TimelineView,
+  'force-graph': ForceGraphView,
 };
 
 function getErrorMessage(error: unknown): string {

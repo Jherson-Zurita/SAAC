@@ -156,7 +156,76 @@ impl HistoryManager {
         // aislado al guardar el AMG.
         Self::save_amg_for_run(project_path, run_id, amg)?;
 
+        // Generar archivo JSON resumen físico en .saac/analysis-summary.json para depuración
+        Self::save_analysis_summary(project_path, total_files, successful, failed, duration_ms, amg, fitness_score);
+
         Ok(history)
+    }
+
+    /// Guarda un archivo resumen detallado en `.saac/analysis-summary.json`
+    fn save_analysis_summary(
+        project_path: &str,
+        total_files: usize,
+        successful: usize,
+        failed: usize,
+        duration_ms: u64,
+        amg: &ArchitectureModelGraph,
+        fitness_score: f64,
+    ) {
+        let saac_dir = Path::new(project_path).join(".saac");
+        let _ = fs::create_dir_all(&saac_dir);
+        let summary_file = saac_dir.join("analysis-summary.json");
+
+        let mut diagrams_info = Vec::new();
+        diagrams_info.push(serde_json::json!({
+            "diagram": "C4 Level 1 (Context)",
+            "nodes": amg.c4_models.context_diagram.nodes.len(),
+            "edges": amg.c4_models.context_diagram.edges.len(),
+        }));
+        diagrams_info.push(serde_json::json!({
+            "diagram": "C4 Level 2 (Container)",
+            "nodes": amg.c4_models.container_diagram.nodes.len(),
+            "edges": amg.c4_models.container_diagram.edges.len(),
+        }));
+        for (key, diag) in &amg.c4_models.component_diagrams {
+            diagrams_info.push(serde_json::json!({
+                "diagram": key,
+                "nodes": diag.nodes.len(),
+                "edges": diag.edges.len(),
+            }));
+        }
+
+        let summary = serde_json::json!({
+            "timestamp": amg.analyzed_at,
+            "project_path": project_path,
+            "project_name": amg.project_name,
+            "saac_version": "2.0.0",
+            "overview": {
+                "total_files": total_files,
+                "successful_files": successful,
+                "failed_files": failed,
+                "duration_ms": duration_ms,
+            },
+            "architecture": {
+                "detected_type": amg.detected_type,
+                "detected_style": amg.detected_style,
+                "style_confidence": amg.style_confidence,
+                "module_count": amg.modules.len(),
+                "dependency_count": amg.dependencies.len(),
+                "container_count": amg.containers.len(),
+                "external_system_count": amg.external_systems.len(),
+                "actor_count": amg.actors.len(),
+                "antipattern_count": amg.antipatterns.len(),
+                "fitness_score": fitness_score,
+            },
+            "metrics": amg.metrics,
+            "antipatterns": amg.antipatterns,
+            "diagrams_diagnostics": diagrams_info,
+        });
+
+        if let Ok(json_str) = serde_json::to_string_pretty(&summary) {
+            let _ = fs::write(summary_file, json_str);
+        }
     }
 
     /// Calcula la diferencia arquitectónica (AMGDelta) entre dos AMGs (`amg_a` y `amg_b`).

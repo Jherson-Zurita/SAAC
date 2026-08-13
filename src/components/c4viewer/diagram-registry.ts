@@ -114,6 +114,13 @@ export const supplementaryDiagramDefinitions = [
     shortLabel: 'Timeline',
     direction: 'LR',
   },
+  {
+    tab: 'force-graph',
+    backendKey: 'supplementary:force-graph',
+    title: 'Grafo de Dependencias (Nodos Proporcionales)',
+    shortLabel: 'Grafo de Fuerza',
+    direction: 'LR',
+  },
 ] as const satisfies readonly SupplementaryDiagramDefinition[];
 
 const supplementaryTabs = new Set<MainTab>(

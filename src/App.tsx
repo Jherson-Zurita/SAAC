@@ -20,6 +20,7 @@ import {
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { saveCachedProjectData, loadCachedProjectData } from './lib/project-cache';
+import { generateAnalysisSummary } from './lib/analysis-summary';
 
 export function App() {
   const {
@@ -104,8 +105,9 @@ export function App() {
           console.warn('Error al evaluar reglas:', e);
         }
 
-        // Guardar resultado del análisis en la caché local
+        // Guardar resultado del análisis en la caché local y generar JSON resumen de diagnóstico
         saveCachedProjectData(targetPath, result.amg, fitnessData);
+        generateAnalysisSummary(targetPath, result, fitnessData);
 
         // Actualizar historial
         try {
