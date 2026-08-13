@@ -2,77 +2,91 @@ import React from 'react';
 import { ShieldCheck, Cpu, AlertTriangle } from 'lucide-react';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useAiStore } from '../../stores/useAiStore';
+import { useSelectionStore } from '../../stores/useSelectionStore';
 
 export const StatusBar: React.FC = () => {
   const { projectPath, isAnalyzing, progress, amg, fitnessResult } = useProjectStore();
   const { aiStatus } = useAiStore();
+  const { selectedId } = useSelectionStore();
 
   const totalFiles = progress?.totalFiles || 0;
   const completedFiles = progress?.completedFiles || 0;
   const percent = totalFiles > 0 ? Math.round((completedFiles / totalFiles) * 100) : 0;
 
   return (
-    <footer className="h-6 bg-[#0a0c12] border-t border-[#1a1e2c] px-3 flex items-center justify-between text-[11px] font-mono text-gray-400 select-none z-30">
-      {/* Izquierda: Estado del Proyecto */}
+    <footer className="h-[23px] bg-[#17152C] border-t border-[#252B34] px-3 flex items-center justify-between text-[9.5px] font-mono text-[#858C98] select-none z-30 shrink-0">
+      {/* Left: Application State (GraphForge Spec Section 32) */}
       <div className="flex items-center space-x-3 truncate">
         <div className="flex items-center space-x-1.5">
-          <div
-            className={`w-2 h-2 rounded-full ${
+          <span
+            className={`text-[8px] ${
               isAnalyzing
-                ? 'bg-amber-400 animate-ping'
+                ? 'text-[#E7B85B] animate-pulse'
                 : amg
-                ? 'bg-emerald-400'
-                : 'bg-gray-600'
+                ? 'text-[#4FD49A]'
+                : 'text-[#5F6671]'
             }`}
-          />
-          <span className="text-gray-300 font-medium truncate">
+          >
+            ●
+          </span>
+          <span className="text-[#E6E9ED] font-semibold truncate">
             {isAnalyzing
-              ? `Analizando: ${progress?.phase || 'iniciando'}...`
+              ? `Analizando: ${progress?.phase || 'escaneando'}...`
               : projectPath
               ? `Proyecto: ${projectPath.split(/[/\\]/).pop()}`
-              : 'SAAC Listo'}
+              : 'Listo'}
           </span>
         </div>
 
-        {projectPath && (
-          <span className="text-gray-600 hidden md:inline truncate max-w-xs">{projectPath}</span>
+        {amg && (
+          <div className="flex items-center space-x-3 text-[#5F6671] border-l border-[#302C51] pl-3">
+            <span>Nodos <strong className="text-[#E6E9ED] font-normal">{amg.modules.length}</strong></span>
+            <span>Aristas <strong className="text-[#E6E9ED] font-normal">{amg.dependencies.length}</strong></span>
+            {selectedId && (
+              <span className="text-[#8B7CFF] truncate max-w-[140px]" title={selectedId}>
+                Selección: {selectedId.split('/').pop()}
+              </span>
+            )}
+          </div>
         )}
       </div>
 
-      {/* Centro: Barra de progreso activa */}
+      {/* Center: Active Progress Bar */}
       {isAnalyzing && (
-        <div className="flex items-center space-x-2 w-64 px-2">
-          <div className="flex-1 bg-[#161a26] h-1.5 rounded-full overflow-hidden border border-[#232838]">
+        <div className="flex items-center space-x-2 w-48 px-2">
+          <div className="flex-1 bg-[#101318] h-1 rounded-full overflow-hidden border border-[#252B34]">
             <div
-              className="bg-gradient-to-r from-blue-500 to-cyan-400 h-full transition-all duration-300"
+              className="bg-[#8B7CFF] h-full transition-all duration-300"
               style={{ width: `${percent}%` }}
             />
           </div>
-          <span className="text-[10px] text-cyan-400 font-bold shrink-0">{percent}%</span>
+          <span className="text-[9px] text-[#8B7CFF] font-bold shrink-0">{percent}%</span>
         </div>
       )}
 
-      {/* Derecha: Métricas y Estado IA */}
+      {/* Right: Technical Metadata (GraphForge Spec Section 32) */}
       <div className="flex items-center space-x-3 shrink-0">
         {fitnessResult && (
-          <div className="flex items-center space-x-1 text-emerald-400 font-bold">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>Fitness: {fitnessResult.fitnessScore}</span>
+          <div className="flex items-center space-x-1 text-[#4FD49A] font-bold">
+            <ShieldCheck className="w-3 h-3" />
+            <span>FS: {fitnessResult.fitnessScore}/100</span>
           </div>
         )}
 
         {amg && amg.antipatterns.length > 0 && (
-          <div className="flex items-center space-x-1 text-amber-400 font-medium">
-            <AlertTriangle className="w-3.5 h-3.5" />
+          <div className="flex items-center space-x-1 text-[#E7B85B]">
+            <AlertTriangle className="w-3 h-3" />
             <span>{amg.antipatterns.length} antipatrones</span>
           </div>
         )}
 
-        <div className="flex items-center space-x-1 border-l border-[#1f2433] pl-2 text-gray-400">
-          <Cpu className="w-3.5 h-3.5 text-blue-400" />
-          <span className="text-[10px]">
-            IA: {aiStatus?.available ? 'Ollama Activo' : 'Modo Mock'}
+        <div className="flex items-center space-x-3 border-l border-[#302C51] pl-3 text-[#5F6671]">
+          <span className="flex items-center gap-1 text-[#45C8DF]">
+            <Cpu className="w-3 h-3" />
+            {aiStatus?.available ? 'Ollama' : 'Mock IA'}
           </span>
+          <span>UTF-8</span>
+          <span className="text-[#8B7CFF] font-bold">SAAC 2.0</span>
         </div>
       </div>
     </footer>

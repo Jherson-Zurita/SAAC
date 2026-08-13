@@ -19,7 +19,7 @@ export const Downbar: React.FC = () => {
 
   const [consoleInput, setConsoleInput] = useState('');
   const [consoleLogs, setConsoleLogs] = useState<Array<{ text: string; type: 'cmd' | 'output' | 'error' }>>([
-    { text: 'SAAC Console v2.0 initialized. Type "help" for commands.', type: 'output' },
+    { text: 'SAAC Workspace Console v2.0 ready. Type "help" for commands.', type: 'output' },
   ]);
 
   const logsEndRef = useRef<HTMLDivElement>(null);
@@ -58,175 +58,83 @@ export const Downbar: React.FC = () => {
   };
 
   return (
-    <footer className="h-56 bg-[#12151e] border-t border-[#232838] flex flex-col select-none z-10">
-      {/* Header de pestañas */}
-      <div className="h-9 px-3 border-b border-[#232838] flex items-center justify-between bg-[#0d0f16]">
+    <footer className="h-[166px] bg-[#101318] border-t border-[#252B34] flex flex-col select-none z-10 font-sans shrink-0">
+      {/* Header de pestañas (GraphForge Spec Section 30) */}
+      <div className="h-[32px] px-3 border-b border-[#252B34] flex items-center justify-between bg-[#0B0D10]">
         <div className="flex items-center space-x-1">
           <button
-            onClick={() => setActiveDownbarTab('output')}
-            className={`px-3 py-1.5 text-xs font-medium flex items-center space-x-1.5 border-b-2 transition ${
-              activeDownbarTab === 'output'
-                ? 'border-blue-500 text-blue-400 bg-[#161a26]'
-                : 'border-transparent text-gray-400 hover:text-gray-200'
+            onClick={() => setActiveDownbarTab('console')}
+            className={`px-3 h-[32px] text-[10px] font-semibold tracking-wider flex items-center space-x-1.5 border-b-2 transition ${
+              activeDownbarTab === 'console'
+                ? 'border-[#8B7CFF] text-[#E6E9ED] bg-[#101318]'
+                : 'border-transparent text-[#858C98] hover:text-[#E6E9ED]'
             }`}
           >
-            <FileText className="w-3.5 h-3.5" />
-            <span>Output</span>
+            <TerminalIcon className="w-3 h-3 text-[#8B7CFF]" />
+            <span>TERMINAL</span>
           </button>
 
           <button
             onClick={() => setActiveDownbarTab('problems')}
-            className={`px-3 py-1.5 text-xs font-medium flex items-center space-x-1.5 border-b-2 transition ${
+            className={`px-3 h-[32px] text-[10px] font-semibold tracking-wider flex items-center space-x-1.5 border-b-2 transition ${
               activeDownbarTab === 'problems'
-                ? 'border-amber-500 text-amber-400 bg-[#161a26]'
-                : 'border-transparent text-gray-400 hover:text-gray-200'
+                ? 'border-[#8B7CFF] text-[#E6E9ED] bg-[#101318]'
+                : 'border-transparent text-[#858C98] hover:text-[#E6E9ED]'
             }`}
           >
-            <AlertTriangle className="w-3.5 h-3.5" />
-            <span>Problemas ({amg?.antipatterns.length || 0})</span>
+            <AlertTriangle className="w-3 h-3 text-[#E7B85B]" />
+            <span>PROBLEMAS ({amg?.antipatterns.length || 0})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveDownbarTab('output')}
+            className={`px-3 h-[32px] text-[10px] font-semibold tracking-wider flex items-center space-x-1.5 border-b-2 transition ${
+              activeDownbarTab === 'output'
+                ? 'border-[#8B7CFF] text-[#E6E9ED] bg-[#101318]'
+                : 'border-transparent text-[#858C98] hover:text-[#E6E9ED]'
+            }`}
+          >
+            <FileText className="w-3 h-3 text-[#45C8DF]" />
+            <span>OUTPUT</span>
           </button>
 
           <button
             onClick={() => setActiveDownbarTab('history')}
-            className={`px-3 py-1.5 text-xs font-medium flex items-center space-x-1.5 border-b-2 transition ${
+            className={`px-3 h-[32px] text-[10px] font-semibold tracking-wider flex items-center space-x-1.5 border-b-2 transition ${
               activeDownbarTab === 'history'
-                ? 'border-purple-500 text-purple-400 bg-[#161a26]'
-                : 'border-transparent text-gray-400 hover:text-gray-200'
+                ? 'border-[#8B7CFF] text-[#E6E9ED] bg-[#101318]'
+                : 'border-transparent text-[#858C98] hover:text-[#E6E9ED]'
             }`}
           >
-            <History className="w-3.5 h-3.5" />
-            <span>Historial ({history?.runs.length || 0})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveDownbarTab('console')}
-            className={`px-3 py-1.5 text-xs font-medium flex items-center space-x-1.5 border-b-2 transition ${
-              activeDownbarTab === 'console'
-                ? 'border-cyan-500 text-cyan-400 bg-[#161a26]'
-                : 'border-transparent text-gray-400 hover:text-gray-200'
-            }`}
-          >
-            <TerminalIcon className="w-3.5 h-3.5" />
-            <span>Consola SAAC</span>
+            <History className="w-3 h-3 text-[#8B7CFF]" />
+            <span>HISTORIAL ({history?.runs.length || 0})</span>
           </button>
         </div>
 
         <button
           onClick={toggleDownbar}
-          className="p-1 text-gray-400 hover:text-white hover:bg-[#1f2433] rounded"
+          className="p-1 text-[#858C98] hover:text-[#E6E9ED] hover:bg-[#171B21] rounded"
           title="Cerrar panel inferior"
         >
-          <X className="w-3.5 h-3.5" />
+          <X className="w-3 h-3" />
         </button>
       </div>
 
-      {/* Cuerpo del Downbar */}
-      <div className="flex-1 overflow-hidden p-2 text-xs font-mono">
-        {/* Pestaña Output */}
-        {activeDownbarTab === 'output' && (
-          <div className="h-full overflow-y-auto space-y-1 text-gray-300 p-1">
-            {lastAnalysisResult ? (
-              <div>
-                <p className="text-emerald-400 font-bold">
-                  [ANÁLISIS COMPLETADO] Duración: {lastAnalysisResult.durationMs} ms | Archivos: {lastAnalysisResult.totalFiles} (Éxito: {lastAnalysisResult.successful}, Saltados: {lastAnalysisResult.skipped})
-                </p>
-                {lastAnalysisResult.outcomes.map((out, idx) => (
-                  <div key={idx} className="text-[11px] text-gray-400">
-                    [{out.status}] {out.filePath} {out.errorMessage && `- Error: ${out.errorMessage}`}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-gray-500 italic">No hay logs de análisis recientes. Inicie un análisis.</p>
-            )}
-          </div>
-        )}
-
-        {/* Pestaña Problems */}
-        {activeDownbarTab === 'problems' && (
-          <div className="h-full overflow-y-auto space-y-1 p-1">
-            {amg?.antipatterns.map((anti) => (
-              <div
-                key={anti.id}
-                className="p-1.5 rounded bg-[#18151f] border border-amber-500/20 text-amber-300 flex items-center justify-between"
-              >
-                <span>[{anti.severity.toUpperCase()}] {anti.name}: {anti.description}</span>
-                <span className="text-[10px] text-gray-400">Afectados: {anti.affectedModuleIds.length}</span>
-              </div>
-            )) || <p className="text-gray-500 italic">No se detectaron problemas en el modelo actual.</p>}
-          </div>
-        )}
-
-        {/* Pestaña History */}
-        {activeDownbarTab === 'history' && (
-          <div className="h-full overflow-y-auto space-y-1.5 p-1">
-            <div className="flex items-center justify-between text-[10px] text-gray-500 pb-1 border-b border-[#1e2333]">
-              <span>Historial de ejecuciones en la sesión actual ({history?.runs.length || 0} corridas)</span>
-              <span className="text-gray-600 italic">Sesión activa (no persistente entre reinicios)</span>
-            </div>
-
-            {!history || history.runs.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-32 text-center text-gray-500">
-                <History className="w-8 h-8 opacity-40 text-purple-400 mb-1" />
-                <p className="italic">Sin historial de ejecuciones guardado.</p>
-                <p className="text-[10px] text-gray-600">Ejecute un análisis de código para registrar entradas.</p>
-              </div>
-            ) : (
-              history.runs.map((run, idx) => {
-                const fsColor =
-                  run.fitnessScore >= 80
-                    ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10'
-                    : run.fitnessScore >= 60
-                    ? 'text-amber-400 border-amber-500/30 bg-amber-500/10'
-                    : 'text-rose-400 border-rose-500/30 bg-rose-500/10';
-
-                return (
-                  <div
-                    key={run.runId || idx}
-                    className="p-2.5 rounded-lg bg-[#141724] border border-[#232838] hover:border-purple-500/40 flex items-center justify-between text-gray-300 transition"
-                  >
-                    <div className="space-y-0.5">
-                      <div className="flex items-center space-x-2">
-                        <span className="font-bold font-mono text-purple-400">#{run.runId}</span>
-                        <span className="text-[10px] text-gray-400">{run.timestamp}</span>
-                      </div>
-                      <div className="text-[11px] text-gray-400 flex items-center space-x-3 font-mono">
-                        <span>Archivos: <strong className="text-gray-200">{run.totalFiles}</strong> ({run.successful} ok)</span>
-                        <span>•</span>
-                        <span>Módulos: <strong className="text-cyan-400">{run.moduleCount}</strong></span>
-                        <span>•</span>
-                        <span>Dependencias: <strong className="text-purple-400">{run.dependencyCount}</strong></span>
-                        <span>•</span>
-                        <span>Antipatrones: <strong className={run.antipatternCount > 0 ? 'text-amber-400' : 'text-emerald-400'}>{run.antipatternCount}</strong></span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-3">
-                      <div className={`px-2.5 py-1 rounded border text-xs font-mono font-bold ${fsColor}`}>
-                        Fitness: {run.fitnessScore}/100
-                      </div>
-                      <span className="text-[10px] text-gray-500 font-mono">{run.durationMs} ms</span>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        )}
-
-        {/* Pestaña Consola SAAC */}
+      {/* Cuerpo del Downbar (GraphForge Spec Section 31 — Monospace Terminal Formatting) */}
+      <div className="flex-1 overflow-hidden p-2 text-[10.5px] font-mono leading-relaxed">
+        {/* Pestaña Consola / Terminal */}
         {activeDownbarTab === 'console' && (
           <div className="h-full flex flex-col">
-            <div className="flex-1 overflow-y-auto space-y-1 bg-[#090b10] p-2 rounded border border-[#1b1f2c] text-gray-200">
+            <div className="flex-1 overflow-y-auto space-y-0.5 bg-[#0B0D10] p-2 rounded border border-[#1D222A] text-[#E6E9ED]">
               {consoleLogs.map((log, idx) => (
                 <div
                   key={idx}
                   className={
                     log.type === 'cmd'
-                      ? 'text-cyan-400 font-bold'
+                      ? 'text-[#8B7CFF] font-semibold'
                       : log.type === 'error'
-                      ? 'text-rose-400 font-semibold'
-                      : 'text-gray-300 whitespace-pre-wrap'
+                      ? 'text-[#EF6B73]'
+                      : 'text-[#858C98] whitespace-pre-wrap'
                   }
                 >
                   {log.text}
@@ -236,21 +144,83 @@ export const Downbar: React.FC = () => {
             </div>
 
             <form onSubmit={handleConsoleSubmit} className="mt-1 flex items-center space-x-2">
-              <span className="text-cyan-400 font-bold text-xs pl-1">saac&gt;</span>
+              <span className="text-[#8B7CFF] font-bold text-xs pl-1">$ saac&gt;</span>
               <input
                 type="text"
                 value={consoleInput}
                 onChange={(e) => setConsoleInput(e.target.value)}
-                placeholder="Escriba un comando (ej: help, analyze, rules check)..."
-                className="flex-1 bg-[#090a0f] border border-[#232838] text-xs text-gray-200 px-2 py-1 rounded focus:outline-none focus:border-cyan-500 font-mono"
+                placeholder="Ingresar comando (ej: help, analyze)..."
+                className="flex-1 bg-[#0B0D10] border border-[#252B34] text-[10.5px] text-[#E6E9ED] px-2 py-0.5 rounded focus:outline-none focus:border-[#8B7CFF] font-mono placeholder-[#5F6671]"
               />
               <button
                 type="submit"
-                className="p-1 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 border border-cyan-500/30 rounded"
+                className="p-1 bg-[#211E39] hover:bg-[#2c284e] text-[#8B7CFF] border border-[#302C51] rounded"
               >
-                <Send className="w-3.5 h-3.5" />
+                <Send className="w-3 h-3" />
               </button>
             </form>
+          </div>
+        )}
+
+        {/* Pestaña Output */}
+        {activeDownbarTab === 'output' && (
+          <div className="h-full overflow-y-auto space-y-1 text-[#858C98] p-1">
+            {lastAnalysisResult ? (
+              <div>
+                <p className="text-[#4FD49A] font-bold">
+                  ✓ [ANÁLISIS COMPLETADO] Duración: {lastAnalysisResult.durationMs} ms | Archivos: {lastAnalysisResult.totalFiles} (Éxito: {lastAnalysisResult.successful}, Omitidos: {lastAnalysisResult.skipped})
+                </p>
+                {lastAnalysisResult.outcomes.map((out, idx) => (
+                  <div key={idx} className="text-[10px] text-[#5F6671]">
+                    [{out.status}] {out.filePath} {out.errorMessage && `- Error: ${out.errorMessage}`}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[#5F6671] italic">No hay registros de análisis recientes.</p>
+            )}
+          </div>
+        )}
+
+        {/* Pestaña Problemas */}
+        {activeDownbarTab === 'problems' && (
+          <div className="h-full overflow-y-auto space-y-1 p-1">
+            {amg?.antipatterns.map((anti) => (
+              <div
+                key={anti.id}
+                className="p-1.5 rounded bg-[#13171D] border border-[#E7B85B]/40 text-[#E7B85B] flex items-center justify-between text-[10px]"
+              >
+                <span>[{anti.severity.toUpperCase()}] {anti.name}: {anti.description}</span>
+                <span className="text-[9px] text-[#858C98]">Afectados: {anti.affectedModuleIds.length}</span>
+              </div>
+            )) || <p className="text-[#5F6671] italic">No se detectaron problemas arquitectónicos.</p>}
+          </div>
+        )}
+
+        {/* Pestaña Historial */}
+        {activeDownbarTab === 'history' && (
+          <div className="h-full overflow-y-auto space-y-1 p-1">
+            {!history || history.runs.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-24 text-center text-[#5F6671]">
+                <p className="italic">Sin historial de corridas en esta sesión.</p>
+              </div>
+            ) : (
+              history.runs.map((run, idx) => (
+                <div
+                  key={run.runId || idx}
+                  className="p-1.5 rounded bg-[#13171D] border border-[#252B34] flex items-center justify-between text-[#E6E9ED] text-[10px]"
+                >
+                  <div className="flex items-center space-x-2">
+                    <span className="font-bold text-[#8B7CFF]">#{run.runId}</span>
+                    <span className="text-[#5F6671]">{run.timestamp}</span>
+                    <span className="text-[#858C98]">({run.totalFiles} archivos, {run.moduleCount} mód)</span>
+                  </div>
+                  <div className="font-mono text-[#8B7CFF] font-bold">
+                    Fitness: {run.fitnessScore}/100 ({run.durationMs} ms)
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         )}
       </div>

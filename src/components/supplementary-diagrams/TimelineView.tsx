@@ -25,18 +25,18 @@ export const TimelineView: React.FC<TimelineViewProps> = () => {
       }
     }
     load();
-  }, []);
+  }, [projectPath]);
 
   if (loading) {
-    return <div className="p-4 text-center text-slate-400">Cargando línea de tiempo histórica...</div>;
+    return <div className="p-4 text-center text-[#858C98] font-sans text-xs">Cargando línea de tiempo histórica...</div>;
   }
 
   if (history.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center p-8 text-center text-slate-400 h-full">
-        <History className="w-12 h-12 mb-3 text-slate-600" />
-        <p className="font-semibold">Sin ejecuciones históricas registradas</p>
-        <span className="text-xs text-slate-500 max-w-sm mt-1">
+      <div className="flex flex-col items-center justify-center p-8 text-center text-[#858C98] h-full font-sans">
+        <History className="w-10 h-10 mb-2 text-[#5F6671]" />
+        <p className="font-semibold text-[#E6E9ED]">Sin ejecuciones históricas registradas</p>
+        <span className="text-xs text-[#5F6671] max-w-sm mt-1">
           Ejecute múltiples análisis del proyecto para rastrear la evolución de métricas y Fitness Score a lo largo del tiempo.
         </span>
       </div>
@@ -44,65 +44,65 @@ export const TimelineView: React.FC<TimelineViewProps> = () => {
   }
 
   return (
-    <div className="flex flex-col w-full h-full p-4 overflow-auto bg-slate-900 text-slate-200">
-      <div className="mb-4">
-        <h3 className="text-lg font-bold text-sky-400">Línea de Tiempo de Evolución Arquitectónica</h3>
-        <p className="text-xs text-slate-400">
+    <div className="flex flex-col w-full h-full p-4 overflow-auto bg-[#0B0E12] text-[#E6E9ED] font-sans">
+      <div className="mb-3">
+        <h3 className="text-sm font-bold text-[#8B7CFF] tracking-tight">Línea de Tiempo de Evolución Arquitectónica</h3>
+        <p className="text-xs text-[#858C98]">
           Tendencia de salud del proyecto a través de ejecuciones consecutivas de análisis (AnalysisRuns).
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <div className="p-4 border border-slate-700 bg-slate-950 rounded-lg flex items-center justify-between">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+        <div className="p-3 border border-[#252B34] bg-[#101318] rounded-md flex items-center justify-between">
           <div>
-            <div className="text-xs text-slate-400">Último Fitness Score</div>
-            <div className="text-2xl font-bold text-emerald-400">
+            <div className="text-[10px] text-[#858C98]">Último Fitness Score</div>
+            <div className="text-xl font-bold text-[#4FD49A] font-mono">
               {history[history.length - 1]?.fitnessScore ?? 100} / 100
             </div>
           </div>
-          <CheckCircle className="w-8 h-8 text-emerald-500/40" />
+          <CheckCircle className="w-7 h-7 text-[#4FD49A]/40" />
         </div>
 
-        <div className="p-4 border border-slate-700 bg-slate-950 rounded-lg flex items-center justify-between">
+        <div className="p-3 border border-[#252B34] bg-[#101318] rounded-md flex items-center justify-between">
           <div>
-            <div className="text-xs text-slate-400">Antipatrones Actuales</div>
-            <div className="text-2xl font-bold text-amber-400">
+            <div className="text-[10px] text-[#858C98]">Antipatrones Actuales</div>
+            <div className="text-xl font-bold text-[#E7B85B] font-mono">
               {history[history.length - 1]?.antipatternCount ?? 0} detectados
             </div>
           </div>
-          <ShieldAlert className="w-8 h-8 text-amber-500/40" />
+          <ShieldAlert className="w-7 h-7 text-[#E7B85B]/40" />
         </div>
       </div>
 
-      <div className="border border-slate-700 rounded-lg p-3 bg-slate-950 flex-1 overflow-auto">
-        <h4 className="text-xs font-semibold text-slate-300 mb-3 flex items-center gap-2">
-          <TrendingUp className="w-4 h-4 text-sky-400" />
+      <div className="border border-[#252B34] rounded-md p-3 bg-[#101318] flex-1 overflow-auto">
+        <h4 className="text-xs font-semibold text-[#858C98] mb-2.5 flex items-center gap-2">
+          <TrendingUp className="w-3.5 h-3.5 text-[#45C8DF]" />
           Historial de Análisis ({history.length} ejecuciones)
         </h4>
 
-        <div className="space-y-3">
+        <div className="space-y-2">
           {history.map((run, idx) => (
             <div
               key={run.runId}
-              className="flex items-center justify-between p-3 rounded bg-slate-900 border border-slate-800 hover:border-slate-700"
+              className="flex items-center justify-between p-2.5 rounded bg-[#13171D] border border-[#1D222A] hover:border-[#8B7CFF]/40 transition"
             >
-              <div className="space-y-1">
-                <div className="text-xs font-mono font-semibold text-sky-300">
+              <div className="space-y-0.5">
+                <div className="text-xs font-mono font-semibold text-[#8B7CFF]">
                   Run #{idx + 1} — {new Date(run.timestamp).toLocaleString()}
                 </div>
-                <div className="text-[10px] text-slate-400">
+                <div className="text-[10px] text-[#858C98] font-mono">
                   Módulos: {run.moduleCount} | Dependencias: {run.dependencyCount} | Duración: {run.durationMs}ms
                 </div>
               </div>
 
               <div className="flex items-center gap-4 text-xs font-mono">
                 <div className="text-right">
-                  <div className="text-[10px] text-slate-400">Fitness</div>
-                  <div className="font-bold text-emerald-400">{run.fitnessScore}/100</div>
+                  <div className="text-[9px] text-[#5F6671]">Fitness</div>
+                  <div className="font-bold text-[#4FD49A]">{run.fitnessScore}/100</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-[10px] text-slate-400">Antipatrones</div>
-                  <div className="font-bold text-amber-400">{run.antipatternCount}</div>
+                  <div className="text-[9px] text-[#5F6671]">Antipatrones</div>
+                  <div className="font-bold text-[#E7B85B]">{run.antipatternCount}</div>
                 </div>
               </div>
             </div>

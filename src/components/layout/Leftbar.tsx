@@ -14,11 +14,10 @@ import {
   LayoutDashboard,
   BarChart3,
   AlertTriangle,
-  History,
   Settings,
   HelpCircle,
 } from 'lucide-react';
-import { useUiStore, type MainTab } from '../../stores/useUiStore';
+import { useUiStore } from '../../stores/useUiStore';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useSelectionStore } from '../../stores/useSelectionStore';
 import { useDiagramStore } from '../../stores/useDiagramStore';

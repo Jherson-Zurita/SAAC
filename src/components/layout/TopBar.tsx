@@ -170,17 +170,30 @@ export const TopBar: React.FC<TopBarProps> = ({
         </button>
 
         <button
-          onClick={onAnalyzeProject}
-          disabled={!projectPath || isAnalyzing}
-          className="flex items-center space-x-1.5 px-3 py-1 text-[11px] font-semibold bg-[#211E39] hover:bg-[#2c284e] text-[#8B7CFF] border border-[#302C51] rounded transition disabled:opacity-40"
-          title={amg ? 'Volver a analizar código AST del proyecto' : 'Iniciar análisis sintáctico AST'}
+          onClick={isAnalyzing ? onCancelAnalysis : onAnalyzeProject}
+          disabled={!projectPath && !isAnalyzing}
+          className={`flex items-center space-x-1.5 px-3 py-1 text-[11px] font-semibold rounded transition ${
+            isAnalyzing
+              ? 'bg-[#EF6B73]/20 hover:bg-[#EF6B73]/30 text-[#EF6B73] border border-[#EF6B73]/40'
+              : 'bg-[#211E39] hover:bg-[#2c284e] text-[#8B7CFF] border border-[#302C51] disabled:opacity-40'
+          }`}
+          title={isAnalyzing ? 'Cancelar análisis en curso' : amg ? 'Volver a analizar código AST del proyecto' : 'Iniciar análisis sintáctico AST'}
         >
-          {amg ? (
-            <RotateCw className={`w-3.5 h-3.5 ${isAnalyzing ? 'animate-spin' : ''}`} />
+          {isAnalyzing ? (
+            <>
+              <XCircle className="w-3.5 h-3.5 text-[#EF6B73]" />
+              <span>Cancelar</span>
+            </>
           ) : (
-            <Play className="w-3.5 h-3.5 fill-current" />
+            <>
+              {amg ? (
+                <RotateCw className="w-3.5 h-3.5" />
+              ) : (
+                <Play className="w-3.5 h-3.5 fill-current" />
+              )}
+              <span>{amg ? 'Reanalizar' : 'Analizar'}</span>
+            </>
           )}
-          <span>{isAnalyzing ? 'Analizando...' : amg ? 'Reanalizar' : 'Analizar'}</span>
         </button>
 
         {amg && (

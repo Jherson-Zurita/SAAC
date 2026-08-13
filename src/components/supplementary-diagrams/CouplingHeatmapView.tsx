@@ -11,7 +11,7 @@ export const CouplingHeatmapView: React.FC<CouplingHeatmapViewProps> = ({ diagra
   const modules = amg?.modules || [];
 
   if (modules.length === 0) {
-    return <div className="p-4 text-center text-slate-400">Sin datos de módulos para la matriz de acoplamiento.</div>;
+    return <div className="p-4 text-center text-[#858C98] font-sans text-xs">Sin datos de módulos para la matriz de acoplamiento.</div>;
   }
 
   // Mapa de dependencias: source -> target -> weight
@@ -24,21 +24,23 @@ export const CouplingHeatmapView: React.FC<CouplingHeatmapViewProps> = ({ diagra
   }
 
   return (
-    <div className="flex flex-col w-full h-full p-4 overflow-auto bg-slate-900 text-slate-200">
-      <div className="mb-4">
-        <h3 className="text-lg font-bold text-sky-400">Mapa de Calor de Acoplamiento (Coupling Matrix)</h3>
-        <p className="text-xs text-slate-400">
+    <div className="flex flex-col w-full h-full p-4 overflow-auto bg-[#0B0E12] text-[#E6E9ED] font-sans">
+      <div className="mb-3">
+        <h3 className="text-sm font-bold text-[#8B7CFF] tracking-tight">Mapa de Calor de Acoplamiento (Coupling Matrix)</h3>
+        <p className="text-xs text-[#858C98]">
           Matriz de adyacencia de dependencias módulo por módulo. Celdas más oscuras/rojas indican acoplamiento más fuerte.
         </p>
       </div>
 
-      <div className="overflow-auto border border-slate-700 rounded-lg">
-        <table className="border-collapse text-xs w-full">
+      <div className="overflow-auto border border-[#252B34] rounded-md bg-[#101318]">
+        <table className="border-collapse text-[11px] w-full">
           <thead>
-            <tr className="bg-slate-800 border-b border-slate-700">
-              <th className="p-2 border-r border-slate-700 text-left min-w-[150px]">Módulo / Módulo</th>
+            <tr className="bg-[#13171D] border-b border-[#252B34]">
+              <th className="p-2 border-r border-[#252B34] text-left min-w-[150px] font-semibold text-[#858C98]">
+                Módulo / Módulo
+              </th>
               {modules.map((m) => (
-                <th key={m.id} className="p-2 border-r border-slate-700 font-mono text-center truncate max-w-[100px]" title={m.name}>
+                <th key={m.id} className="p-2 border-r border-[#252B34] font-mono text-center truncate max-w-[100px] text-[#45C8DF]" title={m.name}>
                   {m.name}
                 </th>
               ))}
@@ -46,25 +48,25 @@ export const CouplingHeatmapView: React.FC<CouplingHeatmapViewProps> = ({ diagra
           </thead>
           <tbody>
             {modules.map((rowMod) => (
-              <tr key={rowMod.id} className="border-b border-slate-800 hover:bg-slate-800/50">
-                <td className="p-2 font-mono border-r border-slate-700 font-medium truncate max-w-[180px]" title={rowMod.id}>
+              <tr key={rowMod.id} className="border-b border-[#252B34] hover:bg-[#13171D]/60 transition">
+                <td className="p-2 font-mono border-r border-[#252B34] font-semibold text-[#E6E9ED] truncate max-w-[180px]" title={rowMod.id}>
                   {rowMod.name}
                 </td>
                 {modules.map((colMod) => {
                   const isSelf = rowMod.id === colMod.id;
                   const hasDep = depMap.get(rowMod.id)?.get(colMod.id) || 0;
 
-                  let cellClass = 'bg-slate-950/40';
+                  let cellClass = 'bg-[#0B0E12]/40 text-[#5F6671]';
                   if (isSelf) {
-                    cellClass = 'bg-slate-800/20 text-slate-600';
+                    cellClass = 'bg-[#171C23] text-[#5F6671]';
                   } else if (hasDep > 0) {
-                    cellClass = 'bg-rose-600/60 text-white font-bold';
+                    cellClass = 'bg-[#EF6B73]/30 border border-[#EF6B73]/50 text-[#EF6B73] font-bold font-mono';
                   }
 
                   return (
                     <td
                       key={colMod.id}
-                      className={`p-2 border-r border-slate-800 text-center font-mono ${cellClass}`}
+                      className={`p-2 border-r border-[#252B34] text-center font-mono ${cellClass}`}
                       title={hasDep ? `${rowMod.name} -> ${colMod.name}` : ''}
                     >
                       {isSelf ? '-' : hasDep > 0 ? '1' : '0'}
