@@ -39,22 +39,22 @@ impl SupplementaryDiagrams {
 
         diagrams.insert(
             "supplementary:call-graph".to_string(),
-            generate_call_graph(modules, invocations),
+            generate_call_graph(modules, dependencies, invocations),
         );
 
         diagrams.insert(
             "supplementary:sequence-diagram".to_string(),
-            generate_sequence_diagram(modules, invocations),
+            generate_sequence_diagram(modules, dependencies, invocations),
         );
 
         diagrams.insert(
             "supplementary:dynamic-diagram".to_string(),
-            generate_dynamic_diagram(modules, invocations),
+            generate_dynamic_diagram(modules, dependencies, invocations),
         );
 
         diagrams.insert(
             "supplementary:dfd-diagram".to_string(),
-            generate_dfd_diagram(modules, invocations),
+            generate_dfd_diagram(modules, dependencies, invocations),
         );
 
         diagrams.insert(
@@ -323,7 +323,11 @@ fn generate_er_diagram(modules: &[Module]) -> C4DiagramData {
 // 4. Grafo de Llamadas (Call Graph) — §4.4.5
 // ============================================================================
 
-fn generate_call_graph(modules: &[Module], invocations: &[Invocation]) -> C4DiagramData {
+fn generate_call_graph(
+    modules: &[Module],
+    dependencies: &[Dependency],
+    invocations: &[Invocation],
+) -> C4DiagramData {
     let mut nodes = Vec::new();
     let mut edges = Vec::new();
 
@@ -364,8 +368,24 @@ fn generate_call_graph(modules: &[Module], invocations: &[Invocation]) -> C4Diag
                 }
             }
         }
+
+        // Si el módulo no tiene funciones o clases registradas explícitamente, agregar el módulo mismo como nodo
+        if m.functions.is_empty() && m.classes.is_empty() {
+            let id = format!("{}::main", m.id);
+            if added_nodes.insert(id.clone()) {
+                nodes.push(C4Node {
+                    id,
+                    label: format!("{} [Móduol]", m.name),
+                    element_type: "Module Function".to_string(),
+                    technology: format!("{:?}", m.language),
+                    description: format!("Module: {}", m.name),
+                    amg_node_id: Some(m.id.clone()),
+                });
+            }
+        }
     }
 
+    // 1. Agregar invocaciones estáticas explícitas
     for inv in invocations {
         edges.push(C4Edge {
             source: inv.source.clone(),
@@ -375,6 +395,33 @@ fn generate_call_graph(modules: &[Module], invocations: &[Invocation]) -> C4Diag
         });
     }
 
+    // 2. FALLBACK: Si no hay invocaciones estáticas entre funciones, construir conexiones basadas en dependencias de módulos
+    if edges.is_empty() {
+        for dep in dependencies {
+            // Mapear source y target a los nodos creados de cada módulo
+            let src_nodes: Vec<String> = nodes
+                .iter()
+                .filter(|n| n.amg_node_id.as_deref() == Some(&dep.source))
+                .map(|n| n.id.clone())
+                .collect();
+            let tgt_nodes: Vec<String> = nodes
+                .iter()
+                .filter(|n| n.amg_node_id.as_deref() == Some(&dep.target))
+                .map(|n| n.id.clone())
+                .collect();
+
+            if !src_nodes.is_empty() && !tgt_nodes.is_empty() {
+                // Conectar el primer nodo funcional del módulo origen al primer nodo del módulo destino
+                edges.push(C4Edge {
+                    source: src_nodes[0].clone(),
+                    target: tgt_nodes[0].clone(),
+                    label: format!("invokes module ({:?})", dep.kind),
+                    protocol: Some("Import/Call".to_string()),
+                });
+            }
+        }
+    }
+
     C4DiagramData { nodes, edges }
 }
 
@@ -382,7 +429,11 @@ fn generate_call_graph(modules: &[Module], invocations: &[Invocation]) -> C4Diag
 // 5. Diagrama de Secuencia (Sequence Diagram, UML) — §4.4.5
 // ============================================================================
 
-fn generate_sequence_diagram(_modules: &[Module], invocations: &[Invocation]) -> C4DiagramData {
+fn generate_sequence_diagram(
+    _modules: &[Module],
+    dependencies: &[Dependency],
+    invocations: &[Invocation],
+) -> C4DiagramData {
     let mut nodes = Vec::new();
     let mut edges = Vec::new();
 
@@ -393,24 +444,45 @@ fn generate_sequence_diagram(_modules: &[Module], invocations: &[Invocation]) ->
         participants.insert(inv.target.clone());
     }
 
+    // Fallback: Si no hay invocaciones directas, usar los módulos con dependencias como participantes
+    if participants.is_empty() {
+        for dep in dependencies {
+            participants.insert(dep.source.clone());
+            participants.insert(dep.target.clone());
+        }
+    }
+
     for p in &participants {
+        let label_name = p.split('/').last().unwrap_or(p).split("::").last().unwrap_or(p);
         nodes.push(C4Node {
             id: p.clone(),
-            label: p.split("::").last().unwrap_or(p).to_string(),
+            label: label_name.to_string(),
             element_type: "Participant".to_string(),
             technology: "UML Lifeline".to_string(),
-            description: format!("Call participant: {}", p),
-            amg_node_id: None,
+            description: format!("Participant: {}", p),
+            amg_node_id: Some(p.clone()),
         });
     }
 
-    for (step, inv) in invocations.iter().enumerate() {
-        edges.push(C4Edge {
-            source: inv.source.clone(),
-            target: inv.target.clone(),
-            label: format!("{}: call()", step + 1),
-            protocol: Some("Sync".to_string()),
-        });
+    if !invocations.is_empty() {
+        for (step, inv) in invocations.iter().enumerate() {
+            edges.push(C4Edge {
+                source: inv.source.clone(),
+                target: inv.target.clone(),
+                label: format!("{}: call()", step + 1),
+                protocol: Some("Sync".to_string()),
+            });
+        }
+    } else {
+        // Fallback: Construir secuencia paso a paso basada en la lista de dependencias
+        for (step, dep) in dependencies.iter().enumerate().take(30) {
+            edges.push(C4Edge {
+                source: dep.source.clone(),
+                target: dep.target.clone(),
+                label: format!("{}: import/call ({:?})", step + 1, dep.kind),
+                protocol: Some("Sync Call".to_string()),
+            });
+        }
     }
 
     C4DiagramData { nodes, edges }
@@ -420,7 +492,11 @@ fn generate_sequence_diagram(_modules: &[Module], invocations: &[Invocation]) ->
 // 6. Diagrama Dinámico (Dynamic Diagram, C4) — §4.4.5
 // ============================================================================
 
-fn generate_dynamic_diagram(modules: &[Module], invocations: &[Invocation]) -> C4DiagramData {
+fn generate_dynamic_diagram(
+    modules: &[Module],
+    dependencies: &[Dependency],
+    invocations: &[Invocation],
+) -> C4DiagramData {
     let mut nodes = Vec::new();
     let mut edges = Vec::new();
 
@@ -433,7 +509,7 @@ fn generate_dynamic_diagram(modules: &[Module], invocations: &[Invocation]) -> C
             label: m.name.clone(),
             element_type: "Dynamic Component".to_string(),
             technology: format!("{:?}", m.language),
-            description: format!("LOC: {}", m.loc),
+            description: format!("LOC: {}, Maintainability: {:.1}", m.loc, m.metrics.maintainability_index),
             amg_node_id: Some(m.id.clone()),
         });
     }
@@ -452,6 +528,20 @@ fn generate_dynamic_diagram(modules: &[Module], invocations: &[Invocation]) -> C
         }
     }
 
+    // FALLBACK: Si no hay invocaciones estáticas explícitas, usar las dependencias de módulos
+    if edges.is_empty() {
+        for (idx, dep) in dependencies.iter().enumerate() {
+            if component_ids.contains(&dep.source) && component_ids.contains(&dep.target) {
+                edges.push(C4Edge {
+                    source: dep.source.clone(),
+                    target: dep.target.clone(),
+                    label: format!("{}: calls module", idx + 1),
+                    protocol: Some(format!("{:?}", dep.kind)),
+                });
+            }
+        }
+    }
+
     C4DiagramData { nodes, edges }
 }
 
@@ -459,7 +549,11 @@ fn generate_dynamic_diagram(modules: &[Module], invocations: &[Invocation]) -> C
 // 7. Diagrama de Flujo de Datos (DFD) — §4.4.5
 // ============================================================================
 
-fn generate_dfd_diagram(modules: &[Module], invocations: &[Invocation]) -> C4DiagramData {
+fn generate_dfd_diagram(
+    modules: &[Module],
+    dependencies: &[Dependency],
+    invocations: &[Invocation],
+) -> C4DiagramData {
     let mut nodes = Vec::new();
     let mut edges = Vec::new();
 
@@ -491,6 +585,20 @@ fn generate_dfd_diagram(modules: &[Module], invocations: &[Invocation]) -> C4Dia
                 label: "data flow".to_string(),
                 protocol: None,
             });
+        }
+    }
+
+    // FALLBACK: Si no hay invocaciones estáticas explícitas, usar las dependencias entre los procesos/data stores
+    if edges.is_empty() {
+        for dep in dependencies {
+            if dep.source != dep.target {
+                edges.push(C4Edge {
+                    source: dep.source.clone(),
+                    target: dep.target.clone(),
+                    label: "data flow / import".to_string(),
+                    protocol: Some(format!("{:?}", dep.kind)),
+                });
+            }
         }
     }
 

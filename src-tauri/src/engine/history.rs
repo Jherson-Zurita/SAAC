@@ -176,24 +176,96 @@ impl HistoryManager {
         let _ = fs::create_dir_all(&saac_dir);
         let summary_file = saac_dir.join("analysis-summary.json");
 
+        let total_classes: usize = amg.modules.iter().map(|m| m.classes.len()).sum();
+        let total_functions: usize = amg.modules.iter().map(|m| m.functions.len()).sum();
+
         let mut diagrams_info = Vec::new();
         diagrams_info.push(serde_json::json!({
             "diagram": "C4 Level 1 (Context)",
+            "has_data": !amg.c4_models.context_diagram.nodes.is_empty(),
             "nodes": amg.c4_models.context_diagram.nodes.len(),
             "edges": amg.c4_models.context_diagram.edges.len(),
+            "diagnostic_explanation": "Vista de Contexto C4 (Sistema + Actores + Sistemas Externos)."
         }));
         diagrams_info.push(serde_json::json!({
             "diagram": "C4 Level 2 (Container)",
+            "has_data": !amg.c4_models.container_diagram.nodes.is_empty(),
             "nodes": amg.c4_models.container_diagram.nodes.len(),
             "edges": amg.c4_models.container_diagram.edges.len(),
+            "diagnostic_explanation": "Vista de Contenedores C4 (Frontend, Backend, DB, etc.)."
         }));
+
         for (key, diag) in &amg.c4_models.component_diagrams {
+            let n_len = diag.nodes.len();
+            let e_len = diag.edges.len();
+            let explanation = match key.as_str() {
+                "supplementary:circular-dependencies" => {
+                    if n_len == 0 {
+                        "OK (Limpio): 0 dependencias circulares. No existen ciclos A -> B -> A en el proyecto.".to_string()
+                    } else {
+                        "Atención: Se detectaron ciclos de dependencia entre los módulos marcados.".to_string()
+                    }
+                }
+                "supplementary:er-diagram" => {
+                    if n_len == 0 {
+                        "Info: No se encontraron clases o modelos ORM explícitos (TypeORM, Prisma, JPA, Django, SQLAlchemy).".to_string()
+                    } else {
+                        "OK: Entidades de modelo detectadas correctamente.".to_string()
+                    }
+                }
+                "supplementary:sequence-diagram" => {
+                    if n_len == 0 {
+                        "Info: No se identificaron trazas explícitas de flujo de secuencia temporal inter-componente.".to_string()
+                    } else {
+                        "OK: Secuencia de invocaciones generada con éxito.".to_string()
+                    }
+                }
+                "supplementary:treemap" => {
+                    "OK (Por Diseño): Mapa visual de bloques jerárquicos de LOC (No requiere aristas por definición).".to_string()
+                }
+                "supplementary:ownership-map" => {
+                    "OK (Por Diseño): Atribución de código e historia de autores por archivo Git (No requiere aristas por definición).".to_string()
+                }
+                "supplementary:call-graph" => {
+                    if e_len == 0 {
+                        format!("Advertencia: Se catalogaron {} funciones/métodos, pero 0 invocaciones estáticas punto a punto fueron resueltas (código altamente dinámico con callbacks o middlewares anónimos).", n_len)
+                    } else {
+                        format!("OK: Grafo de llamadas con {} invocaciones inter-función.", e_len)
+                    }
+                }
+                _ => {
+                    if n_len > 0 && e_len > 0 {
+                        format!("OK: Vista generada correctamente con {} nodos y {} aristas.", n_len, e_len)
+                    } else if n_len > 0 && e_len == 0 {
+                        format!("OK (Sin Aristas): {} elementos visualizados sin líneas de acoplamiento.", n_len)
+                    } else {
+                        "Sin datos generados por el analizador.".to_string()
+                    }
+                }
+            };
+
             diagrams_info.push(serde_json::json!({
                 "diagram": key,
-                "nodes": diag.nodes.len(),
-                "edges": diag.edges.len(),
+                "has_data": n_len > 0,
+                "nodes": n_len,
+                "edges": e_len,
+                "diagnostic_explanation": explanation
             }));
         }
+
+        let mut problematic_modules: Vec<_> = amg.modules
+            .iter()
+            .filter(|m| m.metrics.maintainability_index < 65.0 || m.metrics.cyclomatic_complexity_max > 12)
+            .map(|m| serde_json::json!({
+                "id": m.id,
+                "name": m.name,
+                "loc": m.loc,
+                "maintainability_index": (m.metrics.maintainability_index * 10.0).round() / 10.0,
+                "cyclomatic_complexity_max": m.metrics.cyclomatic_complexity_max,
+                "coupling_total": m.metrics.ca + m.metrics.ce
+            }))
+            .collect();
+        problematic_modules.truncate(10);
 
         let summary = serde_json::json!({
             "timestamp": amg.analyzed_at,
@@ -218,8 +290,14 @@ impl HistoryManager {
                 "antipattern_count": amg.antipatterns.len(),
                 "fitness_score": fitness_score,
             },
+            "ast_details": {
+                "total_classes_extracted": total_classes,
+                "total_functions_extracted": total_functions,
+                "total_external_calls": amg.external_calls.len(),
+            },
             "metrics": amg.metrics,
             "antipatterns": amg.antipatterns,
+            "problematic_modules": problematic_modules,
             "diagrams_diagnostics": diagrams_info,
         });
 

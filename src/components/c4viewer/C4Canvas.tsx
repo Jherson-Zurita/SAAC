@@ -14,6 +14,7 @@ import '@xyflow/react/dist/style.css';
 import type { C4DiagramData, C4Node } from '../../../shared/types';
 import { getLayoutedElements } from '../../lib/dagre-layout';
 import C4NodeCustom, { getC4NodeVariant, type C4NodeData } from './C4NodeCustom';
+import { NodeContextMenu } from './NodeContextMenu';
 
 interface C4CanvasProps {
   diagramData: C4DiagramData;
@@ -101,9 +102,31 @@ export const C4Canvas: React.FC<C4CanvasProps> = ({
     });
   }, [diagramData, direction, isNodeDrillable]);
 
+  const [contextNode, setContextNode] = React.useState<{
+    node: C4Node;
+    pos: { x: number; y: number };
+  } | null>(null);
+
   const handleNodeClick = useCallback(
-    (_: React.MouseEvent, node: Node<C4NodeData>) => onNodeClick?.(node.data.node),
+    (event: React.MouseEvent, node: Node<C4NodeData>) => {
+      onNodeClick?.(node.data.node);
+      setContextNode({
+        node: node.data.node,
+        pos: { x: event.clientX, y: event.clientY },
+      });
+    },
     [onNodeClick]
+  );
+
+  const handleNodeContextMenu = useCallback(
+    (event: React.MouseEvent, node: Node<C4NodeData>) => {
+      event.preventDefault();
+      setContextNode({
+        node: node.data.node,
+        pos: { x: event.clientX, y: event.clientY },
+      });
+    },
+    []
   );
 
   const handleNodeDoubleClick = useCallback(
@@ -150,6 +173,7 @@ export const C4Canvas: React.FC<C4CanvasProps> = ({
         edges={layoutedEdges}
         nodeTypes={nodeTypes}
         onNodeClick={handleNodeClick}
+        onNodeContextMenu={handleNodeContextMenu}
         onNodeDoubleClick={handleNodeDoubleClick}
         fitView
         fitViewOptions={{ padding: 0.18 }}
@@ -165,6 +189,14 @@ export const C4Canvas: React.FC<C4CanvasProps> = ({
           className="c4-flow-minimap"
         />
       </ReactFlow>
+
+      {contextNode && (
+        <NodeContextMenu
+          node={contextNode.node}
+          position={contextNode.pos}
+          onClose={() => setContextNode(null)}
+        />
+      )}
     </section>
   );
 };

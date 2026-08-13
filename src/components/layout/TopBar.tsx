@@ -1,25 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   FolderOpen,
   Play,
-  Square,
-  LayoutDashboard,
-  BarChart3,
-  AlertTriangle,
-  FileText,
+  RotateCw,
+  Sparkles,
+  Sun,
+  Moon,
   PanelLeft,
   PanelRight,
   PanelBottom,
-  Sun,
-  Moon,
-  Sparkles,
-  Terminal,
-  ChevronDown,
-  XCircle,
-  RotateCw,
-  Palette,
   Shield,
   Users,
+  ChevronDown,
+  XCircle,
 } from 'lucide-react';
 import { useUiStore, type MainTab } from '../../stores/useUiStore';
 import { useProjectStore } from '../../stores/useProjectStore';
@@ -53,8 +46,6 @@ export const TopBar: React.FC<TopBarProps> = ({
     toggleDownbar,
     activeMainTab,
     setActiveMainTab,
-    setActiveDownbarTab,
-    setDownbarOpen,
     securityPerspective,
     ownershipPerspective,
     toggleSecurityPerspective,
@@ -70,9 +61,7 @@ export const TopBar: React.FC<TopBarProps> = ({
     setC4Level,
   } = useDiagramStore();
 
-  const handleTabChange = (tab: MainTab) => {
-    setActiveMainTab(tab);
-  };
+  const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
   const handleDiagramSelect = (value: string) => {
     if (value.startsWith('c4:')) {
@@ -110,242 +99,194 @@ export const TopBar: React.FC<TopBarProps> = ({
         : '';
 
   return (
-    <header className="h-12 bg-[#0e111a]/95 backdrop-blur-md border-b border-[#1e2333] flex items-center justify-between px-3 select-none z-30 shadow-md">
-      {/* Izquierda: Logo & Acciones Rápidas */}
-      <div className="flex items-center space-x-3">
-        <div className="flex items-center space-x-2 mr-1">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 via-cyan-400 to-emerald-400 p-0.5 shadow-md shadow-cyan-500/20">
-            <div className="w-full h-full bg-[#0d0f17] rounded-[6px] flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-cyan-400" />
-            </div>
+    <header className="h-[48px] bg-[#0B0D10] border-b border-[#252B34] flex items-center justify-between px-3 select-none z-30 font-sans text-xs">
+      {/* Brand & Menu Links */}
+      <div className="flex items-center space-x-4">
+        {/* Brand Badge */}
+        <div className="flex items-center space-x-2 mr-2">
+          <div className="w-6 h-6 rounded bg-[#211E39] border border-[#302C51] flex items-center justify-center text-[#8B7CFF] font-bold text-[11px]">
+            <Sparkles className="w-3.5 h-3.5 text-[#8B7CFF]" />
           </div>
-          <span className="font-extrabold text-sm tracking-tight text-white">
-            SAAC <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 ml-1">v2.0</span>
+          <span className="font-bold text-[13px] tracking-tight text-[#E6E9ED]">
+            SAAC <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#211E39] text-[#8B7CFF] border border-[#302C51] ml-1">v2.0</span>
           </span>
         </div>
 
-        {/* Botones de Acción de Proyecto */}
-        <div className="flex items-center space-x-1.5 border-l border-[#1e2333] pl-3">
+        {/* IDE Top Menu Items (GraphForge Specification Section 10) */}
+        <nav className="hidden md:flex items-center space-x-1 font-medium text-[11px] text-[#858C98]">
           <button
+            type="button"
             onClick={onOpenProject}
-            disabled={isAnalyzing}
-            className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-gray-200 hover:text-white bg-[#161a26] hover:bg-[#1f2638] border border-[#252c40] rounded-md transition shadow-sm disabled:opacity-40"
-            title="Abrir directorio de proyecto (Ctrl+O)"
+            className="px-2 py-1 rounded hover:bg-[#171B21] hover:text-[#E6E9ED] transition"
           >
-            <FolderOpen className="w-3.5 h-3.5 text-blue-400" />
-            <span>Abrir...</span>
+            Archivo
           </button>
 
           <button
+            type="button"
+            onClick={() => setActiveMenu(activeMenu === 'view' ? null : 'view')}
+            className="px-2 py-1 rounded hover:bg-[#171B21] hover:text-[#E6E9ED] transition"
+          >
+            Vista
+          </button>
+
+          <button
+            type="button"
             onClick={onAnalyzeProject}
             disabled={!projectPath || isAnalyzing}
-            className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-md transition shadow-md shadow-blue-600/20 disabled:opacity-40"
-            title={amg ? 'Volver a analizar código AST del proyecto' : 'Iniciar análisis sintáctico AST'}
+            className="px-2 py-1 rounded hover:bg-[#171B21] hover:text-[#E6E9ED] transition disabled:opacity-40"
           >
-            {amg ? (
-              <RotateCw className={`w-3.5 h-3.5 ${isAnalyzing ? 'animate-spin' : ''}`} />
-            ) : (
-              <Play className="w-3.5 h-3.5 fill-current" />
-            )}
-            <span>{isAnalyzing ? 'Analizando...' : amg ? 'Reanalizar' : 'Analizar'}</span>
+            Analizar
           </button>
 
-          {projectPath && !isAnalyzing && onCloseProject && (
-            <button
-              onClick={onCloseProject}
-              className="flex items-center space-x-1 px-2 py-1.5 text-xs font-semibold text-gray-400 hover:text-rose-400 bg-[#161a26] hover:bg-[#231a20] border border-[#252c40] hover:border-rose-500/30 rounded-md transition"
-              title="Cerrar proyecto y volver a la pantalla inicial"
-            >
-              <XCircle className="w-3.5 h-3.5" />
-              <span>Cerrar</span>
-            </button>
-          )}
-
-          {isAnalyzing && (
-            <button
-              onClick={onCancelAnalysis}
-              className="flex items-center space-x-1.5 px-2.5 py-1.5 text-xs font-semibold bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 rounded-md transition animate-pulse"
-              title="Cancelar análisis activo"
-            >
-              <Square className="w-3.5 h-3.5 fill-current" />
-              <span>Detener</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Centro: Navegación de Vistas y Diagramas */}
-      <div className="flex items-center space-x-1.5 bg-[#090b10] p-1 rounded-lg border border-[#1c2130]">
-        <button
-          onClick={() => handleTabChange('dashboard')}
-          className={`flex items-center space-x-1.5 px-3 py-1 text-xs font-semibold rounded-md transition ${
-            activeMainTab === 'dashboard'
-              ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/30'
-              : 'text-gray-400 hover:text-gray-200 hover:bg-[#161a26]'
-          }`}
-        >
-          <LayoutDashboard className="w-3.5 h-3.5" />
-          <span>Dashboard</span>
-        </button>
-
-        {/* Selector unificado: 4 niveles C4 + 8 vistas suplementarias */}
-        <div className="relative inline-block border-l border-r border-[#1e2333] px-1">
-          <select
-            value={activeDiagramValue}
-            onChange={(event) => handleDiagramSelect(event.target.value)}
-            className="min-w-48 bg-[#121520] text-xs font-semibold text-gray-200 border border-[#232a3e] rounded-md px-2.5 py-1 pr-7 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60 appearance-none cursor-pointer"
-            aria-label="Seleccionar diagrama arquitectónico"
+          <button
+            type="button"
+            onClick={() => setActiveMainTab('dashboard')}
+            className="px-2 py-1 rounded hover:bg-[#171B21] hover:text-[#E6E9ED] transition"
           >
-            <option value="" disabled>Seleccionar diagrama…</option>
-            <optgroup label="Modelo C4">
-              <option value="c4:1">C4 N1 · Contexto</option>
-              <option value="c4:2">C4 N2 · Contenedores</option>
-              <option value="c4:3">C4 N3 · Componentes</option>
-              <option value="c4:4" disabled={!codeDiagramData}>
-                C4 N4 · Código {codeDiagramData ? '' : '(doble clic en un componente)'}
-              </option>
-            </optgroup>
-            <optgroup label="Diagramas suplementarios">
-              {supplementaryDiagramDefinitions.map((definition) => (
-                <option
-                  key={definition.tab}
-                  value={`supplementary:${definition.tab}`}
-                >
-                  {definition.shortLabel}
-                </option>
-              ))}
-            </optgroup>
-          </select>
-          <ChevronDown className="w-3 h-3 text-gray-400 absolute right-3 top-2 pointer-events-none" />
-        </div>
+            Grafos
+          </button>
 
-        {/* Tablas & Informes */}
-        <button
-          onClick={() => handleTabChange('metrics')}
-          className={`flex items-center space-x-1.5 px-2.5 py-1 text-xs font-semibold rounded-md transition ${
-            activeMainTab === 'metrics'
-              ? 'bg-blue-600 text-white shadow-sm'
-              : 'text-gray-400 hover:text-gray-200 hover:bg-[#161a26]'
-          }`}
-          title="Panel de Métricas Arquitectónicas"
-        >
-          <BarChart3 className="w-3.5 h-3.5" />
-          <span>Métricas</span>
-        </button>
-
-        <button
-          onClick={() => handleTabChange('antipatterns')}
-          className={`flex items-center space-x-1.5 px-2.5 py-1 text-xs font-semibold rounded-md transition ${
-            activeMainTab === 'antipatterns'
-              ? 'bg-amber-600 text-white shadow-sm'
-              : 'text-gray-400 hover:text-gray-200 hover:bg-[#161a26]'
-          }`}
-          title="Antipatrones Detectados"
-        >
-          <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-          <span>Antipatrones</span>
-        </button>
-
-        <button
-          onClick={() => handleTabChange('adrs')}
-          className={`flex items-center space-x-1.5 px-2.5 py-1 text-xs font-semibold rounded-md transition ${
-            activeMainTab === 'adrs'
-              ? 'bg-emerald-600 text-white shadow-sm'
-              : 'text-gray-400 hover:text-gray-200 hover:bg-[#161a26]'
-          }`}
-          title="Registro de Decisiones (ADRs)"
-        >
-          <FileText className="w-3.5 h-3.5 text-emerald-400" />
-          <span>ADRs</span>
-        </button>
-
-        <button
-          onClick={() => handleTabChange('design')}
-          className={`flex items-center space-x-1.5 px-2.5 py-1 text-xs font-semibold rounded-md transition ${
-            activeMainTab === 'design'
-              ? 'bg-purple-600 text-white shadow-sm shadow-purple-500/30'
-              : 'text-gray-400 hover:text-gray-200 hover:bg-[#161a26]'
-          }`}
-          title="Módulo de Diseño Arquitectónico Interactivo (Canvas Canvas)"
-        >
-          <Palette className="w-3.5 h-3.5 text-purple-400" />
-          <span>Diseño</span>
-        </button>
+          <button
+            type="button"
+            onClick={() => setActiveMainTab('metrics')}
+            className="px-2 py-1 rounded hover:bg-[#171B21] hover:text-[#E6E9ED] transition"
+          >
+            Métricas
+          </button>
+        </nav>
       </div>
 
-      {/* Derecha: Paneles & Tema */}
-      <div className="flex items-center space-x-1 border-l border-[#1e2333] pl-3">
+      {/* Center: Quick Project Actions */}
+      <div className="flex items-center space-x-2">
         <button
-          onClick={() => {
-            setDownbarOpen(true);
-            setActiveDownbarTab('console');
-          }}
-          className="p-1.5 text-gray-400 hover:text-cyan-400 hover:bg-[#191f2e] rounded-md transition"
-          title="Abrir Consola SAAC (saac> )"
+          onClick={onOpenProject}
+          disabled={isAnalyzing}
+          className="flex items-center space-x-1.5 px-2.5 py-1 text-[11px] font-medium text-[#E6E9ED] bg-[#13171D] hover:bg-[#171C23] border border-[#252B34] rounded transition disabled:opacity-40"
+          title="Abrir directorio de proyecto (Ctrl+O)"
         >
-          <Terminal className="w-4 h-4" />
+          <FolderOpen className="w-3.5 h-3.5 text-[#45C8DF]" />
+          <span>Abrir Proyecto</span>
         </button>
 
+        <button
+          onClick={onAnalyzeProject}
+          disabled={!projectPath || isAnalyzing}
+          className="flex items-center space-x-1.5 px-3 py-1 text-[11px] font-semibold bg-[#211E39] hover:bg-[#2c284e] text-[#8B7CFF] border border-[#302C51] rounded transition disabled:opacity-40"
+          title={amg ? 'Volver a analizar código AST del proyecto' : 'Iniciar análisis sintáctico AST'}
+        >
+          {amg ? (
+            <RotateCw className={`w-3.5 h-3.5 ${isAnalyzing ? 'animate-spin' : ''}`} />
+          ) : (
+            <Play className="w-3.5 h-3.5 fill-current" />
+          )}
+          <span>{isAnalyzing ? 'Analizando...' : amg ? 'Reanalizar' : 'Analizar'}</span>
+        </button>
+
+        {amg && (
+          <div className="relative">
+            <select
+              value={activeDiagramValue}
+              onChange={(e) => handleDiagramSelect(e.target.value)}
+              className="bg-[#13171D] text-[#E6E9ED] text-[11px] pl-2.5 pr-7 py-1 rounded border border-[#252B34] focus:outline-none focus:border-[#8B7CFF] cursor-pointer appearance-none font-mono"
+            >
+              <optgroup label="C4 Core">
+                <option value="c4:1">C4 N1 — Contexto</option>
+                <option value="c4:2">C4 N2 — Contenedores</option>
+                <option value="c4:3">C4 N3 — Componentes</option>
+                {codeDiagramData && <option value="c4:4">C4 N4 — Código UML</option>}
+              </optgroup>
+              <optgroup label="Diagramas Suplementarios">
+                {supplementaryDiagramDefinitions.map((item) => (
+                  <option key={item.tab} value={`supplementary:${item.tab}`}>
+                    {item.title}
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+            <ChevronDown className="w-3 h-3 text-[#858C98] absolute right-2 top-2 pointer-events-none" />
+          </div>
+        )}
+
+        {onCloseProject && amg && (
+          <button
+            onClick={onCloseProject}
+            className="p-1 text-[#858C98] hover:text-[#EF6B73] rounded hover:bg-[#171B21] transition"
+            title="Cerrar proyecto actual"
+          >
+            <XCircle className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+
+      {/* Right Controls: Perspectives, Theme & Layout Panels */}
+      <div className="flex items-center space-x-1.5">
+        {/* Perspectivas */}
+        {amg && (
+          <div className="flex items-center space-x-1 mr-2 border-r border-[#252B34] pr-2">
+            <button
+              onClick={toggleSecurityPerspective}
+              className={`p-1.5 rounded transition ${
+                securityPerspective
+                  ? 'bg-[#211E39] text-[#EF6B73] border border-[#EF6B73]/40'
+                  : 'text-[#858C98] hover:text-[#E6E9ED] hover:bg-[#171B21]'
+              }`}
+              title="Perspectiva de Seguridad"
+            >
+              <Shield className="w-3.5 h-3.5" />
+            </button>
+
+            <button
+              onClick={toggleOwnershipPerspective}
+              className={`p-1.5 rounded transition ${
+                ownershipPerspective
+                  ? 'bg-[#211E39] text-[#45C8DF] border border-[#45C8DF]/40'
+                  : 'text-[#858C98] hover:text-[#E6E9ED] hover:bg-[#171B21]'
+              }`}
+              title="Perspectiva de Autoría / Ownership"
+            >
+              <Users className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        {/* Layout Panel Toggles */}
         <button
           onClick={toggleLeftbar}
-          className={`p-1.5 rounded-md transition ${
-            leftbarOpen ? 'text-blue-400 bg-[#1f2638]' : 'text-gray-400 hover:text-gray-200 hover:bg-[#191f2e]'
+          className={`p-1.5 rounded transition ${
+            leftbarOpen ? 'text-[#8B7CFF] bg-[#211E39]' : 'text-[#858C98] hover:text-[#E6E9ED] hover:bg-[#171B21]'
           }`}
-          title="Alternar Panel Izquierdo (Explorador)"
+          title="Alternar Explorador"
         >
-          <PanelLeft className="w-4 h-4" />
+          <PanelLeft className="w-3.5 h-3.5" />
         </button>
 
         <button
           onClick={toggleDownbar}
-          className={`p-1.5 rounded-md transition ${
-            downbarOpen ? 'text-blue-400 bg-[#1f2638]' : 'text-gray-400 hover:text-gray-200 hover:bg-[#191f2e]'
+          className={`p-1.5 rounded transition ${
+            downbarOpen ? 'text-[#8B7CFF] bg-[#211E39]' : 'text-[#858C98] hover:text-[#E6E9ED] hover:bg-[#171B21]'
           }`}
-          title="Alternar Panel Inferior (Output/Logs)"
+          title="Alternar Panel Inferior"
         >
-          <PanelBottom className="w-4 h-4" />
-        </button>
-
-        <button
-          onClick={toggleSecurityPerspective}
-          className={`p-1.5 rounded-md transition ${
-            securityPerspective
-              ? 'text-emerald-400 bg-emerald-950/80 border border-emerald-500/40'
-              : 'text-gray-400 hover:text-emerald-400 hover:bg-[#191f2e]'
-          }`}
-          title="Perspectiva de Seguridad (Zonas de Red, Cifrado, Autenticación)"
-        >
-          <Shield className="w-4 h-4" />
-        </button>
-
-        <button
-          onClick={toggleOwnershipPerspective}
-          className={`p-1.5 rounded-md transition ${
-            ownershipPerspective
-              ? 'text-purple-400 bg-purple-950/80 border border-purple-500/40'
-              : 'text-gray-400 hover:text-purple-400 hover:bg-[#191f2e]'
-          }`}
-          title="Perspectiva de Propiedad (Equipos y Autores por Módulo)"
-        >
-          <Users className="w-4 h-4" />
+          <PanelBottom className="w-3.5 h-3.5" />
         </button>
 
         <button
           onClick={toggleRightbar}
-          className={`p-1.5 rounded-md transition ${
-            rightbarOpen ? 'text-blue-400 bg-[#1f2638]' : 'text-gray-400 hover:text-gray-200 hover:bg-[#191f2e]'
+          className={`p-1.5 rounded transition ${
+            rightbarOpen ? 'text-[#8B7CFF] bg-[#211E39]' : 'text-[#858C98] hover:text-[#E6E9ED] hover:bg-[#171B21]'
           }`}
-          title="Alternar Panel Derecho (Inspección)"
+          title="Alternar Inspector"
         >
-          <PanelRight className="w-4 h-4" />
+          <PanelRight className="w-3.5 h-3.5" />
         </button>
 
         <button
           onClick={toggleTheme}
-          className="p-1.5 text-gray-400 hover:text-amber-400 hover:bg-[#191f2e] rounded-md transition border-l border-[#1e2333] ml-1"
-          title={`Cambiar a tema ${theme === 'dark' ? 'claro' : 'oscuro'}`}
+          className="p-1.5 text-[#858C98] hover:text-[#E6E9ED] hover:bg-[#171B21] rounded transition ml-1"
+          title={`Tema actual: ${theme}`}
         >
-          {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-blue-400" />}
+          {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
         </button>
       </div>
     </header>

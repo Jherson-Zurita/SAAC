@@ -16,6 +16,7 @@ import '@xyflow/react/dist/style.css';
 import type { C4DiagramData } from '../../../shared/types';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { getLayoutedElements } from '../../lib/dagre-layout';
+import { NodeContextMenu } from '../c4viewer/NodeContextMenu';
 
 // ── Types ──
 
@@ -142,6 +143,26 @@ export const ForceGraphView: React.FC<ForceGraphViewProps> = ({ diagramData: _di
   const modules = amg?.modules || [];
   const dependencies = amg?.dependencies || [];
 
+  const [contextNode, setContextNode] = React.useState<{
+    node: { id: string; label: string; elementType: string; technology: string; description: string; amgNodeId?: string };
+    pos: { x: number; y: number };
+  } | null>(null);
+
+  const handleNodeClick = (event: React.MouseEvent, node: Node<ForceNodeData>) => {
+    const c4Node = {
+      id: node.id,
+      label: node.data.label,
+      elementType: 'Module',
+      technology: `${node.data.language} (${node.data.connections} conexiones)`,
+      description: `LOC: ${node.data.loc}, Maintainability Index: ${node.data.maintainability.toFixed(1)}`,
+      amgNodeId: node.id,
+    };
+    setContextNode({
+      node: c4Node,
+      pos: { x: event.clientX, y: event.clientY },
+    });
+  };
+
   const { nodes: layoutedNodes, edges: layoutedEdges } = useMemo(() => {
     if (modules.length === 0) {
       return { nodes: [], edges: [] };
@@ -256,7 +277,7 @@ export const ForceGraphView: React.FC<ForceGraphViewProps> = ({ diagramData: _di
           Grafo de Dependencias — Nodos Proporcionales
         </span>
         <span style={{ fontSize: 10, color: '#94a3b8' }}>
-          Tamaño ∝ N° de conexiones · Color = Índice de Mantenibilidad · {modules.length} módulos · {dependencies.length} aristas
+          Tamaño ∝ N° de conexiones · Color = Índice de Mantenibilidad · {modules.length} módulos · {dependencies.length} aristas · Clic en un nodo para inspección
         </span>
       </div>
 
@@ -307,6 +328,7 @@ export const ForceGraphView: React.FC<ForceGraphViewProps> = ({ diagramData: _di
         nodes={layoutedNodes}
         edges={layoutedEdges}
         nodeTypes={nodeTypes}
+        onNodeClick={handleNodeClick}
         fitView
         fitViewOptions={{ padding: 0.15 }}
         minZoom={0.1}
@@ -334,6 +356,14 @@ export const ForceGraphView: React.FC<ForceGraphViewProps> = ({ diagramData: _di
           }}
         />
       </ReactFlow>
+
+      {contextNode && (
+        <NodeContextMenu
+          node={contextNode.node}
+          position={contextNode.pos}
+          onClose={() => setContextNode(null)}
+        />
+      )}
     </div>
   );
 };

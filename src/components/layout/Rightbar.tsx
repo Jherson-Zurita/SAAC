@@ -8,6 +8,9 @@ import {
   Zap,
   Info,
   Bot,
+  Gauge,
+  ArrowDownLeft,
+  ArrowUpRight,
 } from 'lucide-react';
 import { useUiStore } from '../../stores/useUiStore';
 import { useSelectionStore } from '../../stores/useSelectionStore';
@@ -26,98 +29,152 @@ export const Rightbar: React.FC = () => {
 
   const renderModuleDetails = (module: Module) => {
     const m = module.metrics;
+    const miColor =
+      m.maintainabilityIndex >= 80
+        ? '#4FD49A'
+        : m.maintainabilityIndex >= 60
+          ? '#E7B85B'
+          : '#EF6B73';
+
+    // Find inbound & outbound dependencies for this module
+    const inboundDeps = (amg?.dependencies || []).filter((d) => d.target === module.id);
+    const outboundDeps = (amg?.dependencies || []).filter((d) => d.source === module.id);
+
     return (
-      <div className="space-y-4">
-        <div className="bg-[#181c2a] p-3 rounded-lg border border-[#232a3e]">
-          <div className="flex items-center space-x-2 text-blue-400 font-semibold text-sm mb-1">
-            <FileCode className="w-4 h-4" />
+      <div className="space-y-3 font-sans text-xs">
+        {/* Module Header Card (GraphForge Spec Section 26) */}
+        <div className="bg-[#13171D] p-2.5 rounded-md border border-[#1D222A] space-y-1">
+          <div className="flex items-center space-x-2 text-[#8B7CFF] font-semibold text-xs">
+            <FileCode className="w-4 h-4 shrink-0" />
             <span className="truncate">{module.name}</span>
           </div>
-          <p className="text-[11px] text-gray-400 font-mono break-all">{module.id}</p>
+          <p className="text-[10px] text-[#5F6671] font-mono truncate" title={module.id}>
+            {module.id}
+          </p>
+        </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-            <div className="bg-[#10131d] p-2 rounded">
-              <span className="text-gray-500 text-[10px]">Lenguaje</span>
-              <p className="font-semibold text-cyan-300 uppercase">{module.language}</p>
+        {/* Section: Properties (GraphForge Spec Section 27 — Two Column Layout) */}
+        <div className="space-y-1 bg-[#13171D] p-2.5 rounded-md border border-[#1D222A]">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[#5F6671] mb-1 block">
+            Propiedades
+          </span>
+          <div className="space-y-1 text-[11px]">
+            <div className="flex justify-between items-center">
+              <span className="text-[#5F6671]">Lenguaje</span>
+              <span className="text-[#45C8DF] font-semibold uppercase">{module.language}</span>
             </div>
-            <div className="bg-[#10131d] p-2 rounded">
-              <span className="text-gray-500 text-[10px]">Rol</span>
-              <p className="font-semibold text-purple-300">{module.moduleType}</p>
+            <div className="flex justify-between items-center">
+              <span className="text-[#5F6671]">Tipo</span>
+              <span className="text-[#8B7CFF] font-semibold">{module.moduleType}</span>
             </div>
-            <div className="bg-[#10131d] p-2 rounded">
-              <span className="text-gray-500 text-[10px]">Líneas LOC</span>
-              <p className="font-semibold text-gray-200">{module.loc}</p>
+            <div className="flex justify-between items-center">
+              <span className="text-[#5F6671]">Líneas (LOC)</span>
+              <span className="text-[#E6E9ED] font-mono">{module.loc}</span>
             </div>
-            <div className="bg-[#10131d] p-2 rounded">
-              <span className="text-gray-500 text-[10px]">Clases / Func</span>
-              <p className="font-semibold text-gray-200">
+            <div className="flex justify-between items-center">
+              <span className="text-[#5F6671]">Clases / Func</span>
+              <span className="text-[#858C98] font-mono">
                 {module.classes.length} c / {module.functions.length} f
-              </p>
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Métricas del Módulo */}
-        <div className="space-y-2">
-          <h4 className="text-xs font-semibold text-gray-300 uppercase tracking-wider">
-            Métricas de Acoplamiento
-          </h4>
-
-          <div className="space-y-1.5 text-xs">
-            <div className="flex justify-between items-center bg-[#141724] p-2 rounded">
-              <span className="text-gray-400">Mantenibilidad (MI)</span>
-              <span
-                className={`font-bold font-mono ${
-                  m.maintainabilityIndex >= 80
-                    ? 'text-emerald-400'
-                    : m.maintainabilityIndex >= 60
-                    ? 'text-amber-400'
-                    : 'text-rose-400'
-                }`}
-              >
+        {/* Section: Metrics (GraphForge Spec Section 28 — Compact 2x2 Grid) */}
+        <div className="space-y-1.5">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[#5F6671] flex items-center gap-1">
+            <Gauge className="w-3.5 h-3.5 text-[#8B7CFF]" /> Métricas de Calidad
+          </span>
+          <div className="grid grid-cols-2 gap-1.5 text-[10px]">
+            <div className="bg-[#13171D] p-2 rounded-md border border-[#1D222A] flex flex-col gap-0.5">
+              <span className="text-[#5F6671]">Mantenibilidad</span>
+              <span className="font-bold font-mono text-xs" style={{ color: miColor }}>
                 {Math.round(m.maintainabilityIndex)} / 100
               </span>
             </div>
 
-            <div className="flex justify-between items-center bg-[#141724] p-2 rounded">
-              <span className="text-gray-400">Aferente (Ca)</span>
-              <span className="font-mono text-cyan-300">{m.ca}</span>
+            <div className="bg-[#13171D] p-2 rounded-md border border-[#1D222A] flex flex-col gap-0.5">
+              <span className="text-[#5F6671]">CC Máx</span>
+              <span
+                className={`font-bold font-mono text-xs ${
+                  m.cyclomaticComplexityMax > 15 ? 'text-[#EF6B73]' : 'text-[#4FD49A]'
+                }`}
+              >
+                {m.cyclomaticComplexityMax}
+              </span>
             </div>
 
-            <div className="flex justify-between items-center bg-[#141724] p-2 rounded">
-              <span className="text-gray-400">Eferente (Ce)</span>
-              <span className="font-mono text-purple-300">{m.ce}</span>
+            <div className="bg-[#13171D] p-2 rounded-md border border-[#1D222A] flex flex-col gap-0.5">
+              <span className="text-[#5F6671]">Aferente (Ca)</span>
+              <span className="font-bold font-mono text-xs text-[#45C8DF]">{m.ca}</span>
             </div>
 
-            <div className="flex justify-between items-center bg-[#141724] p-2 rounded">
-              <span className="text-gray-400">Instabilidad (I)</span>
-              <span className="font-mono text-amber-300">{m.instability.toFixed(2)}</span>
-            </div>
-
-            <div className="flex justify-between items-center bg-[#141724] p-2 rounded">
-              <span className="text-gray-400">Abstractness (A)</span>
-              <span className="font-mono text-blue-300">{m.abstractness.toFixed(2)}</span>
-            </div>
-
-            <div className="flex justify-between items-center bg-[#141724] p-2 rounded">
-              <span className="text-gray-400">Distancia (D)</span>
-              <span className="font-mono text-rose-300">{m.distance.toFixed(2)}</span>
+            <div className="bg-[#13171D] p-2 rounded-md border border-[#1D222A] flex flex-col gap-0.5">
+              <span className="text-[#5F6671]">Eferente (Ce)</span>
+              <span className="font-bold font-mono text-xs text-[#8B7CFF]">{m.ce}</span>
             </div>
           </div>
         </div>
 
-        {/* Lista de Clases */}
+        {/* Section: Connections (GraphForge Spec Section 29 — Compact List) */}
+        <div className="space-y-1.5 pt-1 border-t border-[#252B34]">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[#5F6671]">
+            Conexiones ({inboundDeps.length + outboundDeps.length})
+          </span>
+
+          <div className="space-y-1 text-[10px]">
+            <div className="flex items-center text-[#858C98] gap-1">
+              <ArrowDownLeft className="w-3 h-3 text-[#4FD49A]" />
+              <span>Importado por ({inboundDeps.length}):</span>
+            </div>
+            {inboundDeps.length > 0 ? (
+              <div className="space-y-0.5 max-h-24 overflow-y-auto pl-2">
+                {inboundDeps.map((d, i) => (
+                  <div
+                    key={i}
+                    className="p-1 rounded bg-[#13171D] hover:bg-[#171C23] text-[#E6E9ED] font-mono truncate border border-[#1D222A]"
+                  >
+                    ● {d.source.split('/').pop()}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <span className="text-[#5F6671] text-[9px] italic pl-2">Ninguno</span>
+            )}
+
+            <div className="flex items-center text-[#858C98] gap-1 pt-1">
+              <ArrowUpRight className="w-3 h-3 text-[#45C8DF]" />
+              <span>Importa a ({outboundDeps.length}):</span>
+            </div>
+            {outboundDeps.length > 0 ? (
+              <div className="space-y-0.5 max-h-24 overflow-y-auto pl-2">
+                {outboundDeps.map((d, i) => (
+                  <div
+                    key={i}
+                    className="p-1 rounded bg-[#13171D] hover:bg-[#171C23] text-[#E6E9ED] font-mono truncate border border-[#1D222A]"
+                  >
+                    ● {d.target.split('/').pop()}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <span className="text-[#5F6671] text-[9px] italic pl-2">Ninguno</span>
+            )}
+          </div>
+        </div>
+
+        {/* Classes List */}
         {module.classes.length > 0 && (
-          <div className="space-y-1.5">
-            <h4 className="text-xs font-semibold text-gray-300 uppercase tracking-wider">
+          <div className="space-y-1 pt-1 border-t border-[#252B34]">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#5F6671]">
               Clases ({module.classes.length})
-            </h4>
-            <div className="space-y-1 max-h-36 overflow-y-auto">
+            </span>
+            <div className="space-y-1 max-h-32 overflow-y-auto">
               {module.classes.map((cls: ClassInfo) => (
-                <div key={cls.id} className="bg-[#141724] p-2 rounded text-xs">
-                  <div className="font-semibold text-cyan-300">{cls.name}</div>
-                  <div className="text-[10px] text-gray-500">
-                    {cls.methods.length} métodos | {cls.attributes.length} attrs | WMC: {cls.metrics.wmc}
+                <div key={cls.id} className="bg-[#13171D] p-1.5 rounded text-[10px] border border-[#1D222A]">
+                  <div className="font-semibold text-[#45C8DF]">{cls.name}</div>
+                  <div className="text-[9px] text-[#5F6671] font-mono">
+                    {cls.methods.length} m / {cls.attributes.length} a | WMC: {cls.metrics.wmc}
                   </div>
                 </div>
               ))}
@@ -130,21 +187,21 @@ export const Rightbar: React.FC = () => {
 
   const renderAntipatternDetails = (anti: Antipattern) => {
     return (
-      <div className="space-y-3 bg-[#1c1822] p-3 rounded-lg border border-amber-500/30">
-        <div className="flex items-center space-x-2 text-amber-400 font-semibold text-sm">
-          <AlertTriangle className="w-4 h-4" />
+      <div className="space-y-2.5 bg-[#171C23] p-3 rounded-md border border-[#EF6B73]/50 text-xs">
+        <div className="flex items-center space-x-2 text-[#EF6B73] font-bold">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
           <span>{anti.name}</span>
         </div>
-        <p className="text-xs text-gray-300">{anti.description}</p>
-        <div className="text-xs font-mono text-rose-400 bg-rose-500/10 p-2 rounded border border-rose-500/20">
-          Severidad: {anti.severity.toUpperCase()}
+        <p className="text-[11px] text-[#E6E9ED]">{anti.description}</p>
+        <div className="text-[10px] font-mono text-[#EF6B73] bg-[#EF6B73]/10 p-1.5 rounded border border-[#EF6B73]/30 uppercase font-bold">
+          Severidad: {anti.severity}
         </div>
         {anti.cyclePath && (
-          <div className="space-y-1 text-xs">
-            <span className="text-gray-400 font-medium">Ciclo detectado:</span>
-            <div className="bg-[#120f18] p-2 rounded font-mono text-[11px] text-amber-300 space-y-0.5">
+          <div className="space-y-1">
+            <span className="text-[#858C98] text-[10px]">Ruta del Ciclo:</span>
+            <div className="bg-[#0B0D10] p-2 rounded font-mono text-[10px] text-[#E7B85B] space-y-0.5 border border-[#252B34]">
               {anti.cyclePath.map((pathItem: string, idx: number) => (
-                <div key={idx}>→ {pathItem}</div>
+                <div key={idx}>➔ {pathItem}</div>
               ))}
             </div>
           </div>
@@ -154,15 +211,15 @@ export const Rightbar: React.FC = () => {
   };
 
   return (
-    <aside className="w-80 bg-[#12151e] border-l border-[#232838] flex flex-col h-full select-none">
-      {/* Header Pestañas Rightbar (Inspector vs IA) */}
-      <div className="flex items-center border-b border-[#232838] bg-[#0d0f16]">
+    <aside className="w-[275px] bg-[#101318] border-l border-[#252B34] flex flex-col h-full select-none shrink-0 font-sans">
+      {/* Header Pestañas Rightbar (Inspector vs Assistant IA) */}
+      <div className="flex items-center border-b border-[#252B34] bg-[#0B0D10] h-[39px]">
         <button
           onClick={() => setRightTab('inspector')}
-          className={`flex-1 py-2 flex items-center justify-center space-x-1.5 text-xs font-semibold border-b-2 transition ${
+          className={`flex-1 h-full flex items-center justify-center space-x-1.5 text-[11px] font-semibold border-b-2 transition ${
             rightTab === 'inspector'
-              ? 'border-blue-500 text-blue-400 bg-[#161a26]'
-              : 'border-transparent text-gray-400 hover:text-gray-200'
+              ? 'border-[#8B7CFF] text-[#E6E9ED] bg-[#101318]'
+              : 'border-transparent text-[#858C98] hover:text-[#E6E9ED]'
           }`}
         >
           <Activity className="w-3.5 h-3.5" />
@@ -171,10 +228,10 @@ export const Rightbar: React.FC = () => {
 
         <button
           onClick={() => setRightTab('ai')}
-          className={`flex-1 py-2 flex items-center justify-center space-x-1.5 text-xs font-semibold border-b-2 transition ${
+          className={`flex-1 h-full flex items-center justify-center space-x-1.5 text-[11px] font-semibold border-b-2 transition ${
             rightTab === 'ai'
-              ? 'border-cyan-500 text-cyan-400 bg-[#161a26]'
-              : 'border-transparent text-gray-400 hover:text-gray-200'
+              ? 'border-[#45C8DF] text-[#E6E9ED] bg-[#101318]'
+              : 'border-transparent text-[#858C98] hover:text-[#E6E9ED]'
           }`}
         >
           <Bot className="w-3.5 h-3.5" />
@@ -184,7 +241,7 @@ export const Rightbar: React.FC = () => {
         {selectedId && rightTab === 'inspector' && (
           <button
             onClick={clearSelection}
-            className="px-2 text-gray-400 hover:text-white"
+            className="px-2 text-[#858C98] hover:text-[#E6E9ED]"
             title="Limpiar selección"
           >
             <X className="w-3.5 h-3.5" />
@@ -192,7 +249,7 @@ export const Rightbar: React.FC = () => {
         )}
       </div>
 
-      {/* Cuerpo de Pestaña Activa */}
+      {/* Body Section */}
       {rightTab === 'ai' ? (
         <AiChatPanel />
       ) : (
@@ -202,64 +259,65 @@ export const Rightbar: React.FC = () => {
               {selectedType === 'module' && renderModuleDetails(selectedData as Module)}
               {selectedType === 'antipattern' && renderAntipatternDetails(selectedData as Antipattern)}
               {selectedType !== 'module' && selectedType !== 'antipattern' && (
-                <div className="bg-[#181c2a] p-3 rounded-lg border border-[#232a3e] space-y-2">
-                  <div className="font-semibold text-blue-400 uppercase">{selectedType}</div>
-                  <div className="font-mono text-gray-300 break-all">{selectedId}</div>
-                  <pre className="text-[10px] text-gray-400 bg-[#0c0e15] p-2 rounded overflow-x-auto">
+                <div className="bg-[#13171D] p-3 rounded-md border border-[#1D222A] space-y-2">
+                  <div className="font-bold text-[#8B7CFF] uppercase text-xs">{selectedType}</div>
+                  <div className="font-mono text-[#E6E9ED] text-[10px] break-all">{selectedId}</div>
+                  <pre className="text-[9px] text-[#858C98] bg-[#0B0D10] p-2 rounded overflow-x-auto border border-[#252B34]">
                     {JSON.stringify(selectedData, null, 2)}
                   </pre>
                 </div>
               )}
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {amg ? (
                 <div className="space-y-3">
-                  <div className="bg-[#181c2a] p-3 rounded-lg border border-[#232a3e]">
-                    <h3 className="font-bold text-sm text-gray-100 mb-1">{amg.projectName}</h3>
-                    <div className="flex items-center space-x-2 text-xs text-cyan-400 mb-3">
-                      <Zap className="w-3.5 h-3.5" />
+                  {/* Project Overview Card */}
+                  <div className="bg-[#13171D] p-3 rounded-md border border-[#1D222A] space-y-2">
+                    <h3 className="font-bold text-xs text-[#E6E9ED]">{amg.projectName}</h3>
+                    <div className="flex items-center space-x-1.5 text-[10px] text-[#45C8DF]">
+                      <Zap className="w-3 h-3" />
                       <span>Estilo: {amg.detectedStyle} ({Math.round(amg.styleConfidence * 100)}%)</span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div className="bg-[#10131d] p-2 rounded">
-                        <span className="text-gray-500 text-[10px]">Módulos</span>
-                        <p className="font-bold text-blue-400">{amg.modules.length}</p>
+                    <div className="grid grid-cols-2 gap-1.5 text-[10px] pt-1">
+                      <div className="bg-[#0B0D10] p-1.5 rounded border border-[#252B34]">
+                        <span className="text-[#5F6671] text-[9px]">Módulos</span>
+                        <p className="font-bold text-[#8B7CFF] font-mono">{amg.modules.length}</p>
                       </div>
-                      <div className="bg-[#10131d] p-2 rounded">
-                        <span className="text-gray-500 text-[10px]">Dependencias</span>
-                        <p className="font-bold text-purple-400">{amg.dependencies.length}</p>
+                      <div className="bg-[#0B0D10] p-1.5 rounded border border-[#252B34]">
+                        <span className="text-[#5F6671] text-[9px]">Dependencias</span>
+                        <p className="font-bold text-[#45C8DF] font-mono">{amg.dependencies.length}</p>
                       </div>
-                      <div className="bg-[#10131d] p-2 rounded">
-                        <span className="text-gray-500 text-[10px]">Antipatrones</span>
-                        <p className="font-bold text-amber-400">{amg.antipatterns.length}</p>
+                      <div className="bg-[#0B0D10] p-1.5 rounded border border-[#252B34]">
+                        <span className="text-[#5F6671] text-[9px]">Antipatrones</span>
+                        <p className="font-bold text-[#E7B85B] font-mono">{amg.antipatterns.length}</p>
                       </div>
-                      <div className="bg-[#10131d] p-2 rounded">
-                        <span className="text-gray-500 text-[10px]">Líneas LOC</span>
-                        <p className="font-bold text-emerald-400">{amg.metrics.totalLoc}</p>
+                      <div className="bg-[#0B0D10] p-1.5 rounded border border-[#252B34]">
+                        <span className="text-[#5F6671] text-[9px]">Líneas LOC</span>
+                        <p className="font-bold text-[#4FD49A] font-mono">{amg.metrics.totalLoc}</p>
                       </div>
                     </div>
                   </div>
 
                   {fitnessResult && (
-                    <div className="bg-[#141b2b] p-3 rounded-lg border border-blue-500/30 flex items-center justify-between">
+                    <div className="bg-[#13171D] p-3 rounded-md border border-[#8B7CFF]/40 flex items-center justify-between">
                       <div>
-                        <span className="text-[11px] text-gray-400 font-medium">Fitness Score Global</span>
-                        <div className="text-lg font-extrabold text-blue-400">
+                        <span className="text-[10px] text-[#858C98]">Fitness Score Global</span>
+                        <div className="text-base font-extrabold text-[#8B7CFF] font-mono">
                           {fitnessResult.fitnessScore} / 100
                         </div>
                       </div>
-                      <ShieldCheck className="w-8 h-8 text-blue-400/60" />
+                      <ShieldCheck className="w-7 h-7 text-[#8B7CFF]/60" />
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center h-48 text-center text-gray-500 space-y-2">
-                  <Info className="w-8 h-8 opacity-40 text-blue-400" />
-                  <p>Ningún elemento seleccionado.</p>
-                  <p className="text-[11px] text-gray-600">
-                    Haga clic en un nodo o módulo del canvas para inspeccionar sus métricas.
+                <div className="flex flex-col items-center justify-center h-48 text-center text-[#5F6671] space-y-2">
+                  <Info className="w-7 h-7 opacity-30 text-[#8B7CFF]" />
+                  <p className="font-medium text-[#858C98]">Sin selección</p>
+                  <p className="text-[10px] text-[#5F6671]">
+                    Haga clic en un nodo o módulo para inspeccionar sus propiedades.
                   </p>
                 </div>
               )}

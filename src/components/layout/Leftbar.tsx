@@ -11,8 +11,14 @@ import {
   Sparkles,
   Folder,
   FolderOpen,
+  LayoutDashboard,
+  BarChart3,
+  AlertTriangle,
+  History,
+  Settings,
+  HelpCircle,
 } from 'lucide-react';
-import { useUiStore } from '../../stores/useUiStore';
+import { useUiStore, type MainTab } from '../../stores/useUiStore';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useSelectionStore } from '../../stores/useSelectionStore';
 import { useDiagramStore } from '../../stores/useDiagramStore';
@@ -27,7 +33,13 @@ interface TreeNode {
 }
 
 export const Leftbar: React.FC = () => {
-  const { activeLeftbarTab, setActiveLeftbarTab, leftbarOpen } = useUiStore();
+  const {
+    activeLeftbarTab,
+    setActiveLeftbarTab,
+    leftbarOpen,
+    activeMainTab,
+    setActiveMainTab,
+  } = useUiStore();
   const { amg, projectName } = useProjectStore();
   const { selectElement, selectedId } = useSelectionStore();
   const { setC4Level } = useDiagramStore();
@@ -51,7 +63,6 @@ export const Leftbar: React.FC = () => {
     };
 
     amg.modules.forEach((mod) => {
-      // Separar por slashes / o \
       const parts = mod.id.split(/[/\\]/).filter(Boolean);
       let current = root;
 
@@ -95,18 +106,18 @@ export const Leftbar: React.FC = () => {
         <div key={node.path} className="select-none">
           <div
             onClick={() => toggleExpand(node.path)}
-            style={{ paddingLeft: `${depth * 12 + 4}px` }}
-            className="flex items-center space-x-1.5 py-1 px-1.5 rounded cursor-pointer hover:bg-[#161a26] text-gray-300 hover:text-white transition font-medium text-xs"
+            style={{ paddingLeft: `${depth * 10 + 4}px` }}
+            className="flex items-center space-x-1 py-1 px-1 rounded cursor-pointer hover:bg-[#13171D] text-[#858C98] hover:text-[#E6E9ED] transition text-[11px]"
           >
             {isExpanded ? (
-              <ChevronDown className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+              <ChevronDown className="w-3 h-3 text-[#5F6671] shrink-0" />
             ) : (
-              <ChevronRight className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+              <ChevronRight className="w-3 h-3 text-[#5F6671] shrink-0" />
             )}
             {isExpanded ? (
-              <FolderOpen className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <FolderOpen className="w-3.5 h-3.5 text-[#E7B85B] shrink-0" />
             ) : (
-              <Folder className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <Folder className="w-3.5 h-3.5 text-[#E7B85B] shrink-0" />
             )}
             <span className="truncate">{node.name}</span>
           </div>
@@ -126,35 +137,31 @@ export const Leftbar: React.FC = () => {
 
     const isSelected = selectedId === mod.id;
     const mi = mod.metrics.maintainabilityIndex;
-    const miBadgeClass =
-      mi >= 80
-        ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
-        : mi >= 60
-        ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
-        : 'text-rose-400 bg-rose-500/10 border-rose-500/20';
+    const miColor =
+      mi >= 80 ? '#4FD49A' : mi >= 60 ? '#E7B85B' : '#EF6B73';
 
     return (
       <div
         key={mod.id}
         onClick={() => selectElement(mod.id, 'module', mod)}
-        style={{ paddingLeft: `${depth * 12 + 4}px` }}
-        className={`flex items-center justify-between py-1 px-1.5 rounded cursor-pointer transition text-xs ${
+        style={{ paddingLeft: `${depth * 10 + 4}px` }}
+        className={`flex items-center justify-between py-1 px-1 rounded cursor-pointer transition text-[11px] ${
           isSelected
-            ? 'bg-blue-600/30 text-blue-200 font-semibold border border-blue-500/40 shadow-sm'
-            : 'hover:bg-[#161a26] text-gray-300 hover:text-white'
+            ? 'bg-[#211E39] text-[#8B7CFF] font-semibold border border-[#302C51]'
+            : 'hover:bg-[#13171D] text-[#858C98] hover:text-[#E6E9ED]'
         }`}
       >
         <div className="flex items-center space-x-1.5 truncate">
-          <FileCode className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+          <FileCode className="w-3.5 h-3.5 text-[#45C8DF] shrink-0" />
           <span className="truncate">{mod.name}</span>
         </div>
 
         <div className="flex items-center space-x-1 shrink-0 ml-1">
-          <span className="text-[9px] uppercase px-1 py-0.2 rounded font-mono text-gray-400 bg-[#1e2333]">
-            {mod.language}
-          </span>
-          <span className={`text-[9px] font-mono px-1 py-0.2 rounded border ${miBadgeClass}`}>
-            MI:{Math.round(mi)}
+          <span
+            className="text-[8px] font-mono px-1 py-0.2 rounded font-bold"
+            style={{ color: miColor, backgroundColor: `${miColor}15`, border: `1px solid ${miColor}30` }}
+          >
+            {Math.round(mi)}
           </span>
         </div>
       </div>
@@ -164,145 +171,214 @@ export const Leftbar: React.FC = () => {
   if (!leftbarOpen) return null;
 
   return (
-    <aside className="w-64 bg-[#121520] border-r border-[#1e2333] flex flex-col h-full select-none z-10">
-      {/* Header Pestañas Leftbar */}
-      <div className="flex items-center border-b border-[#1e2333] bg-[#0d0f17]">
-        <button
-          onClick={() => setActiveLeftbarTab('explorer')}
-          className={`flex-1 py-2 flex items-center justify-center space-x-1.5 text-xs font-semibold border-b-2 transition ${
-            activeLeftbarTab === 'explorer'
-              ? 'border-blue-500 text-blue-400 bg-[#161a26]'
-              : 'border-transparent text-gray-400 hover:text-gray-200'
-          }`}
-          title="Explorador de Archivos y Módulos"
-        >
-          <FolderTree className="w-3.5 h-3.5" />
-          <span>Explorador</span>
-        </button>
-
-        <button
-          onClick={() => setActiveLeftbarTab('navigation')}
-          className={`flex-1 py-2 flex items-center justify-center space-x-1.5 text-xs font-semibold border-b-2 transition ${
-            activeLeftbarTab === 'navigation'
-              ? 'border-blue-500 text-blue-400 bg-[#161a26]'
-              : 'border-transparent text-gray-400 hover:text-gray-200'
-          }`}
-          title="Navegación C4 por Jerarquía"
-        >
-          <Compass className="w-3.5 h-3.5" />
-          <span>Jerarquía</span>
-        </button>
-
-        <button
-          onClick={() => setActiveLeftbarTab('search')}
-          className={`flex-1 py-2 flex items-center justify-center space-x-1.5 text-xs font-semibold border-b-2 transition ${
-            activeLeftbarTab === 'search'
-              ? 'border-blue-500 text-blue-400 bg-[#161a26]'
-              : 'border-transparent text-gray-400 hover:text-gray-200'
-          }`}
-          title="Búsqueda Rápida"
-        >
-          <Search className="w-3.5 h-3.5" />
-          <span>Buscar</span>
-        </button>
-      </div>
-
-      {/* Input de filtro general */}
-      <div className="p-2 border-b border-[#1e2333]">
-        <div className="relative">
-          <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-gray-500" />
-          <input
-            type="text"
-            placeholder="Filtrar módulos..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-[#090b10] text-xs text-gray-200 pl-8 pr-2 py-1.5 rounded border border-[#1e2333] focus:outline-none focus:border-cyan-500 font-sans"
-          />
-        </div>
-      </div>
-
-      {/* Cuerpo del Leftbar */}
-      <div className="flex-1 overflow-y-auto p-2 text-xs">
-        {!amg ? (
-          <div className="flex flex-col items-center justify-center h-48 text-center text-gray-500 space-y-2">
-            <FolderTree className="w-8 h-8 opacity-40 text-blue-400" />
-            <p className="font-medium">Sin proyecto cargado.</p>
-            <p className="text-[11px] text-gray-600">Haga clic en 'Abrir...' en la barra superior.</p>
-          </div>
-        ) : (
-          <>
-            {/* Pestaña Explorer: Árbol de archivos real */}
-            {activeLeftbarTab === 'explorer' && fileTree && (
-              <div className="space-y-0.5">
-                {renderTreeNode(fileTree, 0)}
-              </div>
+    <div className="flex h-full select-none z-10 font-sans text-xs">
+      {/* 1. ACTIVITY BAR (GraphForge Spec Section 11 — 46px Width) */}
+      <aside className="w-[46px] bg-[#101318] border-r border-[#252B34] flex flex-col justify-between items-center py-2 shrink-0">
+        <div className="flex flex-col items-center space-y-3 w-full">
+          {/* Activity Bar Items */}
+          <button
+            onClick={() => setActiveLeftbarTab('explorer')}
+            className={`relative w-full py-2 flex items-center justify-center transition ${
+              activeLeftbarTab === 'explorer'
+                ? 'text-[#E6E9ED]'
+                : 'text-[#858C98] hover:text-[#E6E9ED]'
+            }`}
+            title="Explorador de Archivos"
+          >
+            {activeLeftbarTab === 'explorer' && (
+              <div className="absolute left-0 top-1 bottom-1 w-[2px] bg-[#8B7CFF] rounded-r" />
             )}
+            <FolderTree className="w-4 h-4" />
+          </button>
 
-            {/* Pestaña Navigation: Jerarquía C4 */}
+          <button
+            onClick={() => setActiveLeftbarTab('navigation')}
+            className={`relative w-full py-2 flex items-center justify-center transition ${
+              activeLeftbarTab === 'navigation'
+                ? 'text-[#E6E9ED]'
+                : 'text-[#858C98] hover:text-[#E6E9ED]'
+            }`}
+            title="Navegación C4 por Jerarquía"
+          >
             {activeLeftbarTab === 'navigation' && (
-              <div className="space-y-2">
-                <div
-                  onClick={() => setC4Level(1)}
-                  className="p-2.5 rounded-lg bg-[#161a26] hover:bg-[#1f2638] cursor-pointer border border-[#232a3e] transition"
-                >
-                  <div className="flex items-center space-x-2 text-cyan-400 font-bold">
-                    <Sparkles className="w-4 h-4" />
-                    <span>Nivel 1: Contexto</span>
-                  </div>
-                  <p className="text-[11px] text-gray-400 mt-1">
-                    {amg.externalSystems.length} sistemas externos | {amg.actors.length} actores
-                  </p>
-                </div>
-
-                <div
-                  onClick={() => setC4Level(2)}
-                  className="p-2.5 rounded-lg bg-[#161a26] hover:bg-[#1f2638] cursor-pointer border border-[#232a3e] transition"
-                >
-                  <div className="flex items-center space-x-2 text-blue-400 font-bold">
-                    <Box className="w-4 h-4" />
-                    <span>Nivel 2: Contenedores</span>
-                  </div>
-                  <p className="text-[11px] text-gray-400 mt-1">
-                    {amg.containers.length} unidades desplegables
-                  </p>
-                </div>
-
-                <div
-                  onClick={() => setC4Level(3)}
-                  className="p-2.5 rounded-lg bg-[#161a26] hover:bg-[#1f2638] cursor-pointer border border-[#232a3e] transition"
-                >
-                  <div className="flex items-center space-x-2 text-purple-400 font-bold">
-                    <Layers className="w-4 h-4" />
-                    <span>Nivel 3: Componentes</span>
-                  </div>
-                  <p className="text-[11px] text-gray-400 mt-1">
-                    {amg.modules.length} componentes/módulos
-                  </p>
-                </div>
-              </div>
+              <div className="absolute left-0 top-1 bottom-1 w-[2px] bg-[#8B7CFF] rounded-r" />
             )}
+            <Compass className="w-4 h-4" />
+          </button>
 
-            {/* Pestaña Search: Búsqueda avanzada */}
+          <button
+            onClick={() => setActiveLeftbarTab('search')}
+            className={`relative w-full py-2 flex items-center justify-center transition ${
+              activeLeftbarTab === 'search'
+                ? 'text-[#E6E9ED]'
+                : 'text-[#858C98] hover:text-[#E6E9ED]'
+            }`}
+            title="Búsqueda Rápida"
+          >
             {activeLeftbarTab === 'search' && (
-              <div className="space-y-1.5">
-                <p className="text-gray-400 text-[11px]">
-                  {filteredModules.length} módulos encontrados
-                </p>
-                {filteredModules.map((m) => (
-                  <div
-                    key={m.id}
-                    onClick={() => selectElement(m.id, 'module', m)}
-                    className="p-2 rounded bg-[#161a26] hover:bg-[#1f2638] cursor-pointer text-gray-200 border border-[#232a3e] transition"
-                  >
-                    <div className="font-bold text-cyan-300">{m.name}</div>
-                    <div className="text-[10px] text-gray-500 truncate font-mono">{m.id}</div>
-                  </div>
-                ))}
-              </div>
+              <div className="absolute left-0 top-1 bottom-1 w-[2px] bg-[#8B7CFF] rounded-r" />
             )}
-          </>
-        )}
-      </div>
-    </aside>
+            <Search className="w-4 h-4" />
+          </button>
+
+          <div className="w-6 border-b border-[#252B34] my-1" />
+
+          <button
+            onClick={() => setActiveMainTab('dashboard')}
+            className={`relative w-full py-2 flex items-center justify-center transition ${
+              activeMainTab === 'dashboard'
+                ? 'text-[#8B7CFF]'
+                : 'text-[#858C98] hover:text-[#E6E9ED]'
+            }`}
+            title="Dashboard"
+          >
+            <LayoutDashboard className="w-4 h-4" />
+          </button>
+
+          <button
+            onClick={() => setActiveMainTab('metrics')}
+            className={`relative w-full py-2 flex items-center justify-center transition ${
+              activeMainTab === 'metrics'
+                ? 'text-[#8B7CFF]'
+                : 'text-[#858C98] hover:text-[#E6E9ED]'
+            }`}
+            title="Métricas de Arquitectura"
+          >
+            <BarChart3 className="w-4 h-4" />
+          </button>
+
+          <button
+            onClick={() => setActiveMainTab('antipatterns')}
+            className={`relative w-full py-2 flex items-center justify-center transition ${
+              activeMainTab === 'antipatterns'
+                ? 'text-[#EF6B73]'
+                : 'text-[#858C98] hover:text-[#E6E9ED]'
+            }`}
+            title="Antipatrones"
+          >
+            <AlertTriangle className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Activity Bar Bottom Controls */}
+        <div className="flex flex-col items-center space-y-2 text-[#858C98]">
+          <button className="p-2 hover:text-[#E6E9ED] transition" title="Ayuda & Documentación">
+            <HelpCircle className="w-4 h-4" />
+          </button>
+          <button className="p-2 hover:text-[#E6E9ED] transition" title="Configuración de SAAC">
+            <Settings className="w-4 h-4" />
+          </button>
+        </div>
+      </aside>
+
+      {/* 2. EXPLORER PANEL (GraphForge Spec Section 12 — 218px Width) */}
+      <aside className="w-[218px] bg-[#101318] border-r border-[#252B34] flex flex-col h-full shrink-0">
+        {/* Panel Title */}
+        <div className="px-3 py-2 border-b border-[#252B34] bg-[#0B0D10] flex items-center justify-between">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[#858C98]">
+            {activeLeftbarTab === 'explorer'
+              ? 'Explorador'
+              : activeLeftbarTab === 'navigation'
+                ? 'Jerarquía C4'
+                : 'Buscar'}
+          </span>
+          <span className="text-[9px] font-mono text-[#5F6671]">
+            {amg ? `${amg.modules.length} mód` : '0'}
+          </span>
+        </div>
+
+        {/* Filter Input */}
+        <div className="p-2 border-b border-[#252B34]">
+          <div className="relative">
+            <Search className="w-3 h-3 absolute left-2 top-2 text-[#5F6671]" />
+            <input
+              type="text"
+              placeholder="Filtrar..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-[#0B0D10] text-[11px] text-[#E6E9ED] pl-7 pr-2 py-1 rounded border border-[#252B34] focus:outline-none focus:border-[#8B7CFF] font-sans placeholder-[#5F6671]"
+            />
+          </div>
+        </div>
+
+        {/* Explorer Content */}
+        <div className="flex-1 overflow-y-auto p-1.5 text-[11px]">
+          {!amg ? (
+            <div className="flex flex-col items-center justify-center h-48 text-center text-[#5F6671] space-y-2">
+              <FolderTree className="w-7 h-7 opacity-30 text-[#8B7CFF]" />
+              <p className="font-medium text-[#858C98]">Sin proyecto cargado</p>
+              <p className="text-[10px] text-[#5F6671]">Abra una carpeta para explorar.</p>
+            </div>
+          ) : (
+            <>
+              {activeLeftbarTab === 'explorer' && fileTree && (
+                <div className="space-y-0.5">{renderTreeNode(fileTree, 0)}</div>
+              )}
+
+              {activeLeftbarTab === 'navigation' && (
+                <div className="space-y-1.5">
+                  <div
+                    onClick={() => setC4Level(1)}
+                    className="p-2 rounded bg-[#13171D] hover:bg-[#171C23] cursor-pointer border border-[#1D222A] transition"
+                  >
+                    <div className="flex items-center space-x-1.5 text-[#45C8DF] font-bold text-[11px]">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Nivel 1: Contexto</span>
+                    </div>
+                    <p className="text-[10px] text-[#858C98] mt-0.5 font-mono">
+                      {amg.externalSystems.length} ext | {amg.actors.length} actores
+                    </p>
+                  </div>
+
+                  <div
+                    onClick={() => setC4Level(2)}
+                    className="p-2 rounded bg-[#13171D] hover:bg-[#171C23] cursor-pointer border border-[#1D222A] transition"
+                  >
+                    <div className="flex items-center space-x-1.5 text-[#8B7CFF] font-bold text-[11px]">
+                      <Box className="w-3.5 h-3.5" />
+                      <span>Nivel 2: Contenedores</span>
+                    </div>
+                    <p className="text-[10px] text-[#858C98] mt-0.5 font-mono">
+                      {amg.containers.length} unidades desplegables
+                    </p>
+                  </div>
+
+                  <div
+                    onClick={() => setC4Level(3)}
+                    className="p-2 rounded bg-[#13171D] hover:bg-[#171C23] cursor-pointer border border-[#1D222A] transition"
+                  >
+                    <div className="flex items-center space-x-1.5 text-[#4FD49A] font-bold text-[11px]">
+                      <Layers className="w-3.5 h-3.5" />
+                      <span>Nivel 3: Componentes</span>
+                    </div>
+                    <p className="text-[10px] text-[#858C98] mt-0.5 font-mono">
+                      {amg.modules.length} módulos
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {activeLeftbarTab === 'search' && (
+                <div className="space-y-1">
+                  <p className="text-[#5F6671] text-[10px] font-mono mb-1">
+                    {filteredModules.length} coincidencias
+                  </p>
+                  {filteredModules.map((m) => (
+                    <div
+                      key={m.id}
+                      onClick={() => selectElement(m.id, 'module', m)}
+                      className="p-1.5 rounded bg-[#13171D] hover:bg-[#171C23] cursor-pointer text-[#E6E9ED] border border-[#1D222A] transition"
+                    >
+                      <div className="font-semibold text-[#45C8DF] text-[11px]">{m.name}</div>
+                      <div className="text-[9px] text-[#5F6671] truncate font-mono">{m.id}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </aside>
+    </div>
   );
 };
