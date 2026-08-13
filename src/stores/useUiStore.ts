@@ -8,7 +8,14 @@ export type SupplementaryDiagramTab =
   | 'callgraph'
   | 'sequence'
   | 'dynamic'
-  | 'dfd';
+  | 'dfd'
+  | 'coupling-heatmap'
+  | 'deployment'
+  | 'filetree'
+  | 'treemap'
+  | 'ownership'
+  | 'landscape'
+  | 'timeline';
 
 export type DiagramTab = 'c4' | SupplementaryDiagramTab;
 
@@ -28,6 +35,8 @@ interface UiState {
   leftbarOpen: boolean;
   rightbarOpen: boolean;
   downbarOpen: boolean;
+  securityPerspective: boolean;
+  ownershipPerspective: boolean;
   activeLeftbarTab: LeftbarTab;
   activeDownbarTab: DownbarTab;
   activeMainTab: MainTab;
@@ -40,6 +49,8 @@ interface UiState {
   toggleLeftbar: () => void;
   toggleRightbar: () => void;
   toggleDownbar: () => void;
+  toggleSecurityPerspective: () => void;
+  toggleOwnershipPerspective: () => void;
   setActiveLeftbarTab: (tab: LeftbarTab) => void;
   setActiveDownbarTab: (tab: DownbarTab) => void;
   setActiveMainTab: (tab: MainTab) => void;
@@ -50,6 +61,8 @@ export const useUiStore = create<UiState>((set) => ({
   leftbarOpen: true,
   rightbarOpen: true,
   downbarOpen: false,
+  securityPerspective: false,
+  ownershipPerspective: false,
   activeLeftbarTab: 'explorer',
   activeDownbarTab: 'output',
   activeMainTab: 'dashboard',
@@ -62,6 +75,8 @@ export const useUiStore = create<UiState>((set) => ({
   toggleLeftbar: () => set((state) => ({ leftbarOpen: !state.leftbarOpen })),
   toggleRightbar: () => set((state) => ({ rightbarOpen: !state.rightbarOpen })),
   toggleDownbar: () => set((state) => ({ downbarOpen: !state.downbarOpen })),
+  toggleSecurityPerspective: () => set((state) => ({ securityPerspective: !state.securityPerspective })),
+  toggleOwnershipPerspective: () => set((state) => ({ ownershipPerspective: !state.ownershipPerspective })),
   setActiveLeftbarTab: (activeLeftbarTab) => set({ activeLeftbarTab }),
   setActiveDownbarTab: (activeDownbarTab) => set({ activeDownbarTab }),
   setActiveMainTab: (activeMainTab) => set({ activeMainTab }),

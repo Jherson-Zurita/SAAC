@@ -18,6 +18,8 @@ import {
   XCircle,
   RotateCw,
   Palette,
+  Shield,
+  Users,
 } from 'lucide-react';
 import { useUiStore, type MainTab } from '../../stores/useUiStore';
 import { useProjectStore } from '../../stores/useProjectStore';
@@ -45,14 +47,14 @@ export const TopBar: React.FC<TopBarProps> = ({
     toggleTheme,
     leftbarOpen,
     rightbarOpen,
-    downbarOpen,
-    toggleLeftbar,
-    toggleRightbar,
-    toggleDownbar,
     activeMainTab,
     setActiveMainTab,
     setActiveDownbarTab,
     setDownbarOpen,
+    securityPerspective,
+    ownershipPerspective,
+    toggleSecurityPerspective,
+    toggleOwnershipPerspective,
   } = useUiStore();
 
   const { projectPath, isAnalyzing, amg } = useProjectStore();
@@ -298,6 +300,30 @@ export const TopBar: React.FC<TopBarProps> = ({
           title="Alternar Panel Inferior (Output/Logs)"
         >
           <PanelBottom className="w-4 h-4" />
+        </button>
+
+        <button
+          onClick={toggleSecurityPerspective}
+          className={`p-1.5 rounded-md transition ${
+            securityPerspective
+              ? 'text-emerald-400 bg-emerald-950/80 border border-emerald-500/40'
+              : 'text-gray-400 hover:text-emerald-400 hover:bg-[#191f2e]'
+          }`}
+          title="Perspectiva de Seguridad (Zonas de Red, Cifrado, Autenticación)"
+        >
+          <Shield className="w-4 h-4" />
+        </button>
+
+        <button
+          onClick={toggleOwnershipPerspective}
+          className={`p-1.5 rounded-md transition ${
+            ownershipPerspective
+              ? 'text-purple-400 bg-purple-950/80 border border-purple-500/40'
+              : 'text-gray-400 hover:text-purple-400 hover:bg-[#191f2e]'
+          }`}
+          title="Perspectiva de Propiedad (Equipos y Autores por Módulo)"
+        >
+          <Users className="w-4 h-4" />
         </button>
 
         <button

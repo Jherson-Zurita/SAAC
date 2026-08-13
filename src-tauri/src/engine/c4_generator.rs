@@ -13,6 +13,7 @@ use crate::engine::amg::{
     Container, ContainerType, Dependency, ExternalCall, ExternalProtocol, ExternalSystem,
     ExternalSystemType, Invocation, Language, Module, NodeType, ProjectType,
 };
+use crate::engine::deployment_detector::DeploymentDetector;
 use crate::engine::supplementary_diagrams::SupplementaryDiagrams;
 
 pub struct C4GeneratorOutput {
@@ -478,12 +479,20 @@ fn generate_component_diagrams(
         circular_diagram,
     );
 
-    // Añadir el resto de diagramas suplementarios adicionales (§4.4.5):
-    // Package Diagram, Inheritance Tree, ER Diagram, Call Graph, Sequence Diagram,
-    // Dynamic Diagram, DFD Diagram. Se fusionan en el mismo mapa `component_diagrams`
-    // bajo sus propias claves "supplementary:*".
+    // Añadir el resto de diagramas suplementarios adicionales (§4.4.5)
     let extra_diagrams = SupplementaryDiagrams::generate_all(modules, dependencies, invocations);
     map.extend(extra_diagrams);
+
+    // Añadir diagrama de despliegue (C4 Deployment Diagram)
+    let deployment_diagram = DeploymentDetector::detect_and_generate(
+        std::path::Path::new("."),
+        containers,
+        &[],
+    );
+    map.insert(
+        "supplementary:deployment-diagram".to_string(),
+        deployment_diagram,
+    );
 
     map
 }

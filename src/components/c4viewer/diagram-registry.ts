@@ -65,6 +65,55 @@ export const supplementaryDiagramDefinitions = [
     shortLabel: 'Flujo de datos',
     direction: 'TB',
   },
+  {
+    tab: 'coupling-heatmap',
+    backendKey: 'supplementary:coupling-heatmap',
+    title: 'Mapa de Calor de Acoplamiento',
+    shortLabel: 'Matriz Acoplamiento',
+    direction: 'LR',
+  },
+  {
+    tab: 'deployment',
+    backendKey: 'supplementary:deployment-diagram',
+    title: 'Diagrama de Despliegue',
+    shortLabel: 'Despliegue',
+    direction: 'TB',
+  },
+  {
+    tab: 'filetree',
+    backendKey: 'supplementary:file-tree',
+    title: 'Árbol de Directorios',
+    shortLabel: 'Árbol de carpetas',
+    direction: 'TB',
+  },
+  {
+    tab: 'treemap',
+    backendKey: 'supplementary:treemap',
+    title: 'Mapa de Carpetas (Treemap)',
+    shortLabel: 'Treemap D3',
+    direction: 'LR',
+  },
+  {
+    tab: 'ownership',
+    backendKey: 'supplementary:ownership-map',
+    title: 'Mapa de Contribuciones (Ownership)',
+    shortLabel: 'Ownership',
+    direction: 'LR',
+  },
+  {
+    tab: 'landscape',
+    backendKey: 'supplementary:system-landscape',
+    title: 'Paisaje del Sistema (System Landscape)',
+    shortLabel: 'Landscape',
+    direction: 'LR',
+  },
+  {
+    tab: 'timeline',
+    backendKey: 'supplementary:timeline',
+    title: 'Evolución Arquitectónica',
+    shortLabel: 'Timeline',
+    direction: 'LR',
+  },
 ] as const satisfies readonly SupplementaryDiagramDefinition[];
 
 const supplementaryTabs = new Set<MainTab>(

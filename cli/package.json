@@ -1,0 +1,15 @@
+{
+  "name": "saac-cli",
+  "version": "2.0.0",
+  "description": "Herramienta CLI de integración continua (CI/CD) para comprobación de reglas de arquitectura de código con SAAC v2.0.",
+  "main": "saac-cli.js",
+  "bin": {
+    "saac": "saac-cli.js"
+  },
+  "scripts": {
+    "start": "node saac-cli.js"
+  },
+  "keywords": ["architecture", "static-analysis", "c4-model", "saac", "ci-cd"],
+  "author": "SAAC Team",
+  "license": "MIT"
+}

@@ -6,3 +6,9 @@ export * from './CallGraphView';
 export * from './SequenceDiagramView';
 export * from './DynamicDiagramView';
 export * from './DfdDiagramView';
+export * from './CouplingHeatmapView';
+export * from './TreemapView';
+export * from './FileTreeView';
+export * from './TimelineView';
+export * from './OwnershipMapView';
+

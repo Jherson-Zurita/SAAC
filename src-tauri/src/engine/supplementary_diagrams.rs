@@ -57,6 +57,31 @@ impl SupplementaryDiagrams {
             generate_dfd_diagram(modules, invocations),
         );
 
+        diagrams.insert(
+            "supplementary:coupling-heatmap".to_string(),
+            generate_coupling_heatmap(modules, dependencies),
+        );
+
+        diagrams.insert(
+            "supplementary:file-tree".to_string(),
+            generate_file_tree(modules),
+        );
+
+        diagrams.insert(
+            "supplementary:treemap".to_string(),
+            generate_treemap(modules),
+        );
+
+        diagrams.insert(
+            "supplementary:ownership-map".to_string(),
+            generate_ownership_map(modules),
+        );
+
+        diagrams.insert(
+            "supplementary:system-landscape".to_string(),
+            generate_system_landscape(modules, dependencies),
+        );
+
         diagrams
     }
 }
@@ -467,6 +492,189 @@ fn generate_dfd_diagram(modules: &[Module], invocations: &[Invocation]) -> C4Dia
                 protocol: None,
             });
         }
+    }
+
+    C4DiagramData { nodes, edges }
+}
+
+// ============================================================================
+// 8. Mapa de Calor de Acoplamiento (Coupling Heatmap) — §4.4.5
+// ============================================================================
+
+fn generate_coupling_heatmap(modules: &[Module], dependencies: &[Dependency]) -> C4DiagramData {
+    let mut nodes = Vec::new();
+    let mut edges = Vec::new();
+
+    for m in modules {
+        nodes.push(C4Node {
+            id: m.id.clone(),
+            label: m.name.clone(),
+            element_type: "Heatmap Module".to_string(),
+            technology: format!("Ca: {}, Ce: {}", m.metrics.ca, m.metrics.ce),
+            description: format!("Instability: {:.2}, Maintainability: {:.1}", m.metrics.instability, m.metrics.maintainability_index),
+            amg_node_id: Some(m.id.clone()),
+        });
+    }
+
+    for dep in dependencies {
+        edges.push(C4Edge {
+            source: dep.source.clone(),
+            target: dep.target.clone(),
+            label: format!("weight {}", dep.weight),
+            protocol: Some(format!("{:?}", dep.kind)),
+        });
+    }
+
+    C4DiagramData { nodes, edges }
+}
+
+// ============================================================================
+// 9. Árbol de Directorios (File Tree) — §4.4.5
+// ============================================================================
+
+fn generate_file_tree(modules: &[Module]) -> C4DiagramData {
+    let mut nodes = Vec::new();
+    let mut edges = Vec::new();
+    let mut dirs: HashSet<String> = HashSet::new();
+
+    for m in modules {
+        let parts: Vec<&str> = m.id.split('/').collect();
+        if parts.len() > 1 {
+            let dir_path = parts[..parts.len() - 1].join("/");
+            if dirs.insert(dir_path.clone()) {
+                nodes.push(C4Node {
+                    id: format!("dir:{}", dir_path),
+                    label: dir_path.clone(),
+                    element_type: "Folder Node".to_string(),
+                    technology: "Directory".to_string(),
+                    description: "Container directory".to_string(),
+                    amg_node_id: None,
+                });
+            }
+
+            nodes.push(C4Node {
+                id: m.id.clone(),
+                label: m.name.clone(),
+                element_type: "File Node".to_string(),
+                technology: format!("{:?} (LOC: {})", m.language, m.loc),
+                description: format!("CC Avg: {:.1}, Maint Index: {:.1}", m.metrics.cyclomatic_complexity_avg, m.metrics.maintainability_index),
+                amg_node_id: Some(m.id.clone()),
+            });
+
+            edges.push(C4Edge {
+                source: format!("dir:{}", dir_path),
+                target: m.id.clone(),
+                label: "contains".to_string(),
+                protocol: None,
+            });
+        } else {
+            nodes.push(C4Node {
+                id: m.id.clone(),
+                label: m.name.clone(),
+                element_type: "File Node".to_string(),
+                technology: format!("{:?}", m.language),
+                description: format!("LOC: {}", m.loc),
+                amg_node_id: Some(m.id.clone()),
+            });
+        }
+    }
+
+    C4DiagramData { nodes, edges }
+}
+
+// ============================================================================
+// 10. Mapa de Carpetas (Treemap) — §4.4.5
+// ============================================================================
+
+fn generate_treemap(modules: &[Module]) -> C4DiagramData {
+    let mut nodes = Vec::new();
+    let edges = Vec::new();
+
+    for m in modules {
+        nodes.push(C4Node {
+            id: m.id.clone(),
+            label: m.name.clone(),
+            element_type: "Treemap Cell".to_string(),
+            technology: format!("LOC: {}, Maint: {:.1}", m.loc, m.metrics.maintainability_index),
+            description: format!("CC Max: {}, Instability: {:.2}", m.metrics.cyclomatic_complexity_max, m.metrics.instability),
+            amg_node_id: Some(m.id.clone()),
+        });
+    }
+
+    C4DiagramData { nodes, edges }
+}
+
+// ============================================================================
+// 11. Mapa de Calor de Contribuciones (Ownership Map) — §4.4.5
+// ============================================================================
+
+fn generate_ownership_map(modules: &[Module]) -> C4DiagramData {
+    let mut nodes = Vec::new();
+    let edges = Vec::new();
+
+    for m in modules {
+        nodes.push(C4Node {
+            id: m.id.clone(),
+            label: m.name.clone(),
+            element_type: "Ownership Node".to_string(),
+            technology: format!("{:?}", m.language),
+            description: format!("LOC: {}, Ce: {}", m.loc, m.metrics.ce),
+            amg_node_id: Some(m.id.clone()),
+        });
+    }
+
+    C4DiagramData { nodes, edges }
+}
+
+// ============================================================================
+// 12. Diagrama del Paisaje del Sistema (System Landscape) — §4.4.5
+// ============================================================================
+
+fn generate_system_landscape(modules: &[Module], dependencies: &[Dependency]) -> C4DiagramData {
+    let mut nodes = Vec::new();
+    let mut edges = Vec::new();
+
+    // Infiere los subsistemas/paquetes principales como bloques del paisaje
+    let mut subsystems: HashMap<String, u32> = HashMap::new();
+
+    for m in modules {
+        let parts: Vec<&str> = m.id.split('/').collect();
+        let sub = if parts.len() > 1 { parts[0] } else { "root" };
+        *subsystems.entry(sub.to_string()).or_insert(0) += 1;
+    }
+
+    for (sub_name, count) in &subsystems {
+        nodes.push(C4Node {
+            id: format!("subsystem:{}", sub_name),
+            label: sub_name.to_uppercase(),
+            element_type: "Software System".to_string(),
+            technology: "System Boundary".to_string(),
+            description: format!("Subsystem containing {} modules", count),
+            amg_node_id: None,
+        });
+    }
+
+    let mut sub_deps: HashSet<(String, String)> = HashSet::new();
+
+    for dep in dependencies {
+        let src_parts: Vec<&str> = dep.source.split('/').collect();
+        let tgt_parts: Vec<&str> = dep.target.split('/').collect();
+
+        let src_sub = if src_parts.len() > 1 { src_parts[0] } else { "root" };
+        let tgt_sub = if tgt_parts.len() > 1 { tgt_parts[0] } else { "root" };
+
+        if src_sub != tgt_sub {
+            sub_deps.insert((src_sub.to_string(), tgt_sub.to_string()));
+        }
+    }
+
+    for (src, tgt) in sub_deps {
+        edges.push(C4Edge {
+            source: format!("subsystem:{}", src),
+            target: format!("subsystem:{}", tgt),
+            label: "interacts with".to_string(),
+            protocol: Some("API / Protocol".to_string()),
+        });
     }
 
     C4DiagramData { nodes, edges }

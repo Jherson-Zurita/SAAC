@@ -9,12 +9,18 @@ import type { MainTab, SupplementaryDiagramTab } from '../../stores/useUiStore';
 import {
   CallGraphView,
   CircularDependenciesView,
+  CouplingHeatmapView,
   DfdDiagramView,
   DynamicDiagramView,
   ErDiagramView,
+  FileTreeView,
   InheritanceTreeView,
+  OwnershipMapView,
   PackageDiagramView,
   SequenceDiagramView,
+  SupplementaryDiagramView,
+  TimelineView,
+  TreemapView,
 } from '../supplementary-diagrams';
 import { C4Canvas } from './C4Canvas';
 import {
@@ -28,7 +34,7 @@ interface C4ViewerProps {
 
 const supplementaryViews: Record<
   SupplementaryDiagramTab,
-  React.ComponentType<{ diagramData: C4DiagramData }>
+  React.ComponentType<{ diagramData: C4DiagramData; tab?: SupplementaryDiagramTab }>
 > = {
   circular: CircularDependenciesView,
   package: PackageDiagramView,
@@ -38,6 +44,13 @@ const supplementaryViews: Record<
   sequence: SequenceDiagramView,
   dynamic: DynamicDiagramView,
   dfd: DfdDiagramView,
+  'coupling-heatmap': CouplingHeatmapView,
+  deployment: (props) => <SupplementaryDiagramView tab="deployment" {...props} />,
+  filetree: FileTreeView,
+  treemap: TreemapView,
+  ownership: OwnershipMapView,
+  landscape: (props) => <SupplementaryDiagramView tab="landscape" {...props} />,
+  timeline: TimelineView,
 };
 
 function getErrorMessage(error: unknown): string {
