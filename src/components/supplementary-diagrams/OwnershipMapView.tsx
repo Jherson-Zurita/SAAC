@@ -7,7 +7,7 @@ interface OwnershipMapViewProps {
   diagramData: C4DiagramData;
 }
 
-export const OwnershipMapView: React.FC<OwnershipMapViewProps> = ({ diagramData }) => {
+export const OwnershipMapView: React.FC<OwnershipMapViewProps> = ({ diagramData: _diagramData }) => {
   const { amg } = useProjectStore();
   const modules = amg?.modules || [];
 

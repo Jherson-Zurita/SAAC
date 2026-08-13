@@ -11,4 +11,5 @@ export * from './TreemapView';
 export * from './FileTreeView';
 export * from './TimelineView';
 export * from './OwnershipMapView';
+export * from './SupplementaryDiagramView';
 

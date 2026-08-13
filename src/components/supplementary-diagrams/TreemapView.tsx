@@ -6,7 +6,7 @@ interface TreemapViewProps {
   diagramData: C4DiagramData;
 }
 
-export const TreemapView: React.FC<TreemapViewProps> = ({ diagramData }) => {
+export const TreemapView: React.FC<TreemapViewProps> = ({ diagramData: _diagramData }) => {
   const { amg } = useProjectStore();
   const modules = amg?.modules || [];
 

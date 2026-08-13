@@ -2,19 +2,21 @@ import React, { useEffect, useState } from 'react';
 import { History, TrendingUp, ShieldAlert, CheckCircle } from 'lucide-react';
 import type { AnalysisRunSummary, C4DiagramData } from '../../../shared/types';
 import { getAnalysisHistory } from '../../lib/tauri-api';
+import { useProjectStore } from '../../stores/useProjectStore';
 
 interface TimelineViewProps {
   diagramData: C4DiagramData;
 }
 
 export const TimelineView: React.FC<TimelineViewProps> = () => {
+  const { projectPath } = useProjectStore();
   const [history, setHistory] = useState<AnalysisRunSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
       try {
-        const data = await getAnalysisHistory();
+        const data = await getAnalysisHistory(projectPath || '.');
         setHistory(data.runs || []);
       } catch (err) {
         console.error('Error cargando historial:', err);

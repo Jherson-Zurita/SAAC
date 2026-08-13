@@ -82,9 +82,9 @@ export const supplementaryDiagramDefinitions = [
   {
     tab: 'filetree',
     backendKey: 'supplementary:file-tree',
-    title: 'Árbol de Directorios',
+    title: 'Árbol de Directorios (Grafo Horizontal)',
     shortLabel: 'Árbol de carpetas',
-    direction: 'TB',
+    direction: 'LR',
   },
   {
     tab: 'treemap',

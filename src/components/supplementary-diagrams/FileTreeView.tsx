@@ -7,7 +7,7 @@ interface FileTreeViewProps {
   diagramData: C4DiagramData;
 }
 
-export const FileTreeView: React.FC<FileTreeViewProps> = ({ diagramData }) => {
+export const FileTreeView: React.FC<FileTreeViewProps> = ({ diagramData: _diagramData }) => {
   const { amg } = useProjectStore();
   const modules = amg?.modules || [];
   const [collapsedDirs, setCollapsedDirs] = useState<Record<string, boolean>>({});
