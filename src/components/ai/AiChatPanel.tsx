@@ -16,6 +16,7 @@ import { askAi } from '../../lib/tauri-api';
 import { parseSlashCommand, AVAILABLE_SLASH_COMMANDS } from '../../lib/slash-commands';
 import { AiStatusIndicator } from './AiStatusIndicator';
 import { AiSettingsModal } from './AiSettingsModal';
+import { MarkdownRenderer } from './MarkdownRenderer';
 
 export const AiChatPanel: React.FC = () => {
   const { messages, isThinking, addMessage, setIsThinking, clearChat } = useAiStore();
@@ -107,14 +108,14 @@ export const AiChatPanel: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-[#0d0f17] h-full overflow-hidden select-none">
+    <div className="flex-1 flex flex-col bg-[#0B0D10] h-full overflow-hidden select-none font-sans">
       {/* Header del Chat */}
-      <div className="flex items-center justify-between p-3 bg-[#121520] border-b border-[#1e2333]">
+      <div className="flex items-center justify-between p-3 bg-[#101318] border-b border-[#252B34]">
         <div className="flex items-center space-x-2">
-          <Bot className="w-5 h-5 text-cyan-400" />
+          <Bot className="w-5 h-5 text-[#8B7CFF]" />
           <div>
-            <h3 className="text-xs font-bold text-gray-200">Asistente Arquitectónico IA</h3>
-            <p className="text-[10px] text-gray-400">Consultas contextuales del proyecto</p>
+            <h3 className="text-xs font-bold text-[#E6E9ED]">Asistente Arquitectónico IA</h3>
+            <p className="text-[10px] text-[#858C98]">Consultas contextuales del proyecto</p>
           </div>
         </div>
 
@@ -152,31 +153,31 @@ export const AiChatPanel: React.FC = () => {
       />
 
       {/* Lista de Mensajes del Chat */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 font-sans text-xs">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 space-y-3">
-            <Sparkles className="w-10 h-10 text-cyan-400/40" />
-            <p className="font-semibold text-gray-300">¿En qué puedo ayudarte con la arquitectura?</p>
-            <p className="text-[11px] text-gray-500 max-w-xs">
-              Usa comandos como <code className="text-cyan-400 font-mono">/explain</code>,{' '}
-              <code className="text-amber-400 font-mono">/refactor</code> o pregúntame directamente sobre el código.
+          <div className="flex flex-col items-center justify-center h-full text-center text-[#5F6671] space-y-3">
+            <Sparkles className="w-10 h-10 text-[#8B7CFF]/40" />
+            <p className="font-semibold text-[#E6E9ED]">¿En qué puedo ayudarte con la arquitectura?</p>
+            <p className="text-[11px] text-[#858C98] max-w-xs">
+              Usa comandos como <code className="text-[#45C8DF] font-mono">/explain</code>,{' '}
+              <code className="text-[#E7B85B] font-mono">/refactor</code> o pregúntame directamente sobre el código.
             </p>
 
             {/* Quick Prompt Cards */}
             <div className="grid grid-cols-2 gap-2 w-full max-w-md pt-2 text-left">
               <button
                 onClick={() => handleSend('/explain')}
-                className="p-2.5 rounded-lg bg-[#121520] hover:bg-[#161a26] border border-[#1e2333] hover:border-cyan-500/40 transition text-gray-300"
+                className="p-2.5 rounded-md bg-[#101318] hover:bg-[#13171D] border border-[#1D222A] hover:border-[#45C8DF]/40 transition text-[#C8CCD4]"
               >
-                <span className="font-mono text-cyan-400 font-bold text-[11px] block">/explain</span>
-                <span className="text-[10px] text-gray-400">Explicar módulo seleccionado</span>
+                <span className="font-mono text-[#45C8DF] font-bold text-[11px] block">/explain</span>
+                <span className="text-[10px] text-[#858C98]">Explicar módulo seleccionado</span>
               </button>
               <button
                 onClick={() => handleSend('/refactor')}
-                className="p-2.5 rounded-lg bg-[#121520] hover:bg-[#161a26] border border-[#1e2333] hover:border-amber-500/40 transition text-gray-300"
+                className="p-2.5 rounded-md bg-[#101318] hover:bg-[#13171D] border border-[#1D222A] hover:border-[#E7B85B]/40 transition text-[#C8CCD4]"
               >
-                <span className="font-mono text-amber-400 font-bold text-[11px] block">/refactor</span>
-                <span className="text-[10px] text-gray-400">Sugerir refactorización</span>
+                <span className="font-mono text-[#E7B85B] font-bold text-[11px] block">/refactor</span>
+                <span className="text-[10px] text-[#858C98]">Sugerir refactorización</span>
               </button>
             </div>
           </div>
@@ -189,24 +190,24 @@ export const AiChatPanel: React.FC = () => {
               }`}
             >
               {m.sender === 'assistant' && (
-                <div className="p-1.5 rounded-lg bg-cyan-950/60 border border-cyan-500/30 text-cyan-400 shrink-0 mt-0.5">
+                <div className="p-1.5 rounded-md bg-[#211E39] border border-[#302C51] text-[#8B7CFF] shrink-0 mt-0.5">
                   <Bot className="w-4 h-4" />
                 </div>
               )}
 
               <div
-                className={`max-w-[80%] rounded-xl p-3 space-y-1 ${
+                className={`rounded-lg p-3 space-y-1 ${
                   m.sender === 'user'
-                    ? 'bg-blue-600 text-white rounded-tr-none'
-                    : 'bg-[#121520] text-gray-200 border border-[#1e2333] rounded-tl-none'
+                    ? 'max-w-[75%] bg-[#211E39] text-[#E6E9ED] border border-[#302C51] rounded-tr-none'
+                    : 'max-w-[90%] bg-[#101318] text-[#C8CCD4] border border-[#1D222A] rounded-tl-none'
                 }`}
               >
                 {/* Header del mensaje del asistente */}
                 {m.sender === 'assistant' && (
-                  <div className="flex items-center justify-between border-b border-[#1e2333] pb-1 mb-1">
-                    <span className="text-[10px] font-bold text-cyan-400">IA SAAC</span>
+                  <div className="flex items-center justify-between border-b border-[#1D222A] pb-1 mb-1.5">
+                    <span className="text-[10px] font-bold text-[#8B7CFF]">IA SAAC</span>
                     {m.isMockFallback && (
-                      <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center space-x-1">
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#E7B85B]/10 text-[#E7B85B] border border-[#E7B85B]/20 flex items-center space-x-1">
                         <AlertCircle className="w-2.5 h-2.5" />
                         <span>Mock Fallback</span>
                       </span>
@@ -214,15 +215,22 @@ export const AiChatPanel: React.FC = () => {
                   </div>
                 )}
 
-                <div className="whitespace-pre-wrap leading-relaxed">{m.text}</div>
+                {/* Markdown rendering for assistant, plain text for user */}
+                {m.sender === 'assistant' ? (
+                  <div className="saac-markdown-body">
+                    <MarkdownRenderer content={m.text} />
+                  </div>
+                ) : (
+                  <div className="whitespace-pre-wrap leading-relaxed text-[11.5px]">{m.text}</div>
+                )}
 
-                <div className="flex items-center justify-end space-x-2 text-[9px] text-gray-500 font-mono pt-1">
+                <div className="flex items-center justify-end space-x-2 text-[9px] text-[#5F6671] font-mono pt-1">
                   <span>{m.timestamp}</span>
                 </div>
               </div>
 
               {m.sender === 'user' && (
-                <div className="p-1.5 rounded-lg bg-blue-900/60 border border-blue-500/30 text-blue-300 shrink-0 mt-0.5">
+                <div className="p-1.5 rounded-md bg-[#211E39] border border-[#302C51] text-[#8B7CFF] shrink-0 mt-0.5">
                   <User className="w-4 h-4" />
                 </div>
               )}
@@ -231,7 +239,7 @@ export const AiChatPanel: React.FC = () => {
         )}
 
         {isThinking && (
-          <div className="flex items-center space-x-2 text-cyan-400 text-xs font-mono animate-pulse">
+          <div className="flex items-center space-x-2 text-[#8B7CFF] text-xs font-mono animate-pulse">
             <Bot className="w-4 h-4" />
             <span>Generando respuesta arquitectónica...</span>
           </div>
@@ -242,8 +250,8 @@ export const AiChatPanel: React.FC = () => {
 
       {/* Popover de Menú Slash Commands */}
       {showSlashMenu && (
-        <div className="bg-[#121520] border-t border-[#1e2333] p-2 space-y-1">
-          <span className="text-[10px] uppercase font-bold text-gray-500 px-2">Comandos Slash Disponibles</span>
+        <div className="bg-[#101318] border-t border-[#252B34] p-2 space-y-1">
+          <span className="text-[10px] uppercase font-bold text-[#5F6671] px-2">Comandos Slash Disponibles</span>
           {AVAILABLE_SLASH_COMMANDS.map((sc) => (
             <div
               key={sc.command}
@@ -251,17 +259,17 @@ export const AiChatPanel: React.FC = () => {
                 setInput(sc.command + ' ');
                 setShowSlashMenu(false);
               }}
-              className="p-1.5 rounded hover:bg-[#161a26] cursor-pointer text-xs flex items-center justify-between text-gray-300 hover:text-white transition"
+              className="p-1.5 rounded hover:bg-[#13171D] cursor-pointer text-xs flex items-center justify-between text-[#C8CCD4] hover:text-[#E6E9ED] transition"
             >
-              <span className="font-mono text-cyan-400 font-bold">{sc.command}</span>
-              <span className="text-[10px] text-gray-400">{sc.description}</span>
+              <span className="font-mono text-[#45C8DF] font-bold">{sc.command}</span>
+              <span className="text-[10px] text-[#858C98]">{sc.description}</span>
             </div>
           ))}
         </div>
       )}
 
       {/* Input de Envío */}
-      <div className="p-3 bg-[#121520] border-t border-[#1e2333]">
+      <div className="p-3 bg-[#101318] border-t border-[#252B34]">
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -275,12 +283,12 @@ export const AiChatPanel: React.FC = () => {
             value={input}
             onChange={handleInputChange}
             disabled={isThinking}
-            className="flex-1 bg-[#090b10] text-xs text-gray-200 px-3 py-2 rounded-lg border border-[#1e2333] focus:outline-none focus:border-cyan-500 font-sans"
+            className="flex-1 bg-[#0B0D10] text-xs text-[#E6E9ED] px-3 py-2 rounded-md border border-[#252B34] focus:outline-none focus:border-[#8B7CFF] font-sans placeholder:text-[#5F6671]"
           />
           <button
             type="submit"
             disabled={!input.trim() || isThinking}
-            className="p-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-lg disabled:opacity-40 transition shadow-md"
+            className="p-2 bg-[#211E39] hover:bg-[#2c284e] text-[#8B7CFF] rounded-md border border-[#302C51] disabled:opacity-40 transition"
           >
             <Send className="w-4 h-4" />
           </button>

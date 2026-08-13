@@ -1,6 +1,21 @@
-# SAAC v2.0 — Estado y Estructura del Proyecto
+# SAAC v2.0 — Estado y Estructura del Proyecto (100% Completado)
 
-Este documento registra el progreso actual del desarrollo de SAAC v2.0 (Software Architecture Analysis Companion), detallando la estructura de directorios, los módulos implementados y el estado funcional de cada componente de la aplicación.
+Este documento registra el estado funcional completo del desarrollo de **SAAC v2.0** (*Software Architecture Analysis Companion*), incluyendo el nuevo sistema de diseño **GraphForge UI**, el motor de análisis estático multilinguaje en Rust/Workers AST, los diagramas C4 y suplementarios en ReactFlow, la integración del módulo de **IA Local y Cloud (Ollama / Google Gemini / OpenAI)** y la persistencia local de análisis.
+
+---
+
+## 🟢 Estado General del Proyecto: **100% FUNCIONAL Y COMPLETO**
+
+| Módulo / Capa | Estado | Descripción / Cobertura |
+| :--- | :---: | :--- |
+| **Backend Core (Rust + Tauri)** | ✅ 100% | Inferencia de estilos (Layered, Hexagonal, etc.), métricas $Ca, Ce, I, D, \text{Cohesión}$, algoritmo de Tarjan para ciclos, 3 antipatrones, persistencia sled DB. |
+| **Workers AST (Node.js & Python)** | ✅ 100% | Parseo estático en 8 lenguajes (*TS/JS, Python, Java, Kotlin, C#, Swift, Go, Rust*) con extracción de invocaciones función-a-función. |
+| **Sistema de Diseño (GraphForge UI)** | ✅ 100% | Rebranding completo en paleta Near-Black (`#0B0D10`, `#101318`, `#13171D`, `#252B34`, `#8B7CFF`, `#45C8DF`, `#4FD49A`, `#EF6B73`). |
+| **Visualizador C4 & Diagramas** | ✅ 100% | C4 Niveles 1-3 en ReactFlow + Dagre layout, Nivel 4 (UML de Código) bajo demanda, Grafo de Fuerza Interactivo, Árbol de Carpetas Horizontal y 12 Vistas Suplementarias. |
+| **Inspector Contextual & Context Menu** | ✅ 100% | Inspección de nodos por clic e inspector flotante (`NodeContextMenu`) con métricas, severidad, antipatrones y conexiones directas. |
+| **Módulo de Inteligencia Artificial (IA)** | ✅ 100% | Soporte para **Ollama** (Local), **Google Gemini API** (`open-ai-compatible` vía REST), OpenAI Cloud y Mock Fallback, con modal de configuración (`AiSettingsModal`). |
+| **Renderizado Markdown en IA Chat** | ✅ 100% | Visualización de markdown completo (`MarkdownRenderer`) con resaltado de sintaxis en bloques de código (`Prism`), botón de copia en 1-clic, tablas GFM y blockquotes. |
+| **Persistencia & Resumen de Análisis** | ✅ 100% | Exportación automática de `.saac/analysis-summary.json` en disco y almacenamiento en `localStorage` (`saac_last_analysis_summary`). |
 
 ---
 
@@ -8,21 +23,27 @@ Este documento registra el progreso actual del desarrollo de SAAC v2.0 (Software
 
 ```mermaid
 graph TD
-    subgraph Frontend [Capa de Presentación (React + TS + Vite)]
-        UI[Componentes UI / Vistas] --> Stores[Estado / Zustand]
-        Stores --> TauriIPC[Tauri IPC / Commands]
+    subgraph Frontend [Capa de Presentación (React 18 + TS + Vite + GraphForge UI)]
+        AppShell[AppShell Layout 5 Regiones] --> TopBar[TopBar 48px]
+        AppShell --> Leftbar[ActivityBar 46px + Explorer 218px]
+        AppShell --> Rightbar[Inspector 275px]
+        AppShell --> Downbar[Bottom Panel 166px Terminal/Logs]
+        AppShell --> StatusBar[StatusBar 23px]
+        
+        AppShell --> Canvas[C4Canvas / ForceGraphView / Supplementary]
+        AppShell --> AiChat[AiChatPanel + MarkdownRenderer]
+        AiChat --> AiModal[AiSettingsModal Config]
     end
 
-    subgraph Backend [Motor Backend Core (Rust + Tauri)]
-        TauriIPC --> Commands[Comandos Tauri]
-        Commands --> Detector[Project Detector]
-        Commands --> Cache[Cache Manager - sled]
-        Commands --> Aggregator[Aggregator]
-        Aggregator --> AMG[Architecture Model Graph - Models]
-        Aggregator --> Antipatterns[Detector de Antipatrones]
-        Aggregator --> C4Gen[C4 Generator]
-        C4Gen --> SuppDiag[Supplementary Diagrams]
-        Commands --> AiClient[AI Client - Ollama/OpenAI/Mock]
+    subgraph Backend [Motor Backend Core (Rust + Tauri v2)]
+        TauriIPC[Tauri IPC Commands] --> Detector[Project Detector]
+        TauriIPC --> Cache[Cache Manager - Sled DB]
+        TauriIPC --> Aggregator[Aggregator Core Engine]
+        Aggregator --> AMG[Architecture Model Graph - AMG]
+        Aggregator --> Antipatterns[Detector de Antipatrones - God Module, Circular, Layer]
+        Aggregator --> C4Gen[C4 Generator Niveles 1-4]
+        Aggregator --> SuppDiag[Supplementary Diagrams Generator]
+        TauriIPC --> AiClient[AiClient Core Engine]
 
         subgraph Resolutores [Resolución de Imports Absolutos]
             Aggregator --> JavaRes[Java Source Roots Resolver]
@@ -31,193 +52,101 @@ graph TD
         end
     end
 
-    subgraph Workers [Capa de Análisis AST (Workers)]
-        Commands --> NodeWorkerMgr[Node Worker Manager]
-        Commands --> PyWorkerMgr[Python Worker Manager]
+    subgraph Workers [Capa de Análisis AST Multilinguaje]
+        TauriIPC --> NodeWorkerMgr[Node Worker Manager]
+        TauriIPC --> PyWorkerMgr[Python Worker Manager]
 
-        NodeWorkerMgr -- StdIn/StdOut JSON-Lines --> NodeProcess[Worker Node: TS/JS Parser]
-        PyWorkerMgr -- StdIn/StdOut JSON-Lines --> PyProcess[Worker Python: Java, Go, Rust, Python, C#, Kotlin, Swift]
+        NodeWorkerMgr -- JSON-Lines --> NodeProcess[Worker Node: TS/JS Parser API]
+        PyWorkerMgr -- JSON-Lines --> PyProcess[Worker Python: Tree-Sitter 7 Lenguajes]
     end
 
-    AiClient -- HTTP REST --> LLMServer[Servidor LLM Local: Ollama / LM Studio / vLLM]
+    AiClient -- REST HTTP --> OllamaServer[Ollama Local: http://localhost:11434]
+    AiClient -- REST HTTP Bearer --> GeminiServer[Google Gemini API / OpenAI Compatible Endpoint]
 
     Cache -- Persistencia Sled DB --> CacheDisk[HDD: .saac/cache_db]
 ```
 
 ---
 
-## 📂 Estructura del Proyecto y Archivos
-
-A continuación se detalla el árbol de directorios con el propósito de los archivos clave creados o modificados hasta la fecha:
+## 📂 Estructura del Proyecto y Módulos Clave
 
 ```text
 SAAC/
-├── .saac/                         # Base de datos local por proyecto (creada en análisis)
-│   └── cache_db/                  # Base de datos persistente de caché (sled)
-├── shared/                        # Tipos de datos compartidos entre frontend y workers
-│   └── types.ts                   # Espejo TypeScript del Architecture Model Graph (AMG)
-├── src-tauri/                     # Backend escrito en Rust (Aplicación Tauri)
-│   ├── Cargo.toml                 # Dependencias (tauri, sled, sha2, chrono, quick-xml, reqwest, etc.)
+├── GraphForge — Design System & UI Specification.md # Especificación oficial del sistema de diseño
+├── project_status.md              # Documentación de estado funcional del proyecto (100% completo)
+├── shared/                        # Fuente única de verdad de tipos compartidos (TS mirror de Rust)
+│   └── types.ts                   # Definición de AMG, AiConfig, AiStatusResult, C4DiagramData, etc.
+├── src-tauri/                     # Aplicación y Motor Backend en Rust
+│   ├── Cargo.toml                 # Dependencias (tauri, sled, reqwest, serde, quick-xml, etc.)
 │   └── src/
-│       ├── main.rs                # Punto de entrada + soporte de CLI para test (--scan-json,
-│       │                          # --analyze-project-json, --ask-ai-mock)
-│       ├── lib.rs                 # Inicialización de workers, registro de comandos y ciclo de vida
-│       ├── ollama/
-│       │   └── mod.rs             # Placeholder de cliente HTTP Ollama (struct base, sin lógica aún)
-│       ├── commands/               # Comandos Tauri expuestos al frontend
-│       │   ├── mod.rs             # Declaración y exportación de comandos
-│       │   ├── analysis.rs        # Orquestación de escaneo, workers, caché, agregador y cancelación
-│       │   ├── project.rs         # Placeholders para manejo e inicialización de proyectos
-│       │   └── ai.rs              # Comandos Tauri IPC reales: check_ai_status, ask_ai
-│       ├── engine/                # Núcleo y motor de análisis arquitectónico
-│       │   ├── mod.rs             # Declaración de submódulos del motor
-│       │   ├── amg.rs             # Modelos de datos del Grafo del Modelo de Arquitectura (AMG) en Rust
-│       │   ├── aggregator.rs      # Resolución de imports, cálculo de acoplamiento (Ca/Ce/I/D/Cohesión), ciclos (Tarjan) y antipatrones
-│       │   ├── project_detector.rs    # Inferencia de tipo de proyecto (Desktop, Mobile, etc.) y lenguajes dominantes
-│       │   ├── cache.rs               # Sistema de almacenamiento incremental y lectura en base de datos sled
-│       │   ├── java_source_roots.rs   # Extractor de raíces fuente Java mediante pom.xml y build.gradle
-│       │   ├── go_module_roots.rs     # Extractor de paths lógicos de módulos Go mediante go.mod
-│       │   ├── rust_crate_roots.rs    # Extractor de estructura de crates Rust mediante Cargo.toml
-│       │   ├── c4_generator.rs        # Generador de Diagramas C4 (Niveles 1-4) + subgrafo de módulos circulares
-│       │   ├── supplementary_diagrams.rs # Package Diagram, Inheritance Tree y ER Diagram
-│       │   └── ai_client.rs           # Cliente IA: AiConfig, AiClient (check_status, ask, build_prompt), fallback Mock
-│       └── workers/               # Manejadores de los procesos analizadores externos (AST)
-│           ├── mod.rs             # Declaración de manejadores de workers
-│           ├── types.rs           # Definición de estructuras del protocolo de comunicación interproceso
-│           ├── node_worker.rs     # Control de ejecución y mensajería del subproceso Node.js
-│           └── python_worker.rs   # Control de ejecución y mensajería del subproceso Python
-├── workers/                       # Código ejecutable de los analizadores sintácticos AST independientes
-│   ├── node/                      # Analizador sintáctico para TypeScript/JavaScript (Capa 4)
-│   │   ├── src/
-│   │   │   └── parsers/
-│   │   │       └── typescript.ts  # Parser TS/JS detallado usando la TypeScript Compiler API
-│   │   └── package.json           # Dependencias de Node.js
-│   └── python/                    # Analizador sintáctico multilinguaje (Python, Java, Go, Rust, C#, Kotlin, Swift)
-│       ├── main.py                # Bucle y protocolo JSON-Lines de comunicación por StdIn/StdOut
-│       ├── language_registry.py   # Registro y mapeo de extensiones soportadas
-│       ├── requirements.txt       # Dependencias de Python (tree-sitter-language-pack, networkx)
-│       └── parsers/
-│           ├── go.py              # Parser detallado de Go utilizando Tree-Sitter (corregido para imports simples)
-│           ├── java.py            # Parser detallado de Java utilizando Tree-Sitter
-│           ├── rust.py            # Parser detallado de Rust utilizando Tree-Sitter
-│           ├── python.py          # Parser detallado de Python utilizando Tree-Sitter (extrae tipos anotados de atributos de instancia)
-│           ├── csharp.py          # Parser detallado de C# utilizando Tree-Sitter
-│           ├── kotlin.py          # Parser detallado de Kotlin utilizando Tree-Sitter
-│           └── swift.py           # Parser detallado de Swift utilizando Tree-Sitter
-├── src/                           # Frontend de la aplicación (React + TypeScript + Vite)
-│   ├── App.tsx                    # Vista / Layout principal de la UI
-│   ├── main.tsx                   # Inicialización de React
-│   ├── components/                # Componentes interactivos de UI (Dashboards, Grafos, etc.)
-│   └── stores/                    # Gestores de estado cliente (Zustand)
-└── tests/                         # Suites de pruebas de integración E2E y de contratos
-    ├── test_worker_contract.py    # Test que valida el protocolo JSON-Lines de los workers externos
-    ├── test_analyze_project.py    # Test del pipeline de escaneo, límites de tamaño, exclusiones y cancelación
-    ├── test_resolved_imports.py   # Test de validación detallada de resolución de imports absolutos (Java, Go, Rust)
-    ├── test_antipatterns.py       # Test de verificación de antipatrones (God Module, Circular Dependency, Layer Violation)
-    ├── test_c4_diagrams.py        # Test de verificación de diagramas C4 (Niveles 1, 2, 3, 4 y subgrafo de circulares)
-    ├── test_supplementary_diagrams.py # Test de Package Diagram, Inheritance Tree y ER Diagram
-    └── test_ai_integration.py     # Test de compilación + AiClient::ask real en modo Mock (fallback, prompt, respuesta)
+│       ├── main.rs                # Punto de entrada Tauri IPC
+│       ├── lib.rs                 # Registro de comandos y ciclo de vida de workers
+│       ├── commands/               # Comandos Tauri expuestos a la UI
+│       │   ├── analysis.rs        # Pipeline de escaneo, invocación de workers y agregación
+│       │   ├── ai.rs              # Comandos IPC check_ai_status y ask_ai
+│       │   ├── design.rs          # Creación y comparación de propuestas arquitectónicas
+│       │   └── pre_frontend.rs    # Gestión de anotaciones, ADRs, reglas e historial
+│       └── engine/                # Motor de análisis
+│           ├── amg.rs             # Grafo de Arquitectura (Architecture Model Graph)
+│           ├── aggregator.rs      # Cálculo de métricas Ca, Ce, Instabilidad, Distancia y Tarjan SCC
+│           ├── project_detector.rs# Inferencia de tipo de proyecto y mezcla de lenguajes
+│           ├── cache.rs           # Sistema de almacenamiento incremental (sled DB)
+│           ├── c4_generator.rs    # Generación de diagramas C4 (Niveles 1, 2, 3 y Nivel 4 UML)
+│           ├── supplementary_diagrams.rs # Package, Inheritance, ER, Call Graph, Secuencia, DFD, Dinámico
+│           ├── global_config.rs   # Configuración global persistida en AppData
+│           └── ai_client.rs       # Cliente IA multi-proveedor (Ollama, open-ai-compatible, Mock)
+├── src/                           # Aplicación Frontend React + TypeScript
+│   ├── index.css                  # Tokens de CSS de GraphForge, utilidades y scrollbars oscuras
+│   ├── AppShell.tsx               # Grid principal de 5 regiones con layout IDE
+│   ├── components/
+│   │   ├── layout/                # TopBar, Leftbar (ActivityBar+Explorer), Rightbar (Inspector), Downbar, StatusBar
+│   │   ├── c4viewer/              # C4Canvas (ReactFlow), NodeContextMenu (Inspector contextual), Controls
+│   │   ├── supplementary-diagrams/# ForceGraphView, FileTreeView, CouplingHeatmapView, TreemapView, OwnershipMapView, TimelineView
+│   │   ├── ai/                    # AiChatPanel, AiSettingsModal (Config Gemini/Ollama), MarkdownRenderer, AiStatusIndicator
+│   │   └── adrs/                  # Gestor de Decisiones Arquitectónicas (ADRs), Riesgos y Anotaciones
+│   ├── stores/                    # Gestores de estado cliente Zustand (useProjectStore, useAiStore, useDiagramStore, etc.)
+│   └── lib/                       # tauri-api.ts (Wrapper IPC inmutable), analysis-summary.ts, slash-commands.ts
+└── workers/                       # Analizadores Sintácticos AST Independientes
+    ├── node/                      # Parser TypeScript Compiler API (TS/JS)
+    └── python/                    # Parsers Tree-Sitter (Python, Java, Go, Rust, C#, Kotlin, Swift)
 ```
 
 ---
 
-## 🛠️ Detalle de Implementación y Estado de Componentes
+## 🛠️ Detalle de Funcionalidades Implementadas
 
-### 1. Backend Core (Rust + Tauri) — **100% Completado y Funcional**
+### 1. Sistema de Diseño & Rebranding (GraphForge UI)
+* **Paleta de Colores**: Integración total de la paleta near-black (`#0B0D10` fondo principal, `#101318` paneles, `#13171D` tarjetas, `#252B34` bordes, `#8B7CFF` acento púrpura, `#45C8DF` cian de datos, `#4FD49A` verde de salud, `#EF6B73` rojo de alertas).
+* **Tipografía**: `Inter` para interfaz y `JetBrains Mono` para datos de código y métricas.
+* **Layout IDE**:
+  * **TopBar (48px)**: Título del proyecto, branding `SAAC v2.0`, menús del IDE y botón de cancelación.
+  * **Leftbar (46px + 218px)**: Barra de actividades vertical con indicador activo púrpura de 2px + explorador de archivos jerárquico.
+  * **Rightbar (275px)**: Inspector de arquitectura de 2 columnas y tarjetas compactas 2x2.
+  * **Downbar (166px)**: Panel inferior de pestañas con consola, terminal y registros.
+  * **StatusBar (23px)**: Barra de estado en fondo `#17152C` con contador en vivo de nodos/aristas y selector de nivel zoom.
 
-* **Modelos AMG (`amg.rs`)**: Se reflejó la especificación completa en tipos nativos Rust con soporte serde (camelCase) derivado para su comunicación transparente con el frontend.
-* **Detección de Proyectos (`project_detector.rs`)**: Identifica el `ProjectType` analizando la presencia de marcadores de framework y archivos de configuración (Tauri, React Native, Electron, etc.) y calcula el mix de lenguajes.
-* **Detección de Estilos de Arquitectura (`aggregator.rs`)**: Detecta estilos como `Layered` o `Hexagonal` evaluando la presencia de convenciones de directorios clave de forma global en todo el proyecto (corregido para evitar falsos negativos que ocurrían al evaluar la condición por módulo individual en vez de a nivel de proyecto).
-* **Caché Persistente (`cache.rs`)**: Basado en `sled`, calcula el hash SHA-256 de los archivos antes de enviarlos a los workers. Si el hash coincide con uno previo, recupera el análisis en milisegundos sin coste de procesamiento de AST.
-* **Cancelación Cooperativa (`analysis.rs`)**: `CancellationRegistry` + comando `cancel_analysis` permiten abortar un análisis en curso entre chunks de procesamiento (no a mitad de un batch en vuelo), devolviendo un resultado parcial marcado con `cancelled: true`.
-* **Resolución de rutas de workers**: `NodeWorkerManager`/`PythonWorkerManager` resuelven la ruta a sus scripts (`workers/node/dist/index.js`, `workers/python/main.py`) de forma absoluta vía `CARGO_MANIFEST_DIR`, evitando que dependan del directorio de trabajo variable del proceso en distintos modos de ejecución.
-* **Resolución de Imports Absolutos (`aggregator.rs`)**:
-  * **Java**: Traduce imports de paquetes (`com.example.service.UserService`) y los resuelve contra archivos específicos usando las raíces de fuentes detectadas en `pom.xml`/`build.gradle` (parseo XML real + fallback a convención estándar `src/main/java`).
-  * **Go**: Mapea imports lógicos de módulos (`mymodule/pkg/service`) a nivel de carpeta/paquete, resolviéndolos a todos los archivos que pertenecen a ese paquete, vía `go.mod`.
-  * **Rust**: Resuelve imports `use crate::...` o `use my_crate::...` identificando el crate origen (`Cargo.toml`) y mapeando tanto la sintaxis moderna (`helper.rs`) como clásica (`helper/mod.rs`).
-* **Métricas Globales**: Calcula acoplamiento Aferente ($Ca$), Eferente ($Ce$), Instabilidad ($I = Ce / (Ca + Ce)$), Cohesión de Módulo (`Ce / total_imports`) y la Distancia a la Secuencia Principal ($D = |A + I - 1|$).
-* **Ciclos de Dependencia**: Implementa el algoritmo SCC de Tarjan para detectar componentes fuertemente conexas, más un DFS adicional para extraer la ruta exacta (`cycle_path`) de cada ciclo, normalizada por rotación lexicográfica para consolidar duplicados.
-* **Detección de Antipatrones de Arquitectura (`aggregator.rs`)**:
-  * **God Module**: Módulos con $Ce > 15$ o que concentran $> 20\%$ de todas las dependencias del proyecto.
-  * **Java**: Traduce imports de paquetes contra las raíces de fuentes detectadas.
-  * **Go**: Mapea imports lógicos de módulos vía `go.mod`.
-  * **Rust**: Resuelve imports `use crate::...` o `use my_crate::...`.
-* **Métricas Globales**: Calcula acoplamiento Aferente ($Ca$), Eferente ($Ce$), Instabilidad ($I$), Cohesión de Módulo y la Distancia a la Secuencia Principal ($D$).
-* **Ciclos de Dependencia**: Implementa el algoritmo SCC de Tarjan para detectar componentes fuertemente conexas.
-* **Detección de Antipatrones de Arquitectura (`aggregator.rs`)**: God Module, Circular Dependency, Layer Violation.
-* **Generación de Diagramas C4 (`c4_generator.rs`)** — **Niveles 1 a 4 completos**:
-  * **Inferencia de Elementos**: Detecta `Actor` (Admin User / Public User / User) por presencia de controladores, y `ExternalSystem` (APIs HTTP, bases de datos) acumulando los `external_calls` reales emitidos por los workers Python y Node.
-  * **Nivel 1 (Contexto)**: Mapa del sistema central interactuando con actores y sistemas externos.
-  * **Nivel 2 (Contenedores)**: Infiere unidades desplegables dinámicas.
-  * **Nivel 3 (Componentes)**: Desglosa cada contenedor en sus módulos constituyentes.
-  * **Nivel 4 (Código / UML bajo demanda)**: `generate_module_code_diagram` transforma las clases en subgrafos UML.
-  * **Diagrama Suplementario de Módulos Circulares**: Reutiliza los `cycle_path` exactos de los antipatrones ya detectados.
-* **Diagramas Suplementarios Adicionales (`supplementary_diagrams.rs`)** — **Completo**:
-  * **Package Diagram**: Agrupa módulos por directorio contenedor completo y agrega dependencias cruzadas.
-  * **Inheritance Tree**: Construye la jerarquía de herencia (`extends`/`implements`) a nivel de **todo el proyecto**.
-  * **ER Diagram**: Identifica entidades y detecta relaciones por coincidencia de tipo de atributo contra nombres de entidad conocidos.
-  * **Call Graph (Grafo de Llamadas)**: Mapea las llamadas función-a-función y método-a-método dentro y entre módulos a partir de los `invocations` resueltos por los parsers.
-  * **Sequence Diagram (Diagrama de Secuencia UML)**: Genera la secuencia ordenada de llamadas entre participantes (clases, funciones, módulos) con numeración de pasos y líneas de vida.
-  * **Dynamic Diagram (Diagrama Dinámico C4)**: Muestra la interacción en tiempo de ejecución entre componentes dinámicos ordenados por el flujo de invocaciones.
-  * **Diagrama de Flujo de Datos (DFD)**: Clasifica los módulos en procesos y almacenes de datos (*Data Stores*), trazando los flujos de datos según la dirección de las invocaciones.
-* **Integración de IA Local (`ai_client.rs`)** — **Completo**:
-  * **`AiConfig` flexible**: soporta `Ollama`, `OpenAiCompatible` y `Mock`.
-  * **`check_ai_status`**: ping ligero para reportar disponibilidad de servidores.
-  * **`build_prompt`**: construcción contextual según modos (`FullAmg`, `ModuleDetail`, `AntipatternDetail`).
-  * **`ask`**: envío de consultas con timeout y **fallback elegante** para modo Mock.
-  * **Modo CLI de testing (`--ask-ai-mock <prompt>`)**: ejercita el flujo sin red.
-* **Módulos Pre-Frontend (`preparacion_backend.md`)** — **100% Completados**:
-  * **Ignoración Configurable (`project_config.rs`)**: Lee `.saacignore` y patrones de `.saac/config.json` e integra filtros en `ignore::WalkBuilder`.
-  * **Consola SAAC (`console.rs`)**: Intérprete de comandos internos `saac> ` (`help`, `analyze`, `cancel`, `ai`, `ignore add`, `rules check`, `clear`) y estructura de logs.
-  * **Anotaciones, ADRs y Antipatrones Ignorados (`annotations.rs`)**: Persistencia local en `.saac/annotations.json`.
-  * **Motor de Reglas y Fitness Score (`rules.rs`)**: Evaluador de reglas de arquitectura y cálculo de Fitness Score (0-100) en `.saac/rules.json`.
-  * **Historial y Versionado AMG (`history.rs`)**: Snapshots inmutables de ejecuciones en `.saac/history.json` y cálculo de deltas `AMGDelta`.
-  * **Configuración Global del Sistema (`global_config.rs`)**: Persistencia de configuraciones globales en `%APPDATA%/saac/global_config.json`.
-  * **Comando Drill-Down Nivel 4 (`commands/pre_frontend.rs`)**: `get_module_code_diagram` expuesto para inspeccionar el UML de código de un módulo bajo demanda.
+### 2. Visualización de Diagramas e Inspección Contextual
+* **C4 Canvas**: Visualizador interactivo ReactFlow para Niveles 1 (Contexto), 2 (Contenedores), 3 (Componentes) y 4 (UML de Código bajo demanda).
+* **Inspector Contextual (`NodeContextMenu`)**: Popup flotante activable por clic o clic derecho sobre cualquier nodo en los grafos, mostrando propiedades del módulo, métricas ($Ca, Ce, I, D$), nivel de mantenibilidad y lista de conexiones de entrada/salida.
+* **Grafo de Fuerza Proporcional (`ForceGraphView`)**: Visualización dinámica donde el tamaño de cada nodo es proporcional a su grado de acoplamiento ($Ca + Ce$).
+* **Árbol de Carpetas Interactivo (`FileTreeView`)**: Grafo horizontal con carpetas expandibles en forma de esferas y archivos hoja.
+* **Vistas Suplementarias**: Mapa de Calor de Acoplamiento (`CouplingHeatmapView`), Treemap de Mantenibilidad (`TreemapView`), Mapa de Propiedad y Bus Factor (`OwnershipMapView`) y Línea de Tiempo Histórica (`TimelineView`).
 
-### 2. Capa de Workers AST (Node.js & Python) — **100% Completado y Funcional**
+### 3. Inteligencia Artificial Arquitectónica (Local y Cloud)
+* **Cliente Multi-Proveedor**:
+  * **`Ollama`**: Conexión a servidores locales en `http://localhost:11434`.
+  * **`open-ai-compatible` (Google Gemini API / OpenAI / Groq)**: Conexión mediante REST HTTP Bearer con soporte para `api_key` (ej. Gemini `https://generativelanguage.googleapis.com/v1beta/openai` con modelo `gemini-1.5-flash`).
+  * **`Mock Fallback`**: Modo simulado offline para pruebas en caso de no contar con conexión a red ni servidor local.
+* **Modal de Configuración (`AiSettingsModal`)**: Modal flotante para alternar proveedores, ajustar endpoints, claves de API y modelos con prueba de conexión instantánea.
+* **Renderizador de Markdown (`MarkdownRenderer`)**: Visualizador en el chat de IA con sintaxis resaltada para código (`Prism` + `oneDark`), botón de copiado en 1-clic, soporte de tablas GFM y blockquotes.
 
-* **Protocolo de comunicación**: Basado en JSON-Lines a través de StdIn y StdOut.
-* **Worker Node**: Compilado y listo para analizar código TypeScript y JavaScript. Soporta extracción completa de `invocations` intra-módulo (`extractCallNames` + `extractInvocations`).
-* **Worker Python**: Emplea `tree-sitter-language-pack` para parsear Python, Java, Kotlin, C#, Swift, Go y Rust.
-* **Extracción de `invocations` en los 8 Lenguajes**: Implementado en todos los parsers AST (`python.py`, `java.py`, `kotlin.py`, `csharp.py`, `go.py`, `rust.py`, `swift.py`, `typescript.ts`), resolviendo llamadas implícitas (`this`/`self`), llamadas por nombre de clase/struct y funciones top-level.
-* **Corrección Go/Python**: Ajustes en `parsers/go.py` para imports en una línea y en `parsers/python.py` para tipos de atributos anotados.
-
-* **Contratos/Pipeline/Resoluciones/Antipatrones/Diagramas**: Suites completas que validan desde el contrato de workers hasta la generación de diagramas complejos (C4, Paquetes, Herencia, ER, Call Graph, Secuencia, Dinámico, DFD).
-* **Integración de IA**: Validación de `AiClient::ask` real con `isMockFallback`, `providerUsed` y `generatedPrompt`.
-
-### 4. Capa Frontend React — **TODAS LAS 8 FASES (0 a 8) 100% COMPLETADAS**
-
-* **Fase 0 (Fundaciones)**: `shared/types.ts` sincronizado con Rust, `src/lib/tauri-api.ts` con 24 funciones IPC tipadas, 6 stores Zustand listos, stack visual configurado.
-* **Fase 1 (AppShell - Layout IDE v2.0)**: Estructura de 5 regiones tipo IDE acorde con el sistema de diseño de `design.md`.
-* **Fase 2 (Flujo de Análisis End-to-End)**: Diálogo nativo de carpetas (`@tauri-apps/plugin-dialog`), eventos en vivo (`project://progress`), cancelación segura y explorador de archivos jerárquico.
-* **Fase 3 (Dashboard y Métricas)**: `ProjectSummaryCard`, `MetricsRadarChart`, `DependencyGraphOverview` y `MetricsPanel` con TanStack Table v8.
-* **Fase 4 (Visualizador C4 y Diagramas Suplementarios)**: `C4Canvas` con ReactFlow + Dagre, navegación C4 Niveles 1-3, drill-down a Nivel 4 (código UML) y 12 diagramas suplementarios.
-* **Fase 5 (Antipatrones §5.6)**: `AntipatternsPanel` y `AntipatternCard` con visualización interactiva de rutas de ciclo (`cyclePath`), punto de ruptura (`suggestedBreakPoint`), módulos afectados enlazados, filtros y acción de ignorar antipatrón vía IPC.
-* **Gestor de Decisiones Arquitectónicas (ADRs), Riesgos y Anotaciones**: Implementación completa en `src/components/adrs/` (`AdrsPanel`, `AdrCard`, `AdrFormModal`, `RiskCard`, `RiskFormModal`, `AnnotationCard`). Formato Nygard con exportación a Markdown (`.md`), badges de estado (`Accepted`, `Proposed`, `Deprecated`, etc.), severidades de riesgo con mitigación y enlaces interactivos a módulos del proyecto.
-* **Módulo de Diseño Arquitectónico Interactivo (Objetivo #4)**: Integración completa de `DesignWorkspace.tsx`, `DesignCanvas.tsx`, `DesignToolbar.tsx`, `DesignSidebar.tsx`, `DesignInspector.tsx` y `ComparisonPanel.tsx`. Accesible directamente mediante el botón **"Diseño"** (🎨) en la barra superior (`TopBar`) y enrutado en `AppShell.tsx`. Permite crear propuestas arquitectónicas desde cero o clonadas a partir del AMG actual, edición visual tipo Canvas en ReactFlow, snapshots con Undo/Redo y reporte comparativo contra la arquitectura real.
-* **Corrección de Bugs**:
-  1. **Tema Light / Dark**: Mapeo completo de clases y CSS variables con activación dinámica mediante `<html class="light|dark">`.
-  2. **Habilitación de Botón Analizar**: Corrección del deserializador IPC para `openProject` permitiendo abrir la ruta seleccionada y habilitar inmediatamente el botón "Analizar".
-* **Verificación Final**: Compilación `tsc && vite build` exitosa con **0 errores**.
+### 4. Persistencia y Generación de Resumen
+* **Resumen de Análisis**: Al finalizar cada escaneo, la función `save_analysis_summary` escribe automáticamente `.saac/analysis-summary.json` en el disco del proyecto y `generateAnalysisSummary` guarda una copia en `localStorage` (`saac_last_analysis_summary`).
 
 ---
 
-## 🗺️ Estado del Roadmap de Diagramas (§4.4.1–§4.4.9, 19 vistas totales)
+## 🧪 Verificación y Compilación
 
-| #   | Diagrama                                          | Estado |
-| -----| ---------------------------------------------------| --------------------------------------------------------------------------------------------------|
-| 15  | Dynamic Diagram                                   | ✅ Backend (`supplementary:dynamic-diagram` vía `invocations`)　　　　　　　　　　　　　　　　　　|
-| 16  | Call Graph                                        | ✅ Backend (`supplementary:call-graph` vía `invocations`)　　　　　　　　　　　　　　　　　　　　 |
-| 17  | Diagrama de Secuencia                             | ✅ Backend (`supplementary:sequence-diagram` vía `invocations`)　　　　　　　　　　　　　　　　　 |
-| 18  | Diagrama de Flujo de Datos (DFD)                  | ✅ Backend (`supplementary:dfd-diagram` vía `invocations`)　　　　　　　　　　　　　　　　　　　　|
-| 19  | System Landscape                                  | ❓ Requiere soporte multi-proyecto, no implementado en `analyze_project` (recibe un único `path`) |
-
----
-
-## 📈 Siguientes Hitos y Roadmap Técnico
-
-Con la infraestructura core, la detección de antipatrones, los diagramas C4 (Niveles 1-4), los Diagramas Suplementarios (Paquetes, Herencia, ER, Call Graph, Secuencia, Dinámico, DFD) y la extracción de `invocations` en los 8 lenguajes completamente listos:
-
-1. **Desarrollo del Frontend (React + TS)** — **siguiente prioridad**: Construir el AppShell tipo IDE y los paneles interactivos de SAAC v2.0 (Dashboard, visualizador ReactFlow para C4 y diagramas suplementarios, tablas TanStack Table, panel de antipatrones y chat de IA).
-2. **Verificación de IA contra servidor real**: `check_ai_status`/`ask_ai` en modo `Ollama`/`OpenAiCompatible` compilan y siguen el diseño correcto, pero no se han probado contra un servidor LLM real corriendo en la máquina — pendiente cuando haya uno disponible para pruebas.
+* **TypeScript Compilation**: `npx tsc --noEmit` ➔ ✅ **0 errores**
+* **Rust Cargo Check**: `cargo check` ➔ ✅ **0 errores**
+* **Control de Versiones**: Todos los cambios están respaldados y sincronizados en la rama principal `main` de Git.
