@@ -485,10 +485,13 @@ export interface GlobalConfig {
 
 // IA Status
 export interface AiStatusResult {
-  available: boolean;
-  provider: string;
-  endpoint: string;
-  model: string;
+  available?: boolean;
+  isOnline?: boolean;
+  provider: AiProvider | string;
+  endpoint?: string;
+  endpointUrl?: string;
+  model?: string;
+  availableModels?: string[];
   message: string;
 }
 
@@ -582,4 +585,27 @@ export interface ComparisonReport {
   edgesAdded: string[];
   edgesRemoved: string[];
   structuralSummary: string;
+}
+
+// ── AI ENGINE TYPES ──
+
+export type AiProvider = 'ollama' | 'open-ai-compatible' | 'mock';
+
+export interface AiConfig {
+  provider: AiProvider;
+  endpointUrl: string;
+  modelName: string;
+  temperature?: number;
+  timeoutSeconds?: number;
+  apiKey?: string;
+}
+
+export interface AiResponse {
+  content: string;
+  modelUsed: string;
+  providerUsed: AiProvider;
+  promptTokens: number;
+  completionTokens: number;
+  isMockFallback: boolean;
+  generatedPrompt: string;
 }

@@ -21,6 +21,7 @@ import { useUiStore } from '../../stores/useUiStore';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useSelectionStore } from '../../stores/useSelectionStore';
 import { useDiagramStore } from '../../stores/useDiagramStore';
+import { AiSettingsModal } from '../ai/AiSettingsModal';
 import type { Module } from '../../../shared/types';
 
 interface TreeNode {
@@ -45,6 +46,7 @@ export const Leftbar: React.FC = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({ root: true });
+  const [isAiSettingsOpen, setIsAiSettingsOpen] = useState(false);
 
   const toggleExpand = (nodePath: string) => {
     setExpandedNodes((prev) => ({ ...prev, [nodePath]: !prev[nodePath] }));
@@ -264,11 +266,20 @@ export const Leftbar: React.FC = () => {
           <button className="p-2 hover:text-[#E6E9ED] transition" title="Ayuda & Documentación">
             <HelpCircle className="w-4 h-4" />
           </button>
-          <button className="p-2 hover:text-[#E6E9ED] transition" title="Configuración de SAAC">
+          <button
+            onClick={() => setIsAiSettingsOpen(true)}
+            className="p-2 hover:text-[#E6E9ED] transition"
+            title="Configuración de IA (Ollama / Gemini / OpenAI)"
+          >
             <Settings className="w-4 h-4" />
           </button>
         </div>
       </aside>
+
+      <AiSettingsModal
+        isOpen={isAiSettingsOpen}
+        onClose={() => setIsAiSettingsOpen(false)}
+      />
 
       {/* 2. EXPLORER PANEL (GraphForge Spec Section 12 — 218px Width) */}
       <aside className="w-[218px] bg-[#101318] border-r border-[#252B34] flex flex-col h-full shrink-0">

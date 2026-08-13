@@ -22,6 +22,8 @@ import type {
   GlobalConfig,
   C4DiagramData,
   AiStatusResult,
+  AiConfig,
+  AiResponse,
   ProposedArchitecture,
   ProposedArchitectureSummary,
   ProposedNode,
@@ -49,7 +51,17 @@ export function onProjectProgress(callback: (event: ProjectProgressEvent) => voi
   return listen<ProjectProgressEvent>('project://progress', (e) => callback(e.payload));
 }
 
-// ── IA Local ──
+// ── IA Local & Cloud (Ollama / Gemini / OpenAI) ──
+
+function getSavedAiConfig(): AiConfig | undefined {
+  const saved = localStorage.getItem('saac_ai_config');
+  if (!saved) return undefined;
+  try {
+    return JSON.parse(saved);
+  } catch {
+    return undefined;
+  }
+}
 
 export async function askAi(
   prompt: string,
@@ -57,16 +69,20 @@ export async function askAi(
   targetId?: string,
   amg?: ArchitectureModelGraph
 ): Promise<{ answer: string; tokensUsed?: number }> {
-  return await invoke<{ answer: string; tokensUsed?: number }>('ask_ai', {
+  const config = getSavedAiConfig();
+  const res = await invoke<AiResponse>('ask_ai', {
     prompt,
     contextType,
     targetId,
+    config,
     amg,
   });
+  return { answer: res.content, tokensUsed: res.completionTokens };
 }
 
-export async function checkAiStatus(): Promise<AiStatusResult> {
-  return await invoke<AiStatusResult>('check_ai_status');
+export async function checkAiStatus(customConfig?: AiConfig): Promise<AiStatusResult> {
+  const config = customConfig || getSavedAiConfig();
+  return await invoke<AiStatusResult>('check_ai_status', { config });
 }
 
 // ── Módulo 1: Project Config & Ignorados ──

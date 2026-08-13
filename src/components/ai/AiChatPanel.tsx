@@ -7,6 +7,7 @@ import {
   Sparkles,
   User,
   AlertCircle,
+  Settings,
 } from 'lucide-react';
 import { useAiStore } from '../../stores/useAiStore';
 import { useProjectStore } from '../../stores/useProjectStore';
@@ -14,6 +15,7 @@ import { useSelectionStore } from '../../stores/useSelectionStore';
 import { askAi } from '../../lib/tauri-api';
 import { parseSlashCommand, AVAILABLE_SLASH_COMMANDS } from '../../lib/slash-commands';
 import { AiStatusIndicator } from './AiStatusIndicator';
+import { AiSettingsModal } from './AiSettingsModal';
 
 export const AiChatPanel: React.FC = () => {
   const { messages, isThinking, addMessage, setIsThinking, clearChat } = useAiStore();
@@ -22,6 +24,7 @@ export const AiChatPanel: React.FC = () => {
 
   const [input, setInput] = useState('');
   const [showSlashMenu, setShowSlashMenu] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -115,12 +118,19 @@ export const AiChatPanel: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1.5">
           <AiStatusIndicator compact />
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="p-1.5 rounded bg-[#13171D] hover:bg-[#171C23] text-[#858C98] hover:text-[#E6E9ED] border border-[#1D222A] transition"
+            title="Configurar Proveedor de IA (Ollama / Gemini / OpenAI)"
+          >
+            <Settings className="w-3.5 h-3.5 text-[#8B7CFF]" />
+          </button>
           <button
             onClick={exportChatMarkdown}
             disabled={messages.length === 0}
-            className="p-1.5 rounded bg-[#161a26] hover:bg-[#1f2638] text-gray-400 hover:text-white border border-[#232a3e] transition disabled:opacity-40"
+            className="p-1.5 rounded bg-[#13171D] hover:bg-[#171C23] text-[#858C98] hover:text-[#E6E9ED] border border-[#1D222A] transition disabled:opacity-40"
             title="Exportar chat a Markdown (.md)"
           >
             <Download className="w-3.5 h-3.5" />
@@ -128,13 +138,18 @@ export const AiChatPanel: React.FC = () => {
           <button
             onClick={clearChat}
             disabled={messages.length === 0}
-            className="p-1.5 rounded bg-[#161a26] hover:bg-[#1f2638] text-gray-400 hover:text-rose-400 border border-[#232a3e] transition disabled:opacity-40"
+            className="p-1.5 rounded bg-[#13171D] hover:bg-[#171C23] text-[#858C98] hover:text-[#EF6B73] border border-[#1D222A] transition disabled:opacity-40"
             title="Limpiar conversación"
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
+
+      <AiSettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+      />
 
       {/* Lista de Mensajes del Chat */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 font-sans text-xs">

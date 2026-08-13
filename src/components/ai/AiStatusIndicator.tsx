@@ -25,7 +25,13 @@ export const AiStatusIndicator: React.FC<{ compact?: boolean }> = ({ compact = f
     fetchStatus();
   }, []);
 
-  const isOnline = aiStatus?.available && aiStatus.provider === 'ollama';
+  const isOnline = Boolean(aiStatus?.isOnline || aiStatus?.available);
+  const providerLabel =
+    aiStatus?.provider === 'open-ai-compatible'
+      ? 'API Cloud / Gemini'
+      : aiStatus?.provider === 'ollama'
+        ? 'Ollama Online'
+        : 'IA Mock';
 
   if (compact) {
     return (
@@ -33,13 +39,13 @@ export const AiStatusIndicator: React.FC<{ compact?: boolean }> = ({ compact = f
         onClick={fetchStatus}
         className={`flex items-center space-x-1.5 px-2 py-0.5 rounded text-[10px] font-mono border transition ${
           isOnline
-            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
-            : 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20'
+            ? 'bg-[#4FD49A]/10 text-[#4FD49A] border-[#4FD49A]/20 hover:bg-[#4FD49A]/20'
+            : 'bg-[#E7B85B]/10 text-[#E7B85B] border-[#E7B85B]/20 hover:bg-[#E7B85B]/20'
         }`}
         title={`IA Status: ${aiStatus?.message || 'Cargando...'}`}
       >
-        <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-        <span>{isOnline ? 'Ollama Online' : 'IA Mock'}</span>
+        <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-[#4FD49A] animate-pulse' : 'bg-[#E7B85B]'}`} />
+        <span>{providerLabel}</span>
       </button>
     );
   }
@@ -47,21 +53,21 @@ export const AiStatusIndicator: React.FC<{ compact?: boolean }> = ({ compact = f
   return (
     <div
       onClick={fetchStatus}
-      className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-[#161a26] border border-[#232a3e] cursor-pointer hover:border-cyan-500/40 transition select-none text-xs"
+      className="flex items-center justify-between px-3 py-1.5 rounded-md bg-[#13171D] border border-[#1D222A] cursor-pointer hover:border-[#8B7CFF]/40 transition select-none text-xs"
     >
       <div className="flex items-center space-x-2">
-        <Bot className={`w-4 h-4 ${isOnline ? 'text-emerald-400' : 'text-amber-400'}`} />
+        <Bot className={`w-4 h-4 ${isOnline ? 'text-[#4FD49A]' : 'text-[#E7B85B]'}`} />
         <div>
-          <span className="font-bold text-gray-200 block text-[11px]">
-            {isOnline ? `Ollama (${aiStatus?.model})` : 'Motor IA Local (Mock)'}
+          <span className="font-bold text-[#E6E9ED] block text-[11px]">
+            {isOnline ? `${providerLabel} (${aiStatus?.model || aiStatus?.endpointUrl || 'Online'})` : 'Motor IA Local (Mock)'}
           </span>
-          <span className="text-[9px] text-gray-400 font-mono block">
+          <span className="text-[9px] text-[#858C98] font-mono block">
             {aiStatus?.message || 'Verificando estado...'}
           </span>
         </div>
       </div>
 
-      <RefreshCw className="w-3.5 h-3.5 text-gray-500 hover:text-gray-200 transition" />
+      <RefreshCw className="w-3.5 h-3.5 text-[#858C98] hover:text-[#E6E9ED] transition" />
     </div>
   );
 };
