@@ -53,7 +53,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   const { recentProjects, removeRecentProject, clearRecentProjects } = useRecentProjectsStore();
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-[#0B0D10] text-[#E6E9ED] font-sans overflow-hidden select-none">
+    <div className="h-screen w-screen flex flex-col bg-[var(--bg)] text-[var(--text)] font-sans overflow-hidden select-none transition-colors duration-200">
       {/* 1. TopBar Header (Height 48px) */}
       <TopBar
         onOpenProject={onOpenProject}
@@ -71,27 +71,27 @@ export const AppShell: React.FC<AppShellProps> = ({
         <Leftbar />
 
         {/* MAIN WORKSPACE CANVAS (GraphForge Spec Section 14) */}
-        <main className="flex-1 flex flex-col bg-[#0B0E12] overflow-hidden relative">
+        <main className="flex-1 flex flex-col bg-[var(--diagram-canvas)] overflow-hidden relative">
           {children ? (
             children
           ) : !amg ? (
             /* Welcome View when no project loaded (GraphForge Styling) */
             <div className="flex-1 flex flex-col items-center justify-center p-6 text-center relative overflow-y-auto font-sans">
               {/* Radial Backdrop Glow */}
-              <div className="absolute w-[500px] h-[500px] bg-[#8B7CFF]/5 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute w-[500px] h-[500px] bg-[var(--purple)]/5 rounded-full blur-3xl pointer-events-none" />
 
               <div className="relative z-10 max-w-3xl w-full space-y-5 flex flex-col items-center">
                 {/* Hero Badge */}
-                <div className="inline-flex items-center space-x-2 px-2.5 py-1 rounded bg-[#211E39] border border-[#302C51] text-[#8B7CFF] text-[10px] font-semibold tracking-wide">
+                <div className="inline-flex items-center space-x-2 px-2.5 py-1 rounded bg-[var(--purple-soft)] border border-[var(--purple-border)] text-[var(--purple)] text-[10px] font-semibold tracking-wide">
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>Plataforma de Auditoría &amp; Arquitectura Multilenguaje</span>
                 </div>
 
                 <div className="space-y-1.5">
-                  <h1 className="text-2xl font-extrabold tracking-tight text-[#E6E9ED]">
+                  <h1 className="text-2xl font-extrabold tracking-tight text-[var(--text)]">
                     Sistema de Análisis de Arquitectura de Código
                   </h1>
-                  <p className="text-xs text-[#858C98] max-w-lg mx-auto leading-relaxed">
+                  <p className="text-xs text-[var(--muted)] max-w-lg mx-auto leading-relaxed">
                     Motor de análisis estático AST para TypeScript, Python, Java, Go, Rust, C#, Kotlin y Swift. Modelo C4 interactivo, Fitness Functions e IA integrada.
                   </p>
                 </div>
@@ -100,26 +100,26 @@ export const AppShell: React.FC<AppShellProps> = ({
                 <div className="pt-1">
                   <button
                     onClick={onOpenProject}
-                    className="flex items-center space-x-2 px-5 py-2 bg-[#211E39] hover:bg-[#2c284e] text-[#8B7CFF] font-semibold text-xs rounded border border-[#302C51] shadow-lg shadow-[#8B7CFF]/10 transition transform hover:-translate-y-0.5"
+                    className="flex items-center space-x-2 px-5 py-2 bg-[var(--purple-soft)] hover:bg-[var(--purple)] hover:text-white text-[var(--purple)] font-semibold text-xs rounded border border-[var(--purple-border)] shadow-lg transition transform hover:-translate-y-0.5"
                   >
-                    <FolderOpen className="w-4 h-4 text-[#45C8DF]" />
+                    <FolderOpen className="w-4 h-4 text-[var(--cyan)]" />
                     <span>Seleccionar Carpeta de Proyecto</span>
                   </button>
                 </div>
 
                 {/* Recent Projects List */}
-                <div className="w-full bg-[#101318] rounded-md border border-[#252B34] p-4 text-left space-y-3">
-                  <div className="flex items-center justify-between border-b border-[#252B34] pb-2">
+                <div className="w-full bg-[var(--panel)] rounded-md border border-[var(--border)] p-4 text-left space-y-3">
+                  <div className="flex items-center justify-between border-b border-[var(--border)] pb-2">
                     <div className="flex items-center space-x-2">
-                      <History className="w-3.5 h-3.5 text-[#45C8DF]" />
-                      <h3 className="text-xs font-bold text-[#E6E9ED]">
+                      <History className="w-3.5 h-3.5 text-[var(--cyan)]" />
+                      <h3 className="text-xs font-bold text-[var(--text)]">
                         Proyectos Recientes ({recentProjects.length})
                       </h3>
                     </div>
                     {recentProjects.length > 0 && (
                       <button
                         onClick={clearRecentProjects}
-                        className="text-[10px] text-[#5F6671] hover:text-[#EF6B73] transition flex items-center space-x-1"
+                        className="text-[10px] text-[var(--muted-2)] hover:text-[var(--red)] transition flex items-center space-x-1"
                         title="Limpiar historial de recientes"
                       >
                         <Trash2 className="w-3 h-3" />
@@ -129,10 +129,10 @@ export const AppShell: React.FC<AppShellProps> = ({
                   </div>
 
                   {recentProjects.length === 0 ? (
-                    <div className="p-4 text-center text-[#5F6671] text-xs space-y-1">
-                      <FolderGit2 className="w-7 h-7 opacity-30 text-[#8B7CFF] mx-auto mb-1" />
-                      <p className="font-semibold text-[#858C98]">Sin historial de proyectos recientes.</p>
-                      <p className="text-[10px] text-[#5F6671]">
+                    <div className="p-4 text-center text-[var(--muted-2)] text-xs space-y-1">
+                      <FolderGit2 className="w-7 h-7 opacity-30 text-[var(--purple)] mx-auto mb-1" />
+                      <p className="font-semibold text-[var(--muted)]">Sin historial de proyectos recientes.</p>
+                      <p className="text-[10px] text-[var(--muted-2)]">
                         Seleccione una carpeta para iniciar el primer análisis.
                       </p>
                     </div>
@@ -142,26 +142,26 @@ export const AppShell: React.FC<AppShellProps> = ({
                         <div
                           key={p.path}
                           onClick={() => onOpenProjectByPath?.(p.path)}
-                          className="group p-2.5 rounded bg-[#13171D] hover:bg-[#171C23] border border-[#1D222A] hover:border-[#8B7CFF]/50 cursor-pointer transition flex items-center justify-between"
+                          className="group p-2.5 rounded bg-[var(--panel-2)] hover:bg-[var(--panel-3)] border border-[var(--border-soft)] hover:border-[var(--purple)]/50 cursor-pointer transition flex items-center justify-between"
                         >
                           <div className="space-y-0.5 overflow-hidden pr-2">
                             <div className="flex items-center space-x-1.5">
-                              <FolderGit2 className="w-3.5 h-3.5 text-[#45C8DF] shrink-0" />
-                              <span className="font-semibold text-xs text-[#E6E9ED] group-hover:text-[#8B7CFF] truncate">
+                              <FolderGit2 className="w-3.5 h-3.5 text-[var(--cyan)] shrink-0" />
+                              <span className="font-semibold text-xs text-[var(--text)] group-hover:text-[var(--purple)] truncate">
                                 {p.name}
                               </span>
                             </div>
-                            <p className="text-[10px] text-[#5F6671] font-mono truncate" title={p.path}>
+                            <p className="text-[10px] text-[var(--muted-2)] font-mono truncate" title={p.path}>
                               {p.path}
                             </p>
 
-                            <div className="flex items-center space-x-2 text-[9px] font-mono text-[#5F6671] pt-0.5">
+                            <div className="flex items-center space-x-2 text-[9px] font-mono text-[var(--muted-2)] pt-0.5">
                               <span className="flex items-center space-x-1">
                                 <Clock className="w-2.5 h-2.5" />
                                 <span>{p.lastOpened}</span>
                               </span>
                               {p.fitnessScore !== undefined && (
-                                <span className="px-1 py-0.2 rounded bg-[#4FD49A]/10 text-[#4FD49A] border border-[#4FD49A]/20 font-bold">
+                                <span className="px-1 py-0.2 rounded bg-[var(--green)]/10 text-[var(--green)] border border-[var(--green)]/20 font-bold">
                                   FS: {p.fitnessScore}/100
                                 </span>
                               )}
@@ -177,12 +177,12 @@ export const AppShell: React.FC<AppShellProps> = ({
                                 e.stopPropagation();
                                 removeRecentProject(p.path);
                               }}
-                              className="p-1 text-[#5F6671] hover:text-[#EF6B73] rounded transition opacity-0 group-hover:opacity-100"
+                              className="p-1 text-[var(--muted-2)] hover:text-[var(--red)] rounded transition opacity-0 group-hover:opacity-100"
                               title="Quitar de recientes"
                             >
                               <Trash2 className="w-3 h-3" />
                             </button>
-                            <ArrowRight className="w-3.5 h-3.5 text-[#5F6671] group-hover:text-[#8B7CFF] transition transform group-hover:translate-x-0.5" />
+                            <ArrowRight className="w-3.5 h-3.5 text-[var(--muted-2)] group-hover:text-[var(--purple)] transition transform group-hover:translate-x-0.5" />
                           </div>
                         </div>
                       ))}
@@ -192,32 +192,32 @@ export const AppShell: React.FC<AppShellProps> = ({
 
                 {/* Feature Grid */}
                 <div className="grid grid-cols-3 gap-2.5 w-full pt-1 text-left text-xs">
-                  <div className="bg-[#101318] p-3 rounded-md border border-[#252B34] hover:border-[#8B7CFF]/40 transition">
-                    <div className="text-[#45C8DF] font-semibold flex items-center space-x-1.5 mb-1">
+                  <div className="bg-[var(--panel)] p-3 rounded-md border border-[var(--border)] hover:border-[var(--purple)]/40 transition">
+                    <div className="text-[var(--cyan)] font-semibold flex items-center space-x-1.5 mb-1">
                       <LayoutDashboard className="w-3.5 h-3.5" />
                       <span>Dashboard &amp; Métricas</span>
                     </div>
-                    <p className="text-[10px] text-[#858C98]">
+                    <p className="text-[10px] text-[var(--muted)]">
                       Acoplamiento ($Ca, Ce$), instabilidad ($I$), abstractness ($A$) y distancia ($D$).
                     </p>
                   </div>
 
-                  <div className="bg-[#101318] p-3 rounded-md border border-[#252B34] hover:border-[#8B7CFF]/40 transition">
-                    <div className="text-[#8B7CFF] font-semibold flex items-center space-x-1.5 mb-1">
+                  <div className="bg-[var(--panel)] p-3 rounded-md border border-[var(--border)] hover:border-[var(--purple)]/40 transition">
+                    <div className="text-[var(--purple)] font-semibold flex items-center space-x-1.5 mb-1">
                       <Layers className="w-3.5 h-3.5" />
                       <span>Modelo C4 + 19 Vistas</span>
                     </div>
-                    <p className="text-[10px] text-[#858C98]">
+                    <p className="text-[10px] text-[var(--muted)]">
                       C4 Niveles 1-4, Secuencia, DFD, Call Graph, Herencia y ER generados.
                     </p>
                   </div>
 
-                  <div className="bg-[#101318] p-3 rounded-md border border-[#252B34] hover:border-[#8B7CFF]/40 transition">
-                    <div className="text-[#4FD49A] font-semibold flex items-center space-x-1.5 mb-1">
+                  <div className="bg-[var(--panel)] p-3 rounded-md border border-[var(--border)] hover:border-[var(--purple)]/40 transition">
+                    <div className="text-[var(--green)] font-semibold flex items-center space-x-1.5 mb-1">
                       <ShieldCheck className="w-3.5 h-3.5" />
                       <span>Fitness Functions</span>
                     </div>
-                    <p className="text-[10px] text-[#858C98]">
+                    <p className="text-[10px] text-[var(--muted)]">
                       Evaluación configurable de reglas con cálculo de Fitness Score (0-100).
                     </p>
                   </div>

@@ -99,16 +99,16 @@ export const TopBar: React.FC<TopBarProps> = ({
         : '';
 
   return (
-    <header className="h-[48px] bg-[#0B0D10] border-b border-[#252B34] flex items-center justify-between px-3 select-none z-30 font-sans text-xs">
+    <header className="h-[48px] bg-[var(--panel)] border-b border-[var(--border)] flex items-center justify-between px-3 select-none z-30 font-sans text-xs transition-colors duration-200">
       {/* Brand & Menu Links */}
       <div className="flex items-center space-x-4">
         {/* Brand Badge */}
         <div className="flex items-center space-x-2 mr-2">
-          <div className="w-6 h-6 rounded bg-[#211E39] border border-[#302C51] flex items-center justify-center text-[#8B7CFF] font-bold text-[11px]">
-            <Sparkles className="w-3.5 h-3.5 text-[#8B7CFF]" />
+          <div className="w-6 h-6 rounded bg-[var(--purple-soft)] border border-[var(--purple-border)] flex items-center justify-center text-[var(--purple)] font-bold text-[11px]">
+            <Sparkles className="w-3.5 h-3.5 text-[var(--purple)]" />
           </div>
-          <span className="font-bold text-[13px] tracking-tight text-[#E6E9ED]">
-            SAAC <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#211E39] text-[#8B7CFF] border border-[#302C51] ml-1">v2.0</span>
+          <span className="font-bold text-[13px] tracking-tight text-[var(--text)]">
+            SAAC <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[var(--purple-soft)] text-[var(--purple)] border border-[var(--purple-border)] ml-1">v2.0</span>
           </span>
         </div>
 
@@ -162,10 +162,10 @@ export const TopBar: React.FC<TopBarProps> = ({
         <button
           onClick={onOpenProject}
           disabled={isAnalyzing}
-          className="flex items-center space-x-1.5 px-2.5 py-1 text-[11px] font-medium text-[#E6E9ED] bg-[#13171D] hover:bg-[#171C23] border border-[#252B34] rounded transition disabled:opacity-40"
+          className="flex items-center space-x-1.5 px-2.5 py-1 text-[11px] font-medium text-[var(--text)] bg-[var(--panel-2)] hover:bg-[var(--panel-3)] border border-[var(--border-soft)] rounded transition disabled:opacity-40"
           title="Abrir directorio de proyecto (Ctrl+O)"
         >
-          <FolderOpen className="w-3.5 h-3.5 text-[#45C8DF]" />
+          <FolderOpen className="w-3.5 h-3.5 text-[var(--cyan)]" />
           <span>Abrir Proyecto</span>
         </button>
 
@@ -174,14 +174,14 @@ export const TopBar: React.FC<TopBarProps> = ({
           disabled={!projectPath && !isAnalyzing}
           className={`flex items-center space-x-1.5 px-3 py-1 text-[11px] font-semibold rounded transition ${
             isAnalyzing
-              ? 'bg-[#EF6B73]/20 hover:bg-[#EF6B73]/30 text-[#EF6B73] border border-[#EF6B73]/40'
-              : 'bg-[#211E39] hover:bg-[#2c284e] text-[#8B7CFF] border border-[#302C51] disabled:opacity-40'
+              ? 'bg-[var(--red)]/20 hover:bg-[var(--red)]/30 text-[var(--red)] border border-[var(--red)]/40'
+              : 'bg-[var(--purple-soft)] hover:bg-[var(--purple)] hover:text-white text-[var(--purple)] border border-[var(--purple-border)] disabled:opacity-40'
           }`}
           title={isAnalyzing ? 'Cancelar análisis en curso' : amg ? 'Volver a analizar código AST del proyecto' : 'Iniciar análisis sintáctico AST'}
         >
           {isAnalyzing ? (
             <>
-              <XCircle className="w-3.5 h-3.5 text-[#EF6B73]" />
+              <XCircle className="w-3.5 h-3.5 text-[var(--red)]" />
               <span>Cancelar</span>
             </>
           ) : (
@@ -201,7 +201,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             <select
               value={activeDiagramValue}
               onChange={(e) => handleDiagramSelect(e.target.value)}
-              className="bg-[#13171D] text-[#E6E9ED] text-[11px] pl-2.5 pr-7 py-1 rounded border border-[#252B34] focus:outline-none focus:border-[#8B7CFF] cursor-pointer appearance-none font-mono"
+              className="bg-[var(--panel-2)] text-[var(--text)] text-[11px] pl-2.5 pr-7 py-1 rounded border border-[var(--border-soft)] focus:outline-none focus:border-[var(--purple)] cursor-pointer appearance-none font-mono"
             >
               <optgroup label="C4 Core">
                 <option value="c4:1">C4 N1 — Contexto</option>
@@ -217,14 +217,14 @@ export const TopBar: React.FC<TopBarProps> = ({
                 ))}
               </optgroup>
             </select>
-            <ChevronDown className="w-3 h-3 text-[#858C98] absolute right-2 top-2 pointer-events-none" />
+            <ChevronDown className="w-3 h-3 text-[var(--muted)] absolute right-2 top-2 pointer-events-none" />
           </div>
         )}
 
         {onCloseProject && amg && (
           <button
             onClick={onCloseProject}
-            className="p-1 text-[#858C98] hover:text-[#EF6B73] rounded hover:bg-[#171B21] transition"
+            className="p-1 text-[var(--muted)] hover:text-[var(--red)] rounded hover:bg-[var(--border-soft)] transition"
             title="Cerrar proyecto actual"
           >
             <XCircle className="w-3.5 h-3.5" />
@@ -236,13 +236,13 @@ export const TopBar: React.FC<TopBarProps> = ({
       <div className="flex items-center space-x-1.5">
         {/* Perspectivas */}
         {amg && (
-          <div className="flex items-center space-x-1 mr-2 border-r border-[#252B34] pr-2">
+          <div className="flex items-center space-x-1 mr-2 border-r border-[var(--border)] pr-2">
             <button
               onClick={toggleSecurityPerspective}
               className={`p-1.5 rounded transition ${
                 securityPerspective
-                  ? 'bg-[#211E39] text-[#EF6B73] border border-[#EF6B73]/40'
-                  : 'text-[#858C98] hover:text-[#E6E9ED] hover:bg-[#171B21]'
+                  ? 'bg-[var(--purple-soft)] text-[var(--red)] border border-[var(--red)]/40'
+                  : 'text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--border-soft)]'
               }`}
               title="Perspectiva de Seguridad"
             >
@@ -253,8 +253,8 @@ export const TopBar: React.FC<TopBarProps> = ({
               onClick={toggleOwnershipPerspective}
               className={`p-1.5 rounded transition ${
                 ownershipPerspective
-                  ? 'bg-[#211E39] text-[#45C8DF] border border-[#45C8DF]/40'
-                  : 'text-[#858C98] hover:text-[#E6E9ED] hover:bg-[#171B21]'
+                  ? 'bg-[var(--purple-soft)] text-[var(--cyan)] border border-[var(--cyan)]/40'
+                  : 'text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--border-soft)]'
               }`}
               title="Perspectiva de Autoría / Ownership"
             >
@@ -267,7 +267,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         <button
           onClick={toggleLeftbar}
           className={`p-1.5 rounded transition ${
-            leftbarOpen ? 'text-[#8B7CFF] bg-[#211E39]' : 'text-[#858C98] hover:text-[#E6E9ED] hover:bg-[#171B21]'
+            leftbarOpen ? 'text-[var(--purple)] bg-[var(--purple-soft)]' : 'text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--border-soft)]'
           }`}
           title="Alternar Explorador"
         >
@@ -277,7 +277,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         <button
           onClick={toggleDownbar}
           className={`p-1.5 rounded transition ${
-            downbarOpen ? 'text-[#8B7CFF] bg-[#211E39]' : 'text-[#858C98] hover:text-[#E6E9ED] hover:bg-[#171B21]'
+            downbarOpen ? 'text-[var(--purple)] bg-[var(--purple-soft)]' : 'text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--border-soft)]'
           }`}
           title="Alternar Panel Inferior"
         >
@@ -287,7 +287,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         <button
           onClick={toggleRightbar}
           className={`p-1.5 rounded transition ${
-            rightbarOpen ? 'text-[#8B7CFF] bg-[#211E39]' : 'text-[#858C98] hover:text-[#E6E9ED] hover:bg-[#171B21]'
+            rightbarOpen ? 'text-[var(--purple)] bg-[var(--purple-soft)]' : 'text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--border-soft)]'
           }`}
           title="Alternar Inspector"
         >
@@ -296,7 +296,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 
         <button
           onClick={toggleTheme}
-          className="p-1.5 text-[#858C98] hover:text-[#E6E9ED] hover:bg-[#171B21] rounded transition ml-1"
+          className="p-1.5 text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--border-soft)] rounded transition ml-1"
           title={`Tema actual: ${theme}`}
         >
           {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}

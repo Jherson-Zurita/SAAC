@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SAAC v2.0 — GraphForge UI Preview Static Demo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0B0D10;
+      --panel: #101318;
+      --panel-2: #13171D;
+      --border: #252B34;
+      --border-soft: #1D222A;
+      --text: #E6E9ED;
+      --text-muted: #858C98;
+      --purple: #8B7CFF;
+      --purple-soft: #211E39;
+      --purple-border: #302C51;
+      --cyan: #45C8DF;
+      --green: #4FD49A;
+      --red: #EF6B73;
+      --yellow: #E7B85B;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      font-size: 12px;
+    }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    
+    /* TopBar 48px */
+    header {
+      height: 48px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+    }
+    .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--text); }
+    .brand-icon { width: 20px; height: 20px; background: var(--purple); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 900; }
+    .menu-bar { display: flex; gap: 16px; color: var(--text-muted); font-size: 11px; }
+    .menu-item:hover { color: var(--text); cursor: pointer; }
+    
+    /* Main Layout Grid */
+    .workspace {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+    
+    /* ActivityBar 46px */
+    .activity-bar {
+      width: 46px;
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 8px 0;
+      gap: 16px;
+    }
+    .act-btn {
+      width: 100%;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      cursor: pointer;
+      position: relative;
+    }
+    .act-btn.active { color: var(--text); }
+    .act-btn.active::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 4px; bottom: 4px;
+      width: 2px;
+      background: var(--purple);
+      border-radius: 0 2px 2px 0;
+    }
+    
+    /* Explorer 218px */
+    .explorer-panel {
+      width: 218px;
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+    }
+    .panel-header {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border-soft);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .tree-list { padding: 8px; font-size: 11.5px; color: var(--text-muted); }
+    .tree-item { padding: 4px 8px; border-radius: 4px; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+    .tree-item:hover { background: var(--panel-2); color: var(--text); }
+    .tree-item.selected { background: var(--purple-soft); color: var(--purple); border: 1px solid var(--purple-border); }
+    
+    /* Canvas Area */
+    .canvas-container {
+      flex: 1;
+      background: var(--bg);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .canvas-bg {
+      flex: 1;
+      background-image: radial-gradient(var(--border) 1px, transparent 1px);
+      background-size: 20px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .c4-node {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      width: 200px;
+      position: absolute;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+    .c4-node-title { font-weight: 700; font-size: 12px; color: var(--purple); margin-bottom: 4px; }
+    .c4-node-sub { font-size: 10px; color: var(--text-muted); margin-bottom: 8px; }
+    .c4-badge { display: inline-block; font-size: 9px; padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; }
+    .badge-green { background: rgba(79, 212, 154, 0.15); color: var(--green); border: 1px solid rgba(79, 212, 154, 0.3); }
+    .badge-cyan { background: rgba(69, 200, 223, 0.15); color: var(--cyan); border: 1px solid rgba(69, 200, 223, 0.3); }
+    
+    /* Inspector Rightbar 275px */
+    .inspector-panel {
+      width: 275px;
+      background: var(--panel);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+    }
+    .prop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px; }
+    .metric-card {
+      background: var(--panel-2);
+      border: 1px solid var(--border-soft);
+      border-radius: 6px;
+      padding: 8px;
+    }
+    .metric-label { font-size: 9.5px; color: var(--text-muted); }
+    .metric-val { font-size: 14px; font-weight: 700; font-family: 'JetBrains Mono', monospace; margin-top: 2px; }
+    
+    /* Downbar 166px */
+    .downbar {
+      height: 166px;
+      background: var(--panel);
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+    }
+    .downbar-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border-soft);
+      background: var(--bg);
+    }
+    .downbar-tab {
+      padding: 6px 14px;
+      font-size: 10.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+    }
+    .downbar-tab.active { color: var(--purple); border-bottom-color: var(--purple); background: var(--panel); }
+    .console-out {
+      flex: 1;
+      background: var(--bg);
+      padding: 8px 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10.5px;
+      color: var(--text-muted);
+      overflow-y: auto;
+      line-height: 1.6;
+    }
+    
+    /* StatusBar 23px */
+    footer {
+      height: 23px;
+      background: #17152C;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      font-size: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--purple);
+    }
+    .status-ok { display: flex; align-items: center; gap: 6px; color: var(--green); }
+    .dot { width: 6px; height: 6px; background: var(--green); border-radius: 50%; }
+  </style>
+</head>
+<body>
+
+  <!-- TopBar 48px -->
+  <header>
+    <div className="brand" style="display:flex; align-items:center; gap:8px;">
+      <div class="brand-icon">S</div>
+      <span>SAAC v2.0</span>
+      <span style="font-size:10px; color:var(--text-muted); font-weight:400; margin-left:8px;">QuickVotes Project — Web Architecture</span>
+    </div>
+    <div class="menu-bar">
+      <span class="menu-item">Archivo</span>
+      <span class="menu-item">Vista</span>
+      <span class="menu-item">Analizar</span>
+      <span class="menu-item">Grafos</span>
+      <span class="menu-item">Métricas</span>
+      <span class="menu-item">Ayuda</span>
+    </div>
+    <div style="font-size: 10px; color: var(--green); background: rgba(79, 212, 154, 0.1); padding: 4px 10px; border-radius: 4px; border: 1px solid rgba(79, 212, 154, 0.3);">
+      ● Análisis Completo (50 Módulos)
+    </div>
+  </header>
+
+  <!-- Workspace Grid -->
+  <div class="workspace">
+    
+    <!-- ActivityBar 46px -->
+    <div class="activity-bar">
+      <div class="act-btn active" title="Explorador">📁</div>
+      <div class="act-btn" title="C4 Diagramas">🌐</div>
+      <div class="act-btn" title="Métricas">📊</div>
+      <div class="act-btn" title="Antipatrones">⚠️</div>
+      <div class="act-btn" title="Diseño Propuesto">🎨</div>
+      <div class="act-btn" title="Asistente IA" style="margin-top:auto;">🤖</div>
+      <div class="act-btn" title="Configuración">⚙️</div>
+    </div>
+
+    <!-- Explorer Panel 218px -->
+    <div class="explorer-panel">
+      <div class="panel-header">Explorador de Proyecto</div>
+      <div class="tree-list">
+        <div class="tree-item">📁 src/</div>
+        <div class="tree-item" style="padding-left: 18px;">📁 components/</div>
+        <div class="tree-item selected" style="padding-left: 28px;">📄 AppShell.tsx</div>
+        <div class="tree-item" style="padding-left: 28px;">📄 C4Canvas.tsx</div>
+        <div class="tree-item" style="padding-left: 18px;">📁 engine/</div>
+        <div class="tree-item" style="padding-left: 28px;">⚙️ aggregator.rs</div>
+        <div class="tree-item" style="padding-left: 28px;">⚙️ ai_client.rs</div>
+      </div>
+    </div>
+
+    <!-- Canvas Area -->
+    <div class="canvas-container">
+      <div class="panel-header" style="background:var(--panel); display:flex; justify-content:space-between; align-items:center;">
+        <span>Visualizador C4 — Nivel 2: Contenedores</span>
+        <span style="font-size:10px; color:var(--purple); font-family:'JetBrains Mono';">Dagre Auto-Layout | Zoom 100%</span>
+      </div>
+
+      <div class="canvas-bg">
+        <!-- Node 1 -->
+        <div class="c4-node" style="top: 60px; left: 80px;">
+          <div class="c4-node-title">Web Frontend (React)</div>
+          <div class="c4-node-sub">UI / Capa de Presentación</div>
+          <span class="c4-badge badge-cyan">Ca: 0 | Ce: 14</span>
+        </div>
+
+        <!-- Node 2 -->
+        <div class="c4-node" style="top: 60px; left: 340px; border-color: var(--purple);">
+          <div class="c4-node-title">Rust Core Engine</div>
+          <div class="c4-node-sub">Aggregator & AMG Models</div>
+          <span class="c4-badge badge-green">Ca: 14 | Ce: 8</span>
+        </div>
+
+        <!-- Node 3 -->
+        <div class="c4-node" style="top: 220px; left: 340px;">
+          <div class="c4-node-title">Base de Datos sled DB</div>
+          <div class="c4-node-sub">Caché Persistente Local</div>
+          <span class="c4-badge badge-green">Ca: 8 | Ce: 0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Inspector Panel 275px -->
+    <div class="inspector-panel">
+      <div class="panel-header">Inspector de Arquitectura</div>
+      <div style="padding: 12px; border-bottom: 1px solid var(--border-soft);">
+        <div style="font-size: 13px; font-weight: 700; color: var(--text);">Rust Core Engine</div>
+        <div style="font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono'; margin-top: 2px;">src-tauri/src/engine/aggregator.rs</div>
+      </div>
+
+      <div class="prop-grid">
+        <div class="metric-card">
+          <div class="metric-label">Ca (Aferente)</div>
+          <div class="metric-val" style="color: var(--cyan);">14</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Ce (Eferente)</div>
+          <div class="metric-val" style="color: var(--yellow);">8</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Instabilidad (I)</div>
+          <div class="metric-val" style="color: var(--green);">0.36</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Distancia (D)</div>
+          <div class="metric-val" style="color: var(--purple);">0.14</div>
+        </div>
+      </div>
+
+      <div style="padding: 12px;">
+        <div style="font-size: 10px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px;">CONEXIONES ACTIVAS</div>
+        <div style="font-size: 10.5px; color: var(--green); font-family: 'JetBrains Mono'; margin-bottom: 4px;">➔ sled DB (persistencia cache_db)</div>
+        <div style="font-size: 10.5px; color: var(--cyan); font-family: 'JetBrains Mono';">➔ Node & Python Worker Managers</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Downbar 166px -->
+  <div class="downbar">
+    <div class="downbar-tabs">
+      <div class="downbar-tab active">TERMINAL</div>
+      <div class="downbar-tab">PROBLEMAS (0)</div>
+      <div class="downbar-tab">OUTPUT</div>
+      <div class="downbar-tab">HISTORIAL</div>
+    </div>
+    <div class="console-out">
+      [16:18:02] <span style="color:var(--green);">saac-core</span>: Inicializando motor de análisis v2.0...<br>
+      [16:18:03] <span style="color:var(--cyan);">aggregator</span>: AMG construido exitosamente. Total Módulos: 50 | Dependencias: 94.<br>
+      [16:18:03] <span style="color:var(--purple);">ai-client</span>: Proveedor configurado: open-ai-compatible (Google Gemini API). Status: ONLINE.<br>
+      [16:18:04] <span style="color:var(--green);">saac-gui</span>: Resumen escrito en .saac/analysis-summary.json y localStorage.
+    </div>
+  </div>
+
+  <!-- StatusBar 23px -->
+  <footer>
+    <div class="status-ok">
+      <div class="dot"></div>
+      <span>Listo — SAAC v2.0</span>
+    </div>
+    <div>Módulos: 50 | Aristas: 94 | Zoom: 100% | UTF-8 | GraphForge System</div>
+  </footer>
+
+</body>
+</html>

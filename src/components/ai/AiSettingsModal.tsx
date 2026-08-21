@@ -103,22 +103,21 @@ export const AiSettingsModal: React.FC<AiSettingsModalProps> = ({
     try {
       const status = await checkAiStatus(config);
       setAiStatus(status);
-
-      if (status.available || status.provider === 'mock') {
+      if (status.available || status.isOnline) {
         setTestResult({
           success: true,
-          message: status.message || '¡Conexión exitosa con el proveedor de IA!',
+          message: `Conexión exitosa con ${String(status.provider).toUpperCase()} (${status.model || 'OK'})`,
         });
       } else {
         setTestResult({
           success: false,
-          message: status.message || 'No se pudo conectar al endpoint configurado.',
+          message: status.message || `No se pudo conectar: proveedor marcado como inactivo o con error`,
         });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setTestResult({
         success: false,
-        message: `Error de conexión: ${err.toString()}`,
+        message: `Error de conexión: ${String(err)}`,
       });
     } finally {
       setIsTesting(false);
@@ -142,19 +141,19 @@ export const AiSettingsModal: React.FC<AiSettingsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm font-sans select-none animate-in fade-in duration-150">
-      <div className="w-[460px] bg-[#101318] border border-[#252B34] text-[#E6E9ED] rounded-xl shadow-2xl overflow-hidden text-xs">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm font-sans select-none animate-in fade-in duration-150">
+      <div className="w-[460px] bg-[var(--panel)] border border-[var(--border)] text-[var(--text)] rounded-xl shadow-2xl overflow-hidden text-xs">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 bg-[#0B0D10] border-b border-[#252B34]">
+        <div className="flex items-center justify-between px-4 py-3 bg-[var(--bg)] border-b border-[var(--border)]">
           <div className="flex items-center space-x-2">
-            <Bot className="w-4 h-4 text-[#8B7CFF]" />
-            <span className="font-bold text-xs text-[#E6E9ED]">
+            <Bot className="w-4 h-4 text-[var(--purple)]" />
+            <span className="font-bold text-xs text-[var(--text)]">
               Configuración de Inteligencia Artificial (IA)
             </span>
           </div>
           <button
             onClick={onClose}
-            className="p-1 text-[#858C98] hover:text-[#E6E9ED] rounded hover:bg-[#171B21] transition"
+            className="p-1 text-[var(--muted)] hover:text-[var(--text)] rounded hover:bg-[var(--border-soft)] transition"
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -164,7 +163,7 @@ export const AiSettingsModal: React.FC<AiSettingsModalProps> = ({
         <div className="p-4 space-y-4">
           {/* Quick Presets */}
           <div className="space-y-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[#5F6671]">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-2)]">
               Presets Rápidos
             </span>
             <div className="flex gap-2">
@@ -173,8 +172,8 @@ export const AiSettingsModal: React.FC<AiSettingsModalProps> = ({
                 onClick={() => handleProviderChange('ollama')}
                 className={`flex-1 py-1.5 px-2 rounded border text-[11px] font-semibold flex items-center justify-center space-x-1.5 transition ${
                   provider === 'ollama'
-                    ? 'bg-[#211E39] border-[#302C51] text-[#8B7CFF]'
-                    : 'bg-[#13171D] border-[#1D222A] text-[#858C98] hover:text-[#E6E9ED]'
+                    ? 'bg-[var(--purple-soft)] border-[var(--purple-border)] text-[var(--purple)]'
+                    : 'bg-[var(--panel-2)] border-[var(--border-soft)] text-[var(--muted)] hover:text-[var(--text)]'
                 }`}
               >
                 <Cpu className="w-3.5 h-3.5" />
@@ -186,11 +185,11 @@ export const AiSettingsModal: React.FC<AiSettingsModalProps> = ({
                 onClick={applyGeminiPreset}
                 className={`flex-1 py-1.5 px-2 rounded border text-[11px] font-semibold flex items-center justify-center space-x-1.5 transition ${
                   provider === 'open-ai-compatible' && endpointUrl.includes('generativelanguage')
-                    ? 'bg-[#211E39] border-[#302C51] text-[#45C8DF]'
-                    : 'bg-[#13171D] border-[#1D222A] text-[#858C98] hover:text-[#E6E9ED]'
+                    ? 'bg-[var(--purple-soft)] border-[var(--purple-border)] text-[var(--cyan)]'
+                    : 'bg-[var(--panel-2)] border-[var(--border-soft)] text-[var(--muted)] hover:text-[var(--text)]'
                 }`}
               >
-                <Sparkles className="w-3.5 h-3.5 text-[#45C8DF]" />
+                <Sparkles className="w-3.5 h-3.5 text-[var(--cyan)]" />
                 <span>Google Gemini API</span>
               </button>
 
@@ -199,111 +198,110 @@ export const AiSettingsModal: React.FC<AiSettingsModalProps> = ({
                 onClick={applyOpenAiPreset}
                 className={`flex-1 py-1.5 px-2 rounded border text-[11px] font-semibold flex items-center justify-center space-x-1.5 transition ${
                   provider === 'open-ai-compatible' && endpointUrl.includes('openai.com')
-                    ? 'bg-[#211E39] border-[#302C51] text-[#4FD49A]'
-                    : 'bg-[#13171D] border-[#1D222A] text-[#858C98] hover:text-[#E6E9ED]'
+                    ? 'bg-[var(--purple-soft)] border-[var(--purple-border)] text-[var(--green)]'
+                    : 'bg-[var(--panel-2)] border-[var(--border-soft)] text-[var(--muted)] hover:text-[var(--text)]'
                 }`}
               >
-                <Globe className="w-3.5 h-3.5 text-[#4FD49A]" />
+                <Globe className="w-3.5 h-3.5 text-[var(--green)]" />
                 <span>OpenAI / Otro</span>
               </button>
             </div>
           </div>
 
           {/* Form Fields */}
-          <div className="space-y-3 bg-[#13171D] p-3 rounded-lg border border-[#1D222A]">
+          <div className="space-y-3 bg-[var(--panel-2)] p-3 rounded-lg border border-[var(--border-soft)]">
             {/* Endpoint URL */}
             <div className="space-y-1">
-              <label className="text-[10px] text-[#858C98] flex items-center justify-between">
+              <label className="text-[10px] text-[var(--muted)] flex items-center justify-between">
                 <span>URL del Endpoint / Server:</span>
                 {endpointUrl.includes('generativelanguage') && (
-                  <span className="text-[#45C8DF] font-mono text-[9px]">Google Gemini OpenAI Compatible</span>
+                  <span className="text-[var(--cyan)] font-mono text-[9px]">Google Gemini OpenAI Compatible</span>
                 )}
               </label>
               <input
                 type="text"
                 value={endpointUrl}
                 onChange={(e) => setEndpointUrl(e.target.value)}
-                placeholder="https://generativelanguage.googleapis.com/v1beta/openai"
-                className="w-full bg-[#0B0D10] text-[11px] text-[#E6E9ED] px-2.5 py-1.5 rounded border border-[#252B34] focus:outline-none focus:border-[#8B7CFF] font-mono"
+                placeholder="http://localhost:11434"
+                className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-2.5 py-1.5 text-xs text-[var(--text)] font-mono focus:outline-none focus:border-[var(--purple)]"
               />
             </div>
 
             {/* Model Name */}
             <div className="space-y-1">
-              <label className="text-[10px] text-[#858C98]">Nombre del Modelo:</label>
+              <label className="text-[10px] text-[var(--muted)]">Nombre del Modelo:</label>
               <input
                 type="text"
                 value={modelName}
                 onChange={(e) => setModelName(e.target.value)}
-                placeholder="gemini-1.5-flash / qwen2.5-coder / gpt-4o-mini"
-                className="w-full bg-[#0B0D10] text-[11px] text-[#E6E9ED] px-2.5 py-1.5 rounded border border-[#252B34] focus:outline-none focus:border-[#8B7CFF] font-mono"
+                placeholder="qwen2.5-coder, gemini-1.5-flash, etc."
+                className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-2.5 py-1.5 text-xs text-[var(--text)] font-mono focus:outline-none focus:border-[var(--purple)]"
               />
             </div>
 
             {/* API Key */}
-            {provider === 'open-ai-compatible' && (
-              <div className="space-y-1">
-                <label className="text-[10px] text-[#858C98] flex items-center gap-1">
-                  <Key className="w-3 h-3 text-[#E7B85B]" />
-                  <span>API Key (Requerido para Gemini / OpenAI cloud):</span>
-                </label>
-                <input
-                  type="password"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  placeholder="AIzaSy..."
-                  className="w-full bg-[#0B0D10] text-[11px] text-[#E6E9ED] px-2.5 py-1.5 rounded border border-[#252B34] focus:outline-none focus:border-[#8B7CFF] font-mono"
-                />
-              </div>
-            )}
+            <div className="space-y-1">
+              <label className="text-[10px] text-[var(--muted)] flex items-center justify-between">
+                <span className="flex items-center gap-1">
+                  <Key className="w-3 h-3 text-[var(--purple)]" /> API Key (Requerido para Cloud REST APIs):
+                </span>
+              </label>
+              <input
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="AIzaSy... o sk-..."
+                className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-2.5 py-1.5 text-xs text-[var(--text)] font-mono focus:outline-none focus:border-[var(--purple)] placeholder:text-[var(--muted-2)]"
+              />
+            </div>
           </div>
 
-          {/* Test Status Box */}
+          {/* Test Status Banner */}
           {testResult && (
             <div
-              className={`p-2.5 rounded-lg border text-[11px] flex items-start space-x-2 ${
+              className={`p-2.5 rounded-lg border text-xs flex items-center space-x-2 ${
                 testResult.success
-                  ? 'bg-[#4FD49A]/10 border-[#4FD49A]/30 text-[#4FD49A]'
-                  : 'bg-[#EF6B73]/10 border-[#EF6B73]/30 text-[#EF6B73]'
+                  ? 'bg-[var(--green)]/10 border-[var(--green)]/30 text-[var(--green)]'
+                  : 'bg-[var(--red)]/10 border-[var(--red)]/30 text-[var(--red)]'
               }`}
             >
               {testResult.success ? (
-                <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <CheckCircle className="w-4 h-4 shrink-0" />
               ) : (
-                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <AlertTriangle className="w-4 h-4 shrink-0" />
               )}
-              <span className="flex-1">{testResult.message}</span>
+              <span className="leading-tight">{testResult.message}</span>
             </div>
           )}
-        </div>
 
-        {/* Modal Footer */}
-        <div className="flex items-center justify-between px-4 py-3 bg-[#0B0D10] border-t border-[#252B34]">
-          <button
-            type="button"
-            onClick={handleTestConnection}
-            disabled={isTesting}
-            className="px-3 py-1.5 rounded bg-[#13171D] hover:bg-[#171C23] text-[#E6E9ED] border border-[#252B34] font-semibold text-[11px] transition disabled:opacity-40"
-          >
-            {isTesting ? 'Probando conexión...' : 'Probar Conexión'}
-          </button>
-
-          <div className="flex items-center space-x-2">
+          {/* Footer Actions */}
+          <div className="flex items-center justify-between pt-2 border-t border-[var(--border)]">
             <button
               type="button"
-              onClick={onClose}
-              className="px-3 py-1.5 rounded text-[#858C98] hover:text-[#E6E9ED] text-[11px] transition"
+              onClick={handleTestConnection}
+              disabled={isTesting}
+              className="px-3 py-1.5 rounded bg-[var(--panel-2)] hover:bg-[var(--panel-3)] text-[var(--text)] border border-[var(--border)] transition disabled:opacity-50 font-semibold"
             >
-              Cancelar
+              {isTesting ? 'Probando...' : 'Probar Conexión'}
             </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              className="px-4 py-1.5 rounded bg-[#211E39] hover:bg-[#2c284e] text-[#8B7CFF] border border-[#302C51] font-semibold text-[11px] flex items-center space-x-1.5 transition"
-            >
-              <Save className="w-3.5 h-3.5" />
-              <span>Guardar</span>
-            </button>
+
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-3 py-1.5 rounded text-[var(--muted)] hover:text-[var(--text)] transition"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                className="px-3.5 py-1.5 rounded bg-[var(--purple)] hover:opacity-90 text-white font-bold flex items-center space-x-1.5 transition shadow"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>Guardar</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

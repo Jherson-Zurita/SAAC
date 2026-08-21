@@ -10,7 +10,7 @@
   flex: 1;
   height: 100%;
   overflow: hidden;
-  background: var(--bg-dark, #090b10);
+  background: var(--bg);
 }
 
 .design-workspace__main {

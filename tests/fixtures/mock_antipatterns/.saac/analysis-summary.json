@@ -1,0 +1,246 @@
+{
+  "antipatterns": [
+    {
+      "affectedModuleIds": [
+        "d:/Elvis/Semestre 2-2026/SAAC/tests/fixtures/mock_antipatterns/god_module"
+      ],
+      "antipatternType": "god-module",
+      "description": "Module 'god_module' has excessive efferent coupling (Ce = 7, 58.3% of project dependencies). It depends on too many other modules, making it a change bottleneck.",
+      "id": "antipattern:god-module:god_module",
+      "ignored": false,
+      "name": "God Module",
+      "refactorSuggestion": "Split this module into smaller, focused modules with single responsibilities to reduce coupling and improve maintainability.",
+      "severity": "high"
+    },
+    {
+      "affectedModuleIds": [
+        "d:/Elvis/Semestre 2-2026/SAAC/tests/fixtures/mock_antipatterns/repositories/user_repo",
+        "d:/Elvis/Semestre 2-2026/SAAC/tests/fixtures/mock_antipatterns/services/order_service",
+        "d:/Elvis/Semestre 2-2026/SAAC/tests/fixtures/mock_antipatterns/services/user_service"
+      ],
+      "antipatternType": "circular-dependency",
+      "cyclePath": [
+        "d:/Elvis/Semestre 2-2026/SAAC/tests/fixtures/mock_antipatterns/repositories/user_repo",
+        "d:/Elvis/Semestre 2-2026/SAAC/tests/fixtures/mock_antipatterns/services/order_service",
+        "d:/Elvis/Semestre 2-2026/SAAC/tests/fixtures/mock_antipatterns/services/user_service",
+        "d:/Elvis/Semestre 2-2026/SAAC/tests/fixtures/mock_antipatterns/repositories/user_repo"
+      ],
+      "description": "Circular dependency detected: user_repo → order_service → user_service",
+      "id": "antipattern:circular-dependency:user_repo-to-user_service",
+      "ignored": false,
+      "name": "Circular Dependency",
+      "refactorSuggestion": "Introduce an abstraction/interface, use dependency injection, or move shared logic to a separate common module to break the circular reference.",
+      "severity": "critical",
+      "suggestedBreakPoint": "user_service → user_repo"
+    },
+    {
+      "affectedModuleIds": [
+        "d:/Elvis/Semestre 2-2026/SAAC/tests/fixtures/mock_antipatterns/repositories/user_repo",
+        "d:/Elvis/Semestre 2-2026/SAAC/tests/fixtures/mock_antipatterns/services/order_service"
+      ],
+      "antipatternType": "layer-violation",
+      "description": "Layer violation in Layered architecture: 'user_repo' (Repository/Model layer) depends on 'order_service' (Service/Logic layer). Dependencies must only flow downward.",
+      "id": "antipattern:layer-violation:user_repo-to-order_service",
+      "ignored": false,
+      "name": "Layer Violation",
+      "refactorSuggestion": "Apply Dependency Inversion: introduce an abstraction in the Repository/Model layer that the Service/Logic layer implements, so the dependency flows downward.",
+      "severity": "high",
+      "suggestedBreakPoint": "user_repo → order_service"
+    },
+    {
+      "affectedModuleIds": [
+        "d:/Elvis/Semestre 2-2026/SAAC/tests/fixtures/mock_antipatterns/services/user_service",
+        "d:/Elvis/Semestre 2-2026/SAAC/tests/fixtures/mock_antipatterns/controllers/admin_controller"
+      ],
+      "antipatternType": "layer-violation",
+      "description": "Layer violation in Layered architecture: 'user_service' (Service/Logic layer) depends on 'admin_controller' (Controller/UI layer). Dependencies must only flow downward.",
+      "id": "antipattern:layer-violation:user_service-to-admin_controller",
+      "ignored": false,
+      "name": "Layer Violation",
+      "refactorSuggestion": "Apply Dependency Inversion: introduce an abstraction in the Service/Logic layer that the Controller/UI layer implements, so the dependency flows downward.",
+      "severity": "high",
+      "suggestedBreakPoint": "user_service → admin_controller"
+    }
+  ],
+  "architecture": {
+    "actor_count": 2,
+    "antipattern_count": 4,
+    "container_count": 2,
+    "dependency_count": 12,
+    "detected_style": "layered",
+    "detected_type": "server",
+    "external_system_count": 0,
+    "fitness_score": 20.0,
+    "module_count": 8,
+    "style_confidence": 0.5
+  },
+  "ast_details": {
+    "total_classes_extracted": 8,
+    "total_external_calls": 0,
+    "total_functions_extracted": 0
+  },
+  "diagrams_diagnostics": [
+    {
+      "diagnostic_explanation": "Vista de Contexto C4 (Sistema + Actores + Sistemas Externos).",
+      "diagram": "C4 Level 1 (Context)",
+      "edges": 2,
+      "has_data": true,
+      "nodes": 3
+    },
+    {
+      "diagnostic_explanation": "Vista de Contenedores C4 (Frontend, Backend, DB, etc.).",
+      "diagram": "C4 Level 2 (Container)",
+      "edges": 3,
+      "has_data": true,
+      "nodes": 4
+    },
+    {
+      "diagnostic_explanation": "OK: Grafo de llamadas con 12 invocaciones inter-función.",
+      "diagram": "supplementary:call-graph",
+      "edges": 12,
+      "has_data": true,
+      "nodes": 8
+    },
+    {
+      "diagnostic_explanation": "OK: Secuencia de invocaciones generada con éxito.",
+      "diagram": "supplementary:sequence-diagram",
+      "edges": 12,
+      "has_data": true,
+      "nodes": 8
+    },
+    {
+      "diagnostic_explanation": "OK: Vista generada correctamente con 8 nodos y 12 aristas.",
+      "diagram": "supplementary:coupling-heatmap",
+      "edges": 12,
+      "has_data": true,
+      "nodes": 8
+    },
+    {
+      "diagnostic_explanation": "Atención: Se detectaron ciclos de dependencia entre los módulos marcados.",
+      "diagram": "supplementary:circular-dependencies",
+      "edges": 4,
+      "has_data": true,
+      "nodes": 3
+    },
+    {
+      "diagnostic_explanation": "OK: Vista generada correctamente con 5 nodos y 8 aristas.",
+      "diagram": "supplementary:package-diagram",
+      "edges": 8,
+      "has_data": true,
+      "nodes": 5
+    },
+    {
+      "diagnostic_explanation": "OK: Vista generada correctamente con 3 nodos y 2 aristas.",
+      "diagram": "supplementary:deployment-diagram",
+      "edges": 2,
+      "has_data": true,
+      "nodes": 3
+    },
+    {
+      "diagnostic_explanation": "OK (Por Diseño): Mapa visual de bloques jerárquicos de LOC (No requiere aristas por definición).",
+      "diagram": "supplementary:treemap",
+      "edges": 0,
+      "has_data": true,
+      "nodes": 8
+    },
+    {
+      "diagnostic_explanation": "OK: Vista generada correctamente con 8 nodos y 12 aristas.",
+      "diagram": "container:frontend",
+      "edges": 12,
+      "has_data": true,
+      "nodes": 8
+    },
+    {
+      "diagnostic_explanation": "OK (Sin Aristas): 1 elementos visualizados sin líneas de acoplamiento.",
+      "diagram": "supplementary:system-landscape",
+      "edges": 0,
+      "has_data": true,
+      "nodes": 1
+    },
+    {
+      "diagnostic_explanation": "OK: Vista generada correctamente con 8 nodos y 12 aristas.",
+      "diagram": "container:backend",
+      "edges": 12,
+      "has_data": true,
+      "nodes": 8
+    },
+    {
+      "diagnostic_explanation": "OK: Vista generada correctamente con 8 nodos y 12 aristas.",
+      "diagram": "supplementary:dfd-diagram",
+      "edges": 12,
+      "has_data": true,
+      "nodes": 8
+    },
+    {
+      "diagnostic_explanation": "OK: Vista generada correctamente con 13 nodos y 8 aristas.",
+      "diagram": "supplementary:file-tree",
+      "edges": 8,
+      "has_data": true,
+      "nodes": 13
+    },
+    {
+      "diagnostic_explanation": "OK: Entidades de modelo detectadas correctamente.",
+      "diagram": "supplementary:er-diagram",
+      "edges": 0,
+      "has_data": true,
+      "nodes": 1
+    },
+    {
+      "diagnostic_explanation": "OK: Vista generada correctamente con 8 nodos y 12 aristas.",
+      "diagram": "supplementary:dynamic-diagram",
+      "edges": 12,
+      "has_data": true,
+      "nodes": 8
+    },
+    {
+      "diagnostic_explanation": "OK (Por Diseño): Atribución de código e historia de autores por archivo Git (No requiere aristas por definición).",
+      "diagram": "supplementary:ownership-map",
+      "edges": 0,
+      "has_data": true,
+      "nodes": 8
+    },
+    {
+      "diagnostic_explanation": "OK (Sin Aristas): 8 elementos visualizados sin líneas de acoplamiento.",
+      "diagram": "supplementary:inheritance-tree",
+      "edges": 0,
+      "has_data": true,
+      "nodes": 8
+    }
+  ],
+  "metrics": {
+    "avgAbstractness": 0.0,
+    "avgCyclomaticComplexity": 1.0,
+    "avgDistance": 0.6791666666666667,
+    "avgInstability": 0.3208333333333333,
+    "cyclicDependencyCount": 1,
+    "fitnessScore": 0.0,
+    "maintainabilityIndexAvg": 80.0925,
+    "quantumCount": 0,
+    "totalClasses": 8,
+    "totalDependencies": 12,
+    "totalFunctions": 0,
+    "totalLloc": 44,
+    "totalLoc": 49,
+    "totalModules": 8
+  },
+  "overview": {
+    "duration_ms": 726,
+    "failed_files": 0,
+    "successful_files": 8,
+    "total_files": 8
+  },
+  "problematic_modules": [
+    {
+      "coupling_total": 7,
+      "cyclomatic_complexity_max": 1,
+      "id": "d:/Elvis/Semestre 2-2026/SAAC/tests/fixtures/mock_antipatterns/god_module",
+      "loc": 19,
+      "maintainability_index": 63.2,
+      "name": "god_module"
+    }
+  ],
+  "project_name": "mock_antipatterns",
+  "project_path": "d:\\Elvis\\Semestre 2-2026\\SAAC\\tests\\fixtures\\mock_antipatterns",
+  "saac_version": "2.0.0",
+  "timestamp": "2026-08-17T20:30:53.828622700+00:00"
+}

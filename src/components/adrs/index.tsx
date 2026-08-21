@@ -101,23 +101,23 @@ export const AdrsPanel: React.FC = () => {
   }, [adrs]);
 
   return (
-    <div className="flex-1 flex flex-col bg-[#0d0f17] overflow-hidden p-5 space-y-4 select-none">
+    <div className="flex-1 flex flex-col bg-[var(--bg)] text-[var(--text)] transition-colors duration-200 overflow-hidden p-5 space-y-4 select-none font-sans">
       {/* Top Header & Contadores */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-[#121520] p-4 rounded-xl border border-[#1e2333]">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-[var(--panel)] p-4 rounded-xl border border-[var(--border)]">
         <div className="flex items-center space-x-3">
-          <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+          <div className="p-2 rounded-lg bg-[var(--green)]/10 border border-[var(--green)]/20 text-[var(--green)]">
             <FileText className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-base font-extrabold text-white">
+            <h2 className="text-base font-extrabold text-[var(--text)]">
               Gestor de Decisiones Arquitectónicas (ADRs) &amp; Riesgos
             </h2>
-            <div className="flex items-center space-x-2 text-xs font-mono text-gray-400 mt-0.5">
-              <span>ADRs: <strong className="text-gray-200">{adrCounts.total}</strong></span>
+            <div className="flex items-center space-x-2 text-xs font-mono text-[var(--muted)] mt-0.5">
+              <span>ADRs: <strong className="text-[var(--text)]">{adrCounts.total}</strong></span>
               <span>•</span>
-              <span className="text-emerald-400">Aceptados: <strong>{adrCounts.accepted}</strong></span>
+              <span className="text-[var(--green)]">Aceptados: <strong>{adrCounts.accepted}</strong></span>
               <span>•</span>
-              <span className="text-amber-400">Riesgos Críticos: <strong>{riskCounts.critical}</strong></span>
+              <span className="text-[var(--yellow)]">Riesgos Críticos: <strong>{riskCounts.critical}</strong></span>
             </div>
           </div>
         </div>
@@ -127,7 +127,7 @@ export const AdrsPanel: React.FC = () => {
           {activeTab === 'adrs' && (
             <button
               onClick={() => setIsAdrModalOpen(true)}
-              className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs rounded-lg transition shadow-md flex items-center space-x-1.5"
+              className="px-3.5 py-1.5 bg-[var(--green)] hover:opacity-90 text-white font-bold text-xs rounded-lg transition shadow flex items-center space-x-1.5"
             >
               <Plus className="w-4 h-4" />
               <span>Nuevo ADR</span>
@@ -137,7 +137,7 @@ export const AdrsPanel: React.FC = () => {
           {activeTab === 'risks' && (
             <button
               onClick={() => setIsRiskModalOpen(true)}
-              className="px-3.5 py-1.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold text-xs rounded-lg transition shadow-md flex items-center space-x-1.5"
+              className="px-3.5 py-1.5 bg-[var(--yellow)] hover:opacity-90 text-white font-bold text-xs rounded-lg transition shadow flex items-center space-x-1.5"
             >
               <Plus className="w-4 h-4" />
               <span>Nuevo Riesgo</span>
@@ -148,13 +148,13 @@ export const AdrsPanel: React.FC = () => {
 
       {/* Navegación por Sub-pestañas y Filtros */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div className="flex items-center space-x-1 bg-[#121520] p-1 rounded-xl border border-[#1e2333]">
+        <div className="flex items-center space-x-1 bg-[var(--panel)] p-1 rounded-xl border border-[var(--border)]">
           <button
             onClick={() => setActiveTab('adrs')}
             className={`px-3 py-1.5 text-xs font-semibold rounded-lg flex items-center space-x-1.5 transition ${
               activeTab === 'adrs'
-                ? 'bg-emerald-600 text-white shadow-sm'
-                : 'text-gray-400 hover:text-gray-200'
+                ? 'bg-[var(--green)] text-white shadow-sm'
+                : 'text-[var(--muted)] hover:text-[var(--text)]'
             }`}
           >
             <FileText className="w-3.5 h-3.5" />
@@ -165,8 +165,8 @@ export const AdrsPanel: React.FC = () => {
             onClick={() => setActiveTab('risks')}
             className={`px-3 py-1.5 text-xs font-semibold rounded-lg flex items-center space-x-1.5 transition ${
               activeTab === 'risks'
-                ? 'bg-amber-600 text-white shadow-sm'
-                : 'text-gray-400 hover:text-gray-200'
+                ? 'bg-[var(--yellow)] text-white shadow-sm'
+                : 'text-[var(--muted)] hover:text-[var(--text)]'
             }`}
           >
             <AlertTriangle className="w-3.5 h-3.5" />
@@ -177,8 +177,8 @@ export const AdrsPanel: React.FC = () => {
             onClick={() => setActiveTab('annotations')}
             className={`px-3 py-1.5 text-xs font-semibold rounded-lg flex items-center space-x-1.5 transition ${
               activeTab === 'annotations'
-                ? 'bg-cyan-600 text-white shadow-sm'
-                : 'text-gray-400 hover:text-gray-200'
+                ? 'bg-[var(--cyan)] text-white shadow-sm'
+                : 'text-[var(--muted)] hover:text-[var(--text)]'
             }`}
           >
             <MessageSquare className="w-3.5 h-3.5" />
@@ -189,13 +189,13 @@ export const AdrsPanel: React.FC = () => {
         {/* Búsqueda y Filtros de Estado */}
         <div className="flex items-center space-x-2">
           <div className="relative">
-            <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-gray-500" />
+            <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-[var(--muted-2)]" />
             <input
               type="text"
               placeholder="Buscar..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-[#090b10] text-xs text-gray-200 pl-8 pr-2 py-1.5 rounded-lg border border-[#1e2333] focus:outline-none focus:border-cyan-500"
+              className="bg-[var(--bg)] text-xs text-[var(--text)] pl-8 pr-2 py-1.5 rounded-lg border border-[var(--border)] focus:outline-none focus:border-[var(--cyan)] placeholder:text-[var(--muted-2)]"
             />
           </div>
 
@@ -203,7 +203,7 @@ export const AdrsPanel: React.FC = () => {
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value as Adr['status'] | 'all')}
-              className="bg-[#090b10] text-xs text-gray-200 px-3 py-1.5 rounded-lg border border-[#1e2333] focus:outline-none focus:border-cyan-500 font-mono"
+              className="bg-[var(--bg)] text-xs text-[var(--text)] px-3 py-1.5 rounded-lg border border-[var(--border)] focus:outline-none focus:border-[var(--cyan)] font-mono"
             >
               <option value="all">Todos los Estados</option>
               <option value="Accepted">Aceptados</option>
@@ -218,7 +218,7 @@ export const AdrsPanel: React.FC = () => {
             <select
               value={selectedSeverity}
               onChange={(e) => setSelectedSeverity(e.target.value as Risk['severity'] | 'all')}
-              className="bg-[#090b10] text-xs text-gray-200 px-3 py-1.5 rounded-lg border border-[#1e2333] focus:outline-none focus:border-cyan-500 font-mono"
+              className="bg-[var(--bg)] text-xs text-[var(--text)] px-3 py-1.5 rounded-lg border border-[var(--border)] focus:outline-none focus:border-[var(--cyan)] font-mono"
             >
               <option value="all">Todas las Severidades</option>
               <option value="Critical">Crítico</option>
@@ -234,10 +234,10 @@ export const AdrsPanel: React.FC = () => {
       <div className="flex-1 overflow-y-auto space-y-3 pr-1">
         {activeTab === 'adrs' && (
           filteredAdrs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-48 text-center text-gray-500">
-              <CheckCircle2 className="w-10 h-10 text-emerald-400/40 mb-2" />
-              <p className="font-semibold text-sm text-gray-300">No hay decisiones registadas.</p>
-              <p className="text-xs text-gray-500">Haga clic en "+ Nuevo ADR" para registrar una decisión arquitectónica.</p>
+            <div className="flex flex-col items-center justify-center h-48 text-center text-[var(--muted)]">
+              <CheckCircle2 className="w-10 h-10 text-[var(--green)]/40 mb-2" />
+              <p className="font-semibold text-sm text-[var(--text)]">No hay decisiones registradas.</p>
+              <p className="text-xs text-[var(--muted)]">Haga clic en "+ Nuevo ADR" para registrar una decisión arquitectónica.</p>
             </div>
           ) : (
             filteredAdrs.map((adr) => <AdrCard key={adr.id} adr={adr} />)
@@ -246,10 +246,10 @@ export const AdrsPanel: React.FC = () => {
 
         {activeTab === 'risks' && (
           filteredRisks.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-48 text-center text-gray-500">
-              <ShieldCheck className="w-10 h-10 text-amber-400/40 mb-2" />
-              <p className="font-semibold text-sm text-gray-300">No hay riesgos registrados.</p>
-              <p className="text-xs text-gray-500">Haga clic en "+ Nuevo Riesgo" para auditar posibles riesgos técnicos.</p>
+            <div className="flex flex-col items-center justify-center h-48 text-center text-[var(--muted)]">
+              <ShieldCheck className="w-10 h-10 text-[var(--yellow)]/40 mb-2" />
+              <p className="font-semibold text-sm text-[var(--text)]">No hay riesgos registrados.</p>
+              <p className="text-xs text-[var(--muted)]">Haga clic en "+ Nuevo Riesgo" para auditar posibles riesgos técnicos.</p>
             </div>
           ) : (
             filteredRisks.map((risk) => <RiskCard key={risk.id} risk={risk} />)
@@ -258,10 +258,10 @@ export const AdrsPanel: React.FC = () => {
 
         {activeTab === 'annotations' && (
           filteredAnnotations.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-48 text-center text-gray-500">
-              <MessageSquare className="w-10 h-10 text-cyan-400/40 mb-2" />
-              <p className="font-semibold text-sm text-gray-300">No hay anotaciones técnicas.</p>
-              <p className="text-xs text-gray-500">Las notas técnicas guardadas aparecerán aquí.</p>
+            <div className="flex flex-col items-center justify-center h-48 text-center text-[var(--muted)]">
+              <MessageSquare className="w-10 h-10 text-[var(--cyan)]/40 mb-2" />
+              <p className="font-semibold text-sm text-[var(--text)]">No hay anotaciones técnicas.</p>
+              <p className="text-xs text-[var(--muted)]">Las notas técnicas guardadas aparecerán aquí.</p>
             </div>
           ) : (
             filteredAnnotations.map((ann) => <AnnotationCard key={ann.id} annotation={ann} />)

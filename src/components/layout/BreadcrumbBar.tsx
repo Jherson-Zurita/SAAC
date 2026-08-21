@@ -12,22 +12,22 @@ export const BreadcrumbBar: React.FC = () => {
   const getIconForLevel = (level: 1 | 2 | 3 | 4) => {
     switch (level) {
       case 1:
-        return <Sparkles className="w-3.5 h-3.5 text-cyan-400" />;
+        return <Sparkles className="w-3.5 h-3.5 text-[var(--cyan)]" />;
       case 2:
-        return <Box className="w-3.5 h-3.5 text-blue-400" />;
+        return <Box className="w-3.5 h-3.5 text-[var(--purple)]" />;
       case 3:
-        return <Layers className="w-3.5 h-3.5 text-purple-400" />;
+        return <Layers className="w-3.5 h-3.5 text-[var(--purple)]" />;
       case 4:
-        return <Code2 className="w-3.5 h-3.5 text-emerald-400" />;
+        return <Code2 className="w-3.5 h-3.5 text-[var(--green)]" />;
     }
   };
 
   return (
     <nav
-      className="h-8 bg-[#0e1017] border-b border-[#1f2433] px-3 flex items-center space-x-1.5 text-xs select-none overflow-hidden"
+      className="h-8 bg-[var(--panel)] border-b border-[var(--border)] px-3 flex items-center space-x-1.5 text-xs select-none overflow-hidden font-sans transition-colors duration-200"
       aria-label="Navegación jerárquica C4"
     >
-      <div className="flex items-center space-x-1 text-gray-500 font-semibold uppercase tracking-wider text-[10px] mr-2">
+      <div className="flex items-center space-x-1 text-[var(--muted)] font-semibold uppercase tracking-wider text-[10px] mr-2">
         <span>Navegación C4:</span>
       </div>
 
@@ -40,17 +40,17 @@ export const BreadcrumbBar: React.FC = () => {
               type="button"
               onClick={() => navigateToBreadcrumb(idx)}
               aria-current={isLast ? 'page' : undefined}
-              className={`flex min-w-0 items-center space-x-1 px-2 py-0.5 rounded transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60 ${
+              className={`flex min-w-0 items-center space-x-1 px-2 py-0.5 rounded transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--purple)]/60 ${
                 isLast
-                  ? 'bg-blue-600/20 text-blue-300 font-semibold border border-blue-500/30'
-                  : 'text-gray-400 hover:text-white hover:bg-[#1a1e2c]'
+                  ? 'bg-[var(--purple-soft)] text-[var(--purple)] font-semibold border border-[var(--purple-border)]'
+                  : 'text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--panel-2)]'
               }`}
             >
               {getIconForLevel(item.level)}
               <span className="truncate whitespace-nowrap">{item.label}</span>
             </button>
 
-            {!isLast && <ChevronRight className="w-3.5 h-3.5 text-gray-600" />}
+            {!isLast && <ChevronRight className="w-3.5 h-3.5 text-[var(--muted-2)]" />}
           </React.Fragment>
         );
       })}

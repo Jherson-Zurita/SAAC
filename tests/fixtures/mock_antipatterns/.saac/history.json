@@ -1,0 +1,16 @@
+{
+  "runs": [
+    {
+      "runId": "18ccb1cec78d3b78-e04",
+      "timestamp": "2026-08-17T20:30:53.828622700+00:00",
+      "totalFiles": 8,
+      "successful": 8,
+      "failed": 0,
+      "durationMs": 726,
+      "moduleCount": 8,
+      "dependencyCount": 12,
+      "antipatternCount": 4,
+      "fitnessScore": 20.0
+    }
+  ]
+}

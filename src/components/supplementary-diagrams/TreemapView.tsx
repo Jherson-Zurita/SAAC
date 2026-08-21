@@ -11,30 +11,30 @@ export const TreemapView: React.FC<TreemapViewProps> = ({ diagramData: _diagramD
   const modules = amg?.modules || [];
 
   if (modules.length === 0) {
-    return <div className="p-4 text-center text-[#858C98] font-sans text-xs">Sin datos de módulos para el Treemap.</div>;
+    return <div className="p-4 text-center text-[var(--muted)] font-sans text-xs">Sin datos de módulos para el Treemap.</div>;
   }
 
   const totalLoc = modules.reduce((sum, m) => sum + (m.loc || 1), 0);
 
   return (
-    <div className="flex flex-col w-full h-full p-4 overflow-auto bg-[#0B0E12] text-[#E6E9ED] font-sans">
+    <div className="flex flex-col w-full h-full p-4 overflow-auto bg-[var(--bg)] text-[var(--text)] font-sans transition-colors duration-200">
       <div className="mb-3">
-        <h3 className="text-sm font-bold text-[#8B7CFF] tracking-tight">Mapa de Carpetas y Módulos (Treemap)</h3>
-        <p className="text-xs text-[#858C98]">
+        <h3 className="text-sm font-bold text-[var(--purple)] tracking-tight">Mapa de Carpetas y Módulos (Treemap)</h3>
+        <p className="text-xs text-[var(--muted)]">
           El área de cada celda es proporcional a sus Líneas de Código (LOC). El color representa la salud arquitectónica (Verde: Alta mantenibilidad, Rojo: Complejo/Inestable).
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-2 p-2 border border-[#252B34] rounded-md bg-[#101318] flex-1 min-h-[400px]">
+      <div className="flex flex-wrap gap-2 p-2 border border-[var(--border)] rounded-md bg-[var(--panel)] flex-1 min-h-[400px]">
         {modules.map((m) => {
           const pct = Math.max(8, Math.min(100, ((m.loc || 1) / totalLoc) * 100 * 3));
           const maint = m.metrics.maintainabilityIndex || 70;
 
-          let bgColor = 'bg-[#4FD49A]/10 border-[#4FD49A]/30 text-[#4FD49A]';
+          let bgColor = 'bg-[#4FD49A]/10 border-[#4FD49A]/30 text-[var(--green)]';
           if (maint < 50) {
-            bgColor = 'bg-[#EF6B73]/15 border-[#EF6B73]/40 text-[#EF6B73]';
+            bgColor = 'bg-[#EF6B73]/15 border-[#EF6B73]/40 text-[var(--red)]';
           } else if (maint < 70) {
-            bgColor = 'bg-[#E7B85B]/15 border-[#E7B85B]/40 text-[#E7B85B]';
+            bgColor = 'bg-[#E7B85B]/15 border-[#E7B85B]/40 text-[var(--yellow)]';
           }
 
           return (

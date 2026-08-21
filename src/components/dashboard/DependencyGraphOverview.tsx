@@ -25,7 +25,7 @@ export const DependencyGraphOverview: React.FC<DependencyGraphOverviewProps> = (
     const rawNodes: Node[] = amg.modules.map((mod) => {
       const mi = mod.metrics.maintainabilityIndex;
       const borderColor =
-        mi >= 80 ? '#10b981' : mi >= 60 ? '#f59e0b' : '#f43f5e';
+        mi >= 80 ? 'var(--green)' : mi >= 60 ? 'var(--yellow)' : 'var(--red)';
 
       return {
         id: mod.id,
@@ -33,14 +33,14 @@ export const DependencyGraphOverview: React.FC<DependencyGraphOverviewProps> = (
         data: { label: mod.name, module: mod },
         type: 'default',
         style: {
-          background: '#161a26',
-          color: '#f3f4f6',
+          background: 'var(--panel-2)',
+          color: 'var(--text)',
           border: `1.5px solid ${borderColor}`,
           borderRadius: '8px',
           fontSize: '12px',
           fontWeight: 600,
           padding: '8px 12px',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
         },
       };
     });
@@ -50,10 +50,10 @@ export const DependencyGraphOverview: React.FC<DependencyGraphOverviewProps> = (
       source: dep.source,
       target: dep.target,
       animated: dep.kind === 'http-call' || dep.kind === 'messaging',
-      style: { stroke: '#3b82f6', strokeWidth: 1.5 },
+      style: { stroke: 'var(--cyan)', strokeWidth: 1.5 },
       markerEnd: {
         type: MarkerType.ArrowClosed,
-        color: '#3b82f6',
+        color: 'var(--cyan)',
         width: 15,
         height: 15,
       },
@@ -69,8 +69,8 @@ export const DependencyGraphOverview: React.FC<DependencyGraphOverviewProps> = (
   };
 
   return (
-    <div className="h-[450px] w-full bg-[#0d0f17] border border-[#1e2333] rounded-xl overflow-hidden relative shadow-lg">
-      <div className="absolute top-3 left-3 z-10 bg-[#121520]/90 backdrop-blur-md px-3 py-1.5 rounded-lg border border-[#1e2333] text-xs font-semibold text-gray-200">
+    <div className="h-[450px] w-full bg-[var(--diagram-canvas)] border border-[var(--border)] rounded-xl overflow-hidden relative shadow-lg">
+      <div className="absolute top-3 left-3 z-10 bg-[var(--diagram-toolbar-bg)] backdrop-blur-md px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs font-semibold text-[var(--text)]">
         Grafo de Dependencias Generales ({amg.modules.length} módulos, {amg.dependencies.length} aristas)
       </div>
 
@@ -81,12 +81,12 @@ export const DependencyGraphOverview: React.FC<DependencyGraphOverviewProps> = (
         fitView
         attributionPosition="bottom-right"
       >
-        <Background color="#1e2333" gap={16} />
-        <Controls className="bg-[#121520] border border-[#1e2333] fill-gray-300 text-gray-300 rounded-lg overflow-hidden" />
+        <Background color="var(--diagram-grid)" gap={16} />
+        <Controls className="bg-[var(--panel)] border border-[var(--border)] fill-[var(--text)] text-[var(--text)] rounded-lg overflow-hidden" />
         <MiniMap
-          nodeColor={(n) => (n.style?.border as string)?.split(' ')[2] || '#3b82f6'}
-          maskColor="rgba(9, 11, 16, 0.8)"
-          className="bg-[#121520] border border-[#1e2333] rounded-lg"
+          nodeColor={(n) => (n.style?.border as string)?.split(' ')[2] || 'var(--cyan)'}
+          maskColor="var(--diagram-minimap-mask)"
+          className="bg-[var(--panel)] border border-[var(--border)] rounded-lg"
         />
       </ReactFlow>
     </div>

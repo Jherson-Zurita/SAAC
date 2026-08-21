@@ -10,16 +10,16 @@ export const Dashboard: React.FC = () => {
 
   if (!amg) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-center p-6 text-gray-500">
-        <LayoutDashboard className="w-12 h-12 text-blue-400/40 mb-2" />
-        <p className="font-semibold text-sm text-gray-300">No hay datos de análisis disponibles.</p>
-        <p className="text-xs text-gray-500">Abra un proyecto e inicie el análisis para ver el Dashboard.</p>
+      <div className="flex flex-col items-center justify-center h-full text-center p-6 text-[var(--muted)]">
+        <LayoutDashboard className="w-12 h-12 text-[var(--purple)]/40 mb-2" />
+        <p className="font-semibold text-sm text-[var(--text)]">No hay datos de análisis disponibles.</p>
+        <p className="text-xs text-[var(--muted)]">Abra un proyecto e inicie el análisis para ver el Dashboard.</p>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-5 space-y-5 bg-[#0d0f17]">
+    <div className="flex-1 overflow-y-auto p-5 space-y-5 bg-[var(--bg)] text-[var(--text)] transition-colors duration-200 font-sans">
       {/* Tarjeta de Resumen del Proyecto */}
       <ProjectSummaryCard amg={amg} fitnessResult={fitnessResult} />
 

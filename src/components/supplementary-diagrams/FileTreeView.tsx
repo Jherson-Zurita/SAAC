@@ -136,7 +136,7 @@ const FileTreeNode: React.FC<NodeProps> = ({ data, sourcePosition, targetPositio
         style={{
           fontSize: isRoot ? 11 : 10,
           fontWeight: isRoot ? 700 : isDir ? 600 : 400,
-          color: isDir ? '#93c5fd' : '#d1d5db',
+          color: isDir ? 'var(--cyan)' : 'var(--text)',
           maxWidth: 110,
           textAlign: 'center',
           overflow: 'hidden',
@@ -412,20 +412,20 @@ export const FileTreeView: React.FC<FileTreeViewProps> = ({ diagramData: _diagra
           top: 12,
           left: 12,
           zIndex: 10,
-          background: 'rgba(15, 23, 42, 0.92)',
+          background: 'var(--diagram-toolbar-bg)',
           backdropFilter: 'blur(8px)',
           padding: '8px 14px',
           borderRadius: 10,
-          border: '1px solid #1e293b',
+          border: '1px solid var(--border)',
           display: 'flex',
           flexDirection: 'column',
           gap: 2,
         }}
       >
-        <span style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
           Árbol de Directorios — Grafo Horizontal
         </span>
-        <span style={{ fontSize: 10, color: '#94a3b8' }}>
+        <span style={{ fontSize: 10, color: 'var(--muted)' }}>
           Clic en una carpeta para expandir/colapsar · {layoutedNodes.length} nodos visibles
         </span>
       </div>
@@ -441,11 +441,11 @@ export const FileTreeView: React.FC<FileTreeViewProps> = ({ diagramData: _diagra
         maxZoom={3}
         attributionPosition="bottom-right"
       >
-        <Background color="#1e293b" gap={20} />
+        <Background color="var(--diagram-grid)" gap={20} />
         <Controls
           style={{
-            background: '#0f172a',
-            border: '1px solid #1e293b',
+            background: 'var(--panel)',
+            border: '1px solid var(--border)',
             borderRadius: 8,
           }}
         />
@@ -454,10 +454,10 @@ export const FileTreeView: React.FC<FileTreeViewProps> = ({ diagramData: _diagra
             const d = n.data as FileTreeNodeData;
             return d.entry.isDir ? '#3b82f6' : (LANG_COLORS[d.entry.language || ''] || '#6b7280');
           }}
-          maskColor="rgba(9, 11, 16, 0.8)"
+          maskColor="var(--diagram-minimap-mask)"
           style={{
-            background: '#0f172a',
-            border: '1px solid #1e293b',
+            background: 'var(--panel)',
+            border: '1px solid var(--border)',
             borderRadius: 8,
           }}
         />

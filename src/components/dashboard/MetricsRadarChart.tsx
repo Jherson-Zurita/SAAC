@@ -64,8 +64,8 @@ export const MetricsRadarChart: React.FC<MetricsRadarChartProps> = ({
   const levels = [0.2, 0.4, 0.6, 0.8, 1.0];
 
   return (
-    <div className="bg-[#121520] border border-[#1e2333] rounded-xl p-5 shadow-lg select-none flex flex-col items-center justify-center">
-      <h3 className="text-sm font-bold text-gray-200 uppercase tracking-wider mb-2 self-start">
+    <div className="bg-[var(--panel)] border border-[var(--border)] rounded-xl p-5 shadow-lg select-none flex flex-col items-center justify-center">
+      <h3 className="text-sm font-bold text-[var(--text)] uppercase tracking-wider mb-2 self-start">
         Perfil de Salud Arquitectónica
       </h3>
 
@@ -79,7 +79,7 @@ export const MetricsRadarChart: React.FC<MetricsRadarChartProps> = ({
               cy={center}
               r={radius * level}
               fill="none"
-              stroke="#1e2333"
+              stroke="var(--border)"
               strokeDasharray={idx === levels.length - 1 ? 'none' : '3,3'}
               strokeWidth="1"
             />
@@ -95,7 +95,7 @@ export const MetricsRadarChart: React.FC<MetricsRadarChartProps> = ({
                 y1={center}
                 x2={x}
                 y2={y}
-                stroke="#1e2333"
+                stroke="var(--border)"
                 strokeWidth="1"
               />
             );
@@ -105,9 +105,9 @@ export const MetricsRadarChart: React.FC<MetricsRadarChartProps> = ({
           <polygon
             points={polygonPoints}
             fill="rgba(6, 182, 212, 0.25)"
-            stroke="#06b6d4"
+            stroke="var(--cyan)"
             strokeWidth="2"
-            className="transition-all duration-500 hover:fill-cyan-500/35"
+            className="transition-all duration-500 hover:fill-[var(--cyan)]/35"
           />
 
           {/* Puntos y etiquetas de los vértices */}
@@ -117,13 +117,13 @@ export const MetricsRadarChart: React.FC<MetricsRadarChartProps> = ({
 
             return (
               <g key={i}>
-                <circle cx={x} cy={y} r="4" fill="#06b6d4" stroke="#ffffff" strokeWidth="1.5" />
+                <circle cx={x} cy={y} r="4" fill="var(--cyan)" stroke="var(--panel)" strokeWidth="1.5" />
                 <text
                   x={labelCoords.x}
                   y={labelCoords.y}
                   textAnchor="middle"
                   dominantBaseline="central"
-                  className="fill-gray-300 text-[10px] font-semibold font-mono"
+                  className="fill-[var(--text)] text-[10px] font-semibold font-mono"
                 >
                   {d.label.split(' ')[0]} ({Math.round(d.value)})
                 </text>

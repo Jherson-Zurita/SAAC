@@ -12,14 +12,14 @@ export const OwnershipMapView: React.FC<OwnershipMapViewProps> = ({ diagramData:
   const modules = amg?.modules || [];
 
   if (modules.length === 0) {
-    return <div className="p-4 text-center text-[#858C98] font-sans text-xs">Sin datos de módulos para Ownership Map.</div>;
+    return <div className="p-4 text-center text-[var(--muted)] font-sans text-xs">Sin datos de módulos para Ownership Map.</div>;
   }
 
   return (
-    <div className="flex flex-col w-full h-full p-4 overflow-auto bg-[#0B0E12] text-[#E6E9ED] font-sans">
+    <div className="flex flex-col w-full h-full p-4 overflow-auto bg-[var(--bg)] text-[var(--text)] font-sans transition-colors duration-200">
       <div className="mb-3">
-        <h3 className="text-sm font-bold text-[#8B7CFF] tracking-tight">Mapa de Contribuciones y Propiedad (Ownership & Bus-Factor)</h3>
-        <p className="text-xs text-[#858C98]">
+        <h3 className="text-sm font-bold text-[var(--purple)] tracking-tight">Mapa de Contribuciones y Propiedad (Ownership & Bus-Factor)</h3>
+        <p className="text-xs text-[var(--muted)]">
           Identifica autores principales por módulo y detecta módulos con riesgo de Bus Factor (dominados por 1 solo desarrollador).
         </p>
       </div>
@@ -35,27 +35,27 @@ export const OwnershipMapView: React.FC<OwnershipMapViewProps> = ({ diagramData:
               className={`p-3 rounded-md border flex flex-col justify-between ${
                 isBusFactorRisk
                   ? 'bg-[#E7B85B]/10 border-[#E7B85B]/40'
-                  : 'bg-[#101318] border-[#252B34]'
+                  : 'bg-[var(--panel)] border-[var(--border)]'
               }`}
             >
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <span className="font-semibold text-xs text-[#E6E9ED] truncate" title={m.id}>
+                  <span className="font-semibold text-xs text-[var(--text)] truncate" title={m.id}>
                     {m.name}
                   </span>
                   {isBusFactorRisk && (
-                    <span className="flex items-center gap-1 text-[9.5px] px-1.5 py-0.5 rounded bg-[#E7B85B]/20 text-[#E7B85B] font-bold border border-[#E7B85B]/30">
+                    <span className="flex items-center gap-1 text-[9.5px] px-1.5 py-0.5 rounded bg-[#E7B85B]/20 text-[var(--yellow)] font-bold border border-[#E7B85B]/30">
                       <AlertTriangle className="w-3 h-3" /> Bus Factor
                     </span>
                   )}
                 </div>
-                <div className="text-[10px] text-[#5F6671] font-mono truncate">{m.id}</div>
+                <div className="text-[10px] text-[var(--muted-2)] font-mono truncate">{m.id}</div>
               </div>
 
-              <div className="mt-3 pt-2 border-t border-[#252B34] flex items-center justify-between text-[10px] text-[#858C98]">
+              <div className="mt-3 pt-2 border-t border-[var(--border-soft)] flex items-center justify-between text-[10px] text-[var(--muted)]">
                 <div className="flex items-center gap-1">
-                  <UserCheck className="w-3 h-3 text-[#45C8DF]" />
-                  <span>Autor: <strong className="text-[#E6E9ED]">{author}</strong></span>
+                  <UserCheck className="w-3 h-3 text-[var(--cyan)]" />
+                  <span>Autor: <strong className="text-[var(--text)]">{author}</strong></span>
                 </div>
                 <div className="font-mono">LOC: {m.loc}</div>
               </div>

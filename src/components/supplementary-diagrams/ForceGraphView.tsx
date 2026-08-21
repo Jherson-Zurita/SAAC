@@ -263,20 +263,20 @@ export const ForceGraphView: React.FC<ForceGraphViewProps> = ({ diagramData: _di
           top: 12,
           left: 12,
           zIndex: 10,
-          background: 'rgba(15, 23, 42, 0.92)',
+          background: 'var(--diagram-toolbar-bg)',
           backdropFilter: 'blur(8px)',
           padding: '8px 14px',
           borderRadius: 10,
-          border: '1px solid #1e293b',
+          border: '1px solid var(--border)',
           display: 'flex',
           flexDirection: 'column',
           gap: 4,
         }}
       >
-        <span style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
           Grafo de Dependencias — Nodos Proporcionales
         </span>
-        <span style={{ fontSize: 10, color: '#94a3b8' }}>
+        <span style={{ fontSize: 10, color: 'var(--muted)' }}>
           Tamaño ∝ N° de conexiones · Color = Índice de Mantenibilidad · {modules.length} módulos · {dependencies.length} aristas · Clic en un nodo para inspección
         </span>
       </div>
@@ -288,17 +288,17 @@ export const ForceGraphView: React.FC<ForceGraphViewProps> = ({ diagramData: _di
           top: 12,
           right: 12,
           zIndex: 10,
-          background: 'rgba(15, 23, 42, 0.92)',
+          background: 'var(--diagram-toolbar-bg)',
           backdropFilter: 'blur(8px)',
           padding: '8px 12px',
           borderRadius: 10,
-          border: '1px solid #1e293b',
+          border: '1px solid var(--border)',
           display: 'flex',
           flexDirection: 'column',
           gap: 5,
         }}
       >
-        <span style={{ fontSize: 10, fontWeight: 600, color: '#cbd5e1' }}>Leyenda</span>
+        <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text)' }}>Leyenda</span>
         {[
           { color: '#10b981', label: 'MI ≥ 80 (Saludable)' },
           { color: '#f59e0b', label: 'MI 60–79 (Alerta)' },
@@ -314,11 +314,11 @@ export const ForceGraphView: React.FC<ForceGraphViewProps> = ({ diagramData: _di
                 border: `1.5px solid ${color}`,
               }}
             />
-            <span style={{ fontSize: 9, color: '#94a3b8' }}>{label}</span>
+            <span style={{ fontSize: 9, color: 'var(--muted)' }}>{label}</span>
           </div>
         ))}
-        <div style={{ borderTop: '1px solid #334155', paddingTop: 4, marginTop: 2 }}>
-          <span style={{ fontSize: 9, color: '#64748b' }}>
+        <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 4, marginTop: 2 }}>
+          <span style={{ fontSize: 9, color: 'var(--muted-2)' }}>
             ⬤ grande = muchas conexiones
           </span>
         </div>
@@ -335,11 +335,11 @@ export const ForceGraphView: React.FC<ForceGraphViewProps> = ({ diagramData: _di
         maxZoom={3}
         attributionPosition="bottom-right"
       >
-        <Background color="#1e293b" gap={20} />
+        <Background color="var(--diagram-grid)" gap={20} />
         <Controls
           style={{
-            background: '#0f172a',
-            border: '1px solid #1e293b',
+            background: 'var(--panel)',
+            border: '1px solid var(--border)',
             borderRadius: 8,
           }}
         />
@@ -348,10 +348,10 @@ export const ForceGraphView: React.FC<ForceGraphViewProps> = ({ diagramData: _di
             const d = n.data as ForceNodeData;
             return getHealthColor(d.maintainability);
           }}
-          maskColor="rgba(9, 11, 16, 0.8)"
+          maskColor="var(--diagram-minimap-mask)"
           style={{
-            background: '#0f172a',
-            border: '1px solid #1e293b',
+            background: 'var(--panel)',
+            border: '1px solid var(--border)',
             borderRadius: 8,
           }}
         />

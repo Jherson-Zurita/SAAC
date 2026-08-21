@@ -54,21 +54,36 @@
     --bg: #F5F6FA;
     --panel: #FFFFFF;
     --panel-2: #F0F2F8;
-    --panel-3: #E8EBF2;
-    --border: #E2E5ED;
-    --border-soft: #D1D5E0;
-    --text: #1A1D28;
-    --muted: #4B5563;
+    --panel-3: #E4E7F0;
+    --border: #DDE1EC;
+    --border-soft: #E8ECF4;
+    --text: #1E232A;
+    --muted: #5F6671;
     --muted-2: #858C98;
     --purple: #6366F1;
     --purple-soft: #EEF2FF;
     --purple-border: #C7D2FE;
-    --diagram-canvas: #EEF0F6;
-    --diagram-grid: #E2E5ED;
+    --cyan: #0284C7;
+    --green: #059669;
+    --yellow: #D97706;
+    --red: #DC2626;
+    --orange: #EA580C;
+
+    /* Backward compatibility mapping */
+    --bg-dark: var(--bg);
+    --panel-dark: var(--panel);
+    --panel-border: var(--border);
+    --panel-border-light: var(--border-soft);
+    --text-primary: var(--text);
+    --text-secondary: var(--muted);
+    --text-muted: var(--muted-2);
+
+    --diagram-canvas: #F1F4F9;
+    --diagram-grid: #CBD5E1;
     --diagram-node-bg: #FFFFFF;
     --diagram-toolbar-bg: rgba(255, 255, 255, 0.94);
     --diagram-minimap-mask: rgba(245, 246, 250, 0.85);
-    --diagram-overlay-bg: rgba(245, 246, 250, 0.78);
+    --diagram-overlay-bg: rgba(245, 246, 250, 0.92);
   }
 
   body {
