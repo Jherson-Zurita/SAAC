@@ -1,0 +1,256 @@
+{
+  "antipatterns": [],
+  "architecture": {
+    "actor_count": 1,
+    "antipattern_count": 0,
+    "container_count": 2,
+    "dependency_count": 208,
+    "detected_style": "unknown",
+    "detected_type": "desktop",
+    "external_system_count": 0,
+    "fitness_score": 80.0,
+    "module_count": 91,
+    "style_confidence": 0.0
+  },
+  "ast_details": {
+    "total_classes_extracted": 135,
+    "total_external_calls": 0,
+    "total_functions_extracted": 172
+  },
+  "diagrams_diagnostics": [
+    {
+      "diagnostic_explanation": "Vista de Contexto C4 (Sistema + Actores + Sistemas Externos).",
+      "diagram": "C4 Level 1 (Context)",
+      "edges": 1,
+      "has_data": true,
+      "nodes": 2
+    },
+    {
+      "diagnostic_explanation": "Vista de Contenedores C4 (Frontend, Backend, DB, etc.).",
+      "diagram": "C4 Level 2 (Container)",
+      "edges": 2,
+      "has_data": true,
+      "nodes": 3
+    },
+    {
+      "diagnostic_explanation": "OK (Por Diseño): Atribución de código e historia de autores por archivo Git (No requiere aristas por definición).",
+      "diagram": "supplementary:ownership-map",
+      "edges": 0,
+      "has_data": true,
+      "nodes": 91
+    },
+    {
+      "diagnostic_explanation": "OK: Vista generada correctamente con 91 nodos y 206 aristas.",
+      "diagram": "container:frontend",
+      "edges": 206,
+      "has_data": true,
+      "nodes": 91
+    },
+    {
+      "diagnostic_explanation": "OK: Vista generada correctamente con 3 nodos y 2 aristas.",
+      "diagram": "supplementary:deployment-diagram",
+      "edges": 2,
+      "has_data": true,
+      "nodes": 3
+    },
+    {
+      "diagnostic_explanation": "OK: Vista generada correctamente con 91 nodos y 208 aristas.",
+      "diagram": "supplementary:coupling-heatmap",
+      "edges": 208,
+      "has_data": true,
+      "nodes": 91
+    },
+    {
+      "diagnostic_explanation": "OK: Vista generada correctamente con 91 nodos y 206 aristas.",
+      "diagram": "supplementary:dynamic-diagram",
+      "edges": 206,
+      "has_data": true,
+      "nodes": 91
+    },
+    {
+      "diagnostic_explanation": "OK (Por Diseño): Mapa visual de bloques jerárquicos de LOC (No requiere aristas por definición).",
+      "diagram": "supplementary:treemap",
+      "edges": 0,
+      "has_data": true,
+      "nodes": 91
+    },
+    {
+      "diagnostic_explanation": "OK: Grafo de llamadas con 91 invocaciones inter-función.",
+      "diagram": "supplementary:call-graph",
+      "edges": 91,
+      "has_data": true,
+      "nodes": 180
+    },
+    {
+      "diagnostic_explanation": "OK (Sin Aristas): 1 elementos visualizados sin líneas de acoplamiento.",
+      "diagram": "supplementary:system-landscape",
+      "edges": 0,
+      "has_data": true,
+      "nodes": 1
+    },
+    {
+      "diagnostic_explanation": "OK (Sin Aristas): 135 elementos visualizados sin líneas de acoplamiento.",
+      "diagram": "supplementary:inheritance-tree",
+      "edges": 0,
+      "has_data": true,
+      "nodes": 135
+    },
+    {
+      "diagnostic_explanation": "OK: Vista generada correctamente con 115 nodos y 91 aristas.",
+      "diagram": "supplementary:file-tree",
+      "edges": 91,
+      "has_data": true,
+      "nodes": 115
+    },
+    {
+      "diagnostic_explanation": "OK: Secuencia de invocaciones generada con éxito.",
+      "diagram": "supplementary:sequence-diagram",
+      "edges": 30,
+      "has_data": true,
+      "nodes": 81
+    },
+    {
+      "diagnostic_explanation": "OK: Vista generada correctamente con 24 nodos y 46 aristas.",
+      "diagram": "supplementary:package-diagram",
+      "edges": 46,
+      "has_data": true,
+      "nodes": 24
+    },
+    {
+      "diagnostic_explanation": "OK: Vista generada correctamente con 91 nodos y 206 aristas.",
+      "diagram": "container:backend",
+      "edges": 206,
+      "has_data": true,
+      "nodes": 91
+    },
+    {
+      "diagnostic_explanation": "OK: Vista generada correctamente con 91 nodos y 208 aristas.",
+      "diagram": "supplementary:dfd-diagram",
+      "edges": 208,
+      "has_data": true,
+      "nodes": 91
+    },
+    {
+      "diagnostic_explanation": "OK (Limpio): 0 dependencias circulares. No existen ciclos A -> B -> A en el proyecto.",
+      "diagram": "supplementary:circular-dependencies",
+      "edges": 0,
+      "has_data": false,
+      "nodes": 0
+    },
+    {
+      "diagnostic_explanation": "OK: Entidades de modelo detectadas correctamente.",
+      "diagram": "supplementary:er-diagram",
+      "edges": 1,
+      "has_data": true,
+      "nodes": 22
+    }
+  ],
+  "metrics": {
+    "avgAbstractness": 0.5934065934065934,
+    "avgCyclomaticComplexity": 9.073846153846153,
+    "avgDistance": 0.49377571146801913,
+    "avgInstability": 0.5328665351742276,
+    "cyclicDependencyCount": 0,
+    "fitnessScore": 0.0,
+    "maintainabilityIndexAvg": 45.19747252747252,
+    "quantumCount": 0,
+    "totalClasses": 135,
+    "totalDependencies": 208,
+    "totalFunctions": 172,
+    "totalLloc": 12340,
+    "totalLoc": 14291,
+    "totalModules": 91
+  },
+  "overview": {
+    "duration_ms": 8845,
+    "failed_files": 87,
+    "successful_files": 91,
+    "total_files": 178
+  },
+  "problematic_modules": [
+    {
+      "coupling_total": 0,
+      "cyclomatic_complexity_max": 11,
+      "id": "D:/Elvis/Semestre 2-2026/SAAC/cli/saac-cli",
+      "loc": 114,
+      "maintainability_index": 40.7,
+      "name": "saac-cli"
+    },
+    {
+      "coupling_total": 51,
+      "cyclomatic_complexity_max": 1,
+      "id": "D:/Elvis/Semestre 2-2026/SAAC/shared/types",
+      "loc": 612,
+      "maintainability_index": 20.1,
+      "name": "types"
+    },
+    {
+      "coupling_total": 13,
+      "cyclomatic_complexity_max": 23,
+      "id": "D:/Elvis/Semestre 2-2026/SAAC/src/App",
+      "loc": 282,
+      "maintainability_index": 27.0,
+      "name": "App"
+    },
+    {
+      "coupling_total": 2,
+      "cyclomatic_complexity_max": 5,
+      "id": "D:/Elvis/Semestre 2-2026/SAAC/src/components/adrs/AdrCard",
+      "loc": 164,
+      "maintainability_index": 35.8,
+      "name": "AdrCard"
+    },
+    {
+      "coupling_total": 4,
+      "cyclomatic_complexity_max": 12,
+      "id": "D:/Elvis/Semestre 2-2026/SAAC/src/components/adrs/AdrFormModal",
+      "loc": 194,
+      "maintainability_index": 32.8,
+      "name": "AdrFormModal"
+    },
+    {
+      "coupling_total": 2,
+      "cyclomatic_complexity_max": 1,
+      "id": "D:/Elvis/Semestre 2-2026/SAAC/src/components/adrs/AnnotationCard",
+      "loc": 39,
+      "maintainability_index": 54.4,
+      "name": "AnnotationCard"
+    },
+    {
+      "coupling_total": 7,
+      "cyclomatic_complexity_max": 36,
+      "id": "D:/Elvis/Semestre 2-2026/SAAC/src/components/adrs/index",
+      "loc": 285,
+      "maintainability_index": 24.7,
+      "name": "index"
+    },
+    {
+      "coupling_total": 4,
+      "cyclomatic_complexity_max": 6,
+      "id": "D:/Elvis/Semestre 2-2026/SAAC/src/components/adrs/RiskCard",
+      "loc": 104,
+      "maintainability_index": 41.4,
+      "name": "RiskCard"
+    },
+    {
+      "coupling_total": 4,
+      "cyclomatic_complexity_max": 15,
+      "id": "D:/Elvis/Semestre 2-2026/SAAC/src/components/adrs/RiskFormModal",
+      "loc": 195,
+      "maintainability_index": 32.3,
+      "name": "RiskFormModal"
+    },
+    {
+      "coupling_total": 9,
+      "cyclomatic_complexity_max": 21,
+      "id": "D:/Elvis/Semestre 2-2026/SAAC/src/components/ai/AiChatPanel",
+      "loc": 300,
+      "maintainability_index": 26.2,
+      "name": "AiChatPanel"
+    }
+  ],
+  "project_name": "SAAC",
+  "project_path": "D:\\Elvis\\Semestre 2-2026\\SAAC",
+  "saac_version": "2.0.0",
+  "timestamp": "2026-08-26T13:50:00.106997500+00:00"
+}

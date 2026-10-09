@@ -5,7 +5,7 @@ use std::fs;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", default)]
 pub struct GlobalConfig {
     pub ai_provider: String,      // "ollama" | "openai" | "mock"
     pub ai_endpoint: String,      // "http://localhost:11434"
@@ -13,6 +13,10 @@ pub struct GlobalConfig {
     pub max_worker_threads: usize,
     pub default_theme: String, // "dark" | "light" | "system"
     pub auto_check_ai: bool,
+    pub notify_on_analysis_complete: bool,
+    /// Solo se notifica si el análisis duró al menos esto.
+    pub notify_min_duration_secs: u64,
+    pub report_author: String,
 }
 
 impl Default for GlobalConfig {
@@ -24,6 +28,9 @@ impl Default for GlobalConfig {
             max_worker_threads: 4,
             default_theme: "dark".to_string(),
             auto_check_ai: true,
+            notify_on_analysis_complete: true,
+            notify_min_duration_secs: 10,
+            report_author: String::new(),
         }
     }
 }

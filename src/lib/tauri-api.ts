@@ -1,9 +1,9 @@
 /**
- * tauri-api.ts — Wrapper único e inmutable para todas las llamadas IPC (`invoke`, `listen`) de SAAC v2.0.
+ * tauri-api.ts — Wrapper único e inmutable para todas las llamadas IPC (`invoke`, `listen`) de SAAC.
  * Ningún componente o store llama directamente a `@tauri-apps/api/core` o `event`.
  */
 
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, Channel } from '@tauri-apps/api/core';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import type {
   ArchitectureModelGraph,
@@ -24,6 +24,7 @@ import type {
   AiStatusResult,
   AiConfig,
   AiResponse,
+  AiStreamSummary,
   ProposedArchitecture,
   ProposedArchitectureSummary,
   ProposedNode,
@@ -31,6 +32,8 @@ import type {
   NodePosition,
   ComparisonReport,
   ExportFormat,
+  WorkersStatus,
+  ModuleSource,
 } from '../../shared/types';
 
 // ── Análises y Proyecto ──
@@ -43,8 +46,28 @@ export async function cancelAnalysis(): Promise<void> {
   await invoke('cancel_analysis');
 }
 
+export async function getWorkersStatus(): Promise<WorkersStatus> {
+  return await invoke<WorkersStatus>('get_workers_status');
+}
+
 export async function openProject(path: string): Promise<string> {
   return await invoke<string>('open_project', { path });
+}
+
+/**
+ * Guarda un informe ya generado. La ruta la elige el usuario en el diálogo nativo
+ * que abre el backend; devuelve `null` si canceló.
+ */
+export async function saveReport(
+  format: 'markdown' | 'pdf',
+  fileStem: string,
+  contents: Uint8Array
+): Promise<string | null> {
+  return await invoke<string | null>('save_report', { format, fileStem, contents: Array.from(contents) });
+}
+
+export async function readModuleSource(projectPath: string, moduleId: string): Promise<ModuleSource> {
+  return await invoke<ModuleSource>('read_module_source', { projectPath, moduleId });
 }
 
 export function onProjectProgress(callback: (event: ProjectProgressEvent) => void): Promise<UnlistenFn> {
@@ -53,14 +76,53 @@ export function onProjectProgress(callback: (event: ProjectProgressEvent) => voi
 
 // ── IA Local & Cloud (Ollama / Gemini / OpenAI) ──
 
-function getSavedAiConfig(): AiConfig | undefined {
-  const saved = localStorage.getItem('saac_ai_config');
+const AI_CONFIG_STORAGE_KEY = 'saac_ai_config';
+
+/** Configuración de IA no secreta. La API key vive en el almacén seguro del sistema (backend). */
+export function getSavedAiConfig(): AiConfig | undefined {
+  const saved = localStorage.getItem(AI_CONFIG_STORAGE_KEY);
   if (!saved) return undefined;
   try {
-    return JSON.parse(saved);
+    const { apiKey: _apiKey, ...config } = JSON.parse(saved) as AiConfig;
+    return config;
   } catch {
     return undefined;
   }
+}
+
+export function saveAiConfig(config: AiConfig): void {
+  const { apiKey: _apiKey, ...publicConfig } = config;
+  localStorage.setItem(AI_CONFIG_STORAGE_KEY, JSON.stringify(publicConfig));
+}
+
+let legacyKeyMigration: Promise<void> | null = null;
+
+/** Mueve una API key guardada por versiones anteriores en `localStorage` al almacén seguro. */
+function migrateLegacyAiApiKey(): Promise<void> {
+  legacyKeyMigration ??= (async () => {
+    const saved = localStorage.getItem(AI_CONFIG_STORAGE_KEY);
+    if (!saved) return;
+    try {
+      const parsed = JSON.parse(saved) as AiConfig;
+      if (!parsed.apiKey) return;
+      await invoke<boolean>('set_ai_api_key', { apiKey: parsed.apiKey });
+      saveAiConfig(parsed);
+    } catch (err) {
+      console.warn('No se pudo migrar la API key al almacén seguro:', err);
+      legacyKeyMigration = null;
+    }
+  })();
+  return legacyKeyMigration;
+}
+
+/** Guarda la API key en el almacén seguro; `null` o vacía la elimina. Devuelve si queda una guardada. */
+export async function saveAiApiKey(apiKey: string | null): Promise<boolean> {
+  return await invoke<boolean>('set_ai_api_key', { apiKey: apiKey?.trim() || null });
+}
+
+export async function hasAiApiKey(): Promise<boolean> {
+  await migrateLegacyAiApiKey();
+  return await invoke<boolean>('has_ai_api_key');
 }
 
 export async function askAi(
@@ -68,7 +130,14 @@ export async function askAi(
   contextType?: string,
   targetId?: string,
   amg?: ArchitectureModelGraph
-): Promise<{ answer: string; tokensUsed?: number }> {
+): Promise<{
+  answer: string;
+  tokensUsed?: number;
+  isMockFallback: boolean;
+  providerUsed: AiResponse['providerUsed'];
+  modelUsed: string;
+}> {
+  await migrateLegacyAiApiKey();
   const config = getSavedAiConfig();
   const res = await invoke<AiResponse>('ask_ai', {
     prompt,
@@ -77,10 +146,74 @@ export async function askAi(
     config,
     amg,
   });
-  return { answer: res.content, tokensUsed: res.completionTokens };
+  return {
+    answer: res.content,
+    tokensUsed: res.completionTokens,
+    isMockFallback: res.isMockFallback,
+    providerUsed: res.providerUsed,
+    modelUsed: res.modelUsed,
+  };
 }
 
+type AiStreamEvent =
+  | { event: 'delta'; data: { content: string } }
+  | { event: 'done'; data: AiStreamSummary };
+
+/**
+ * Consulta a la IA recibiendo el texto a medida que se genera (`onDelta`).
+ * Se resuelve con el evento `done` del canal, que siempre llega después del último fragmento.
+ */
+export async function askAiStream(
+  requestId: string,
+  prompt: string,
+  contextType: string | undefined,
+  targetId: string | undefined,
+  amg: ArchitectureModelGraph | undefined,
+  onDelta: (text: string) => void
+): Promise<AiStreamSummary> {
+  await migrateLegacyAiApiKey();
+  const config = getSavedAiConfig();
+
+  return await new Promise<AiStreamSummary>((resolve, reject) => {
+    let settled = false;
+    const finish = (summary: AiStreamSummary) => {
+      if (settled) return;
+      settled = true;
+      resolve(summary);
+    };
+
+    const channel = new Channel<AiStreamEvent>();
+    channel.onmessage = (message) => {
+      if (message.event === 'delta') onDelta(message.data.content);
+      else finish(message.data);
+    };
+
+    invoke<AiStreamSummary>('ask_ai_stream', {
+      requestId,
+      prompt,
+      contextType,
+      targetId,
+      config,
+      amg,
+      onEvent: channel,
+    })
+      // Respaldo por si el evento `done` no llegara.
+      .then((summary) => setTimeout(() => finish(summary), 2000))
+      .catch((err) => {
+        if (settled) return;
+        settled = true;
+        reject(err);
+      });
+  });
+}
+
+export async function cancelAiStream(requestId: string): Promise<boolean> {
+  return await invoke<boolean>('cancel_ai_stream', { requestId });
+}
+
+/** `customConfig.apiKey` solo se envía para probar una key escrita y aún no guardada. */
 export async function checkAiStatus(customConfig?: AiConfig): Promise<AiStatusResult> {
+  await migrateLegacyAiApiKey();
   const config = customConfig || getSavedAiConfig();
   return await invoke<AiStatusResult>('check_ai_status', { config });
 }
@@ -276,5 +409,19 @@ export async function exportProposedArchitecture(
     projectPath,
     designId,
     format,
+  });
+}
+
+export async function saveProposedArchitectureExport(
+  projectPath: string,
+  designId: string,
+  format: ExportFormat,
+  targetPath: string
+): Promise<void> {
+  await invoke('save_proposed_architecture_export', {
+    projectPath,
+    designId,
+    format,
+    targetPath,
   });
 }

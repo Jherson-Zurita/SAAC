@@ -60,6 +60,17 @@ impl HistoryManager {
         Path::new(project_path).join(".saac").join("runs")
     }
 
+    /// Ruta de `.saac/runs/<run_id>.json`, o `None` si `run_id` no es un id
+    /// generado por SAAC (hex y `-`). `compare_analysis_runs` recibe el id
+    /// desde el frontend: sin esta validación, `../../x` leería cualquier
+    /// `.json` del disco.
+    fn run_file_path(project_path: &str, run_id: &str) -> Option<std::path::PathBuf> {
+        let valid = !run_id.is_empty()
+            && run_id.len() <= 128
+            && run_id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+        valid.then(|| Self::runs_dir(project_path).join(format!("{}.json", run_id)))
+    }
+
     /// Persiste el AMG completo de una corrida específica.
     ///
     /// Llamado desde `record_run` (ver más abajo) para que ambas
@@ -71,11 +82,12 @@ impl HistoryManager {
         run_id: &str,
         amg: &ArchitectureModelGraph,
     ) -> Result<(), String> {
+        let file_path = Self::run_file_path(project_path, run_id)
+            .ok_or_else(|| format!("run_id inválido: '{}'", run_id))?;
         let runs_dir = Self::runs_dir(project_path);
         if !runs_dir.exists() {
             fs::create_dir_all(&runs_dir).map_err(|e| e.to_string())?;
         }
-        let file_path = runs_dir.join(format!("{}.json", run_id));
         let content = serde_json::to_string(amg).map_err(|e| e.to_string())?;
         fs::write(file_path, content).map_err(|e| e.to_string())?;
         Ok(())
@@ -88,7 +100,7 @@ impl HistoryManager {
     /// este módulo) — el llamador (`compare_analysis_runs`) debe manejar
     /// ese caso devolviendo un error claro al frontend, no un pánico.
     pub fn load_amg_for_run(project_path: &str, run_id: &str) -> Option<ArchitectureModelGraph> {
-        let file_path = Self::runs_dir(project_path).join(format!("{}.json", run_id));
+        let file_path = Self::run_file_path(project_path, run_id)?;
         let content = fs::read_to_string(file_path).ok()?;
         serde_json::from_str(&content).ok()
     }
@@ -380,5 +392,19 @@ impl HistoryManager {
             removed_dependencies_count: removed_deps,
             metrics_diff,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::HistoryManager;
+
+    #[test]
+    fn run_file_path_rejects_traversal_and_separators() {
+        for bad in ["", "../secret", "..\\secret", "a/b", "C:\\x", "id.json", &"a".repeat(129)] {
+            assert!(HistoryManager::run_file_path("proj", bad).is_none(), "accepted {bad:?}");
+        }
+        let ok = HistoryManager::run_file_path("proj", "18cf5f2771cb7890-7b08").unwrap();
+        assert!(ok.ends_with("18cf5f2771cb7890-7b08.json"));
     }
 }

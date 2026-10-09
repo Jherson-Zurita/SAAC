@@ -15,6 +15,7 @@ import { useUiStore } from '../../stores/useUiStore';
 import { useSelectionStore } from '../../stores/useSelectionStore';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { AiChatPanel } from '../ai/AiChatPanel';
+import { getModuleGroupColor } from '../../lib/color-utils';
 import type { Module, Antipattern, ClassInfo } from '../../../shared/types';
 
 export const Rightbar: React.FC = () => {
@@ -28,6 +29,7 @@ export const Rightbar: React.FC = () => {
 
   const renderModuleDetails = (module: Module) => {
     const m = module.metrics;
+    const moduleColor = getModuleGroupColor(module.id);
     const miColor =
       m.maintainabilityIndex >= 80
         ? 'var(--green)'
@@ -42,10 +44,25 @@ export const Rightbar: React.FC = () => {
     return (
       <div className="space-y-3 font-sans text-xs">
         {/* Module Header Card (GraphForge Spec Section 26) */}
-        <div className="bg-[var(--panel-2)] p-2.5 rounded-md border border-[var(--border-soft)] space-y-1">
-          <div className="flex items-center space-x-2 text-[var(--purple)] font-semibold text-xs">
-            <FileCode className="w-4 h-4 shrink-0" />
-            <span className="truncate">{module.name}</span>
+        <div
+          className="bg-[var(--panel-2)] p-2.5 rounded-md border border-[var(--border-soft)] space-y-1"
+          style={{ borderLeft: `3px solid ${moduleColor.hex}` }}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2 font-semibold text-xs text-[var(--text)] truncate">
+              <FileCode className="w-4 h-4 shrink-0" style={{ color: moduleColor.hex }} />
+              <span className="truncate">{module.name}</span>
+            </div>
+            <span
+              className="text-[9px] font-mono px-1.5 py-0.5 rounded font-bold shrink-0 ml-1"
+              style={{
+                color: moduleColor.hex,
+                backgroundColor: moduleColor.bg,
+                border: `1px solid ${moduleColor.border}`,
+              }}
+            >
+              {module.language}
+            </span>
           </div>
           <p className="text-[10px] text-[var(--muted-2)] font-mono truncate" title={module.id}>
             {module.id}
@@ -186,7 +203,7 @@ export const Rightbar: React.FC = () => {
 
   const renderAntipatternDetails = (anti: Antipattern) => {
     return (
-      <div className="space-y-2.5 bg-[var(--panel-2)] p-3 rounded-md border border-[var(--red)]/50 text-xs">
+      <div className="space-y-2.5 bg-[var(--panel-2)] p-3 rounded-md border border-[var(--red)]/50 text-xs font-sans">
         <div className="flex items-center space-x-2 text-[var(--red)] font-bold">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           <span>{anti.name}</span>
@@ -202,6 +219,116 @@ export const Rightbar: React.FC = () => {
               {anti.cyclePath.map((pathItem: string, idx: number) => (
                 <div key={idx}>➔ {pathItem}</div>
               ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderC4NodeDetails = (c4Node: any) => {
+    // c4Node can be C4Node directly or wrapped in data
+    const node = c4Node?.node || c4Node;
+    if (!node || !node.label) return null;
+
+    const matchingModule: Module | undefined = amg?.modules.find(
+      (m) => m.id === node.amgNodeId || m.id === node.id || node.id?.includes(m.id) || m.id?.includes(node.id)
+    );
+
+    if (matchingModule) {
+      return renderModuleDetails(matchingModule);
+    }
+
+    // Inbound and outbound connections if available
+    const nodeId = node.amgNodeId || node.id;
+    const moduleColor = getModuleGroupColor(nodeId || node.technology || node.label);
+    const inboundDeps = (amg?.dependencies || []).filter((d) => d.target === nodeId);
+    const outboundDeps = (amg?.dependencies || []).filter((d) => d.source === nodeId);
+
+    return (
+      <div className="space-y-3 font-sans text-xs">
+        <div
+          className="bg-[var(--panel-2)] p-2.5 rounded-md border border-[var(--border-soft)] space-y-1"
+          style={{ borderLeft: `3px solid ${moduleColor.hex}` }}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2 font-semibold text-xs text-[var(--text)] truncate">
+              <FileCode className="w-4 h-4 shrink-0" style={{ color: moduleColor.hex }} />
+              <span className="truncate">{node.label}</span>
+            </div>
+            <span
+              className="text-[9px] font-mono px-1.5 py-0.5 rounded font-bold shrink-0 ml-1"
+              style={{
+                color: moduleColor.hex,
+                backgroundColor: moduleColor.bg,
+                border: `1px solid ${moduleColor.border}`,
+              }}
+            >
+              {node.elementType}
+            </span>
+          </div>
+          <p className="text-[10px] text-[var(--muted-2)] font-mono truncate" title={node.id}>
+            {node.id}
+          </p>
+        </div>
+
+        <div className="space-y-1 bg-[var(--panel-2)] p-2.5 rounded-md border border-[var(--border-soft)]">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-2)] mb-1 block">
+            Propiedades del Nodo
+          </span>
+          <div className="space-y-1 text-[11px]">
+            <div className="flex justify-between items-center">
+              <span className="text-[var(--muted)]">Tipo C4</span>
+              <span className="text-[var(--cyan)] font-semibold">{node.elementType || 'Component'}</span>
+            </div>
+            {node.technology && (
+              <div className="flex justify-between items-center">
+                <span className="text-[var(--muted)]">Tecnología</span>
+                <span className="text-[var(--purple)] font-semibold truncate max-w-[150px]">{node.technology}</span>
+              </div>
+            )}
+            {node.description && (
+              <div className="pt-1.5 text-[10px] text-[var(--muted)] border-t border-[var(--border-soft)]">
+                {node.description}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {(inboundDeps.length > 0 || outboundDeps.length > 0) && (
+          <div className="space-y-1.5 pt-1 border-t border-[var(--border)]">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-2)]">
+              Conexiones ({inboundDeps.length + outboundDeps.length})
+            </span>
+
+            <div className="space-y-1 text-[10px]">
+              <div className="flex items-center text-[var(--muted)] gap-1">
+                <ArrowDownLeft className="w-3 h-3 text-[var(--green)]" />
+                <span>Importado por ({inboundDeps.length}):</span>
+              </div>
+              {inboundDeps.length > 0 && (
+                <div className="space-y-0.5 max-h-24 overflow-y-auto pl-2">
+                  {inboundDeps.map((d, i) => (
+                    <div key={i} className="p-1 rounded bg-[var(--panel-2)] text-[var(--text)] font-mono truncate border border-[var(--border-soft)]">
+                      ● {d.source.split('/').pop()}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-center text-[var(--muted)] gap-1 pt-1">
+                <ArrowUpRight className="w-3 h-3 text-[var(--cyan)]" />
+                <span>Importa a ({outboundDeps.length}):</span>
+              </div>
+              {outboundDeps.length > 0 && (
+                <div className="space-y-0.5 max-h-24 overflow-y-auto pl-2">
+                  {outboundDeps.map((d, i) => (
+                    <div key={i} className="p-1 rounded bg-[var(--panel-2)] text-[var(--text)] font-mono truncate border border-[var(--border-soft)]">
+                      ● {d.target.split('/').pop()}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -302,6 +429,7 @@ export const Rightbar: React.FC = () => {
                 </div>
 
                 {selectedType === 'module' && Boolean(selectedData) && renderModuleDetails(selectedData as Module)}
+                {selectedType === 'c4_node' && Boolean(selectedData) && renderC4NodeDetails(selectedData)}
                 {selectedType === 'antipattern' && Boolean(selectedData) && renderAntipatternDetails(selectedData as Antipattern)}
               </div>
             )}

@@ -6,6 +6,8 @@ export interface SupplementaryDiagramDefinition {
   title: string;
   shortLabel: string;
   direction: 'LR' | 'TB';
+  /** La vista obtiene sus datos del AMG o del historial, no de `componentDiagrams[backendKey]`. */
+  selfSourced?: boolean;
 }
 
 export const supplementaryDiagramDefinitions = [
@@ -113,13 +115,15 @@ export const supplementaryDiagramDefinitions = [
     title: 'Evolución Arquitectónica',
     shortLabel: 'Timeline',
     direction: 'LR',
+    selfSourced: true,
   },
   {
     tab: 'force-graph',
     backendKey: 'supplementary:force-graph',
-    title: 'Grafo de Dependencias (Nodos Proporcionales)',
+    title: 'Grafo de Fuerza (Nodos Proporcionales)',
     shortLabel: 'Grafo de Fuerza',
     direction: 'LR',
+    selfSourced: true,
   },
 ] as const satisfies readonly SupplementaryDiagramDefinition[];
 

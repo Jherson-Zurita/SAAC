@@ -129,7 +129,8 @@ PYTHON_COMPLEXITY_CONFIG = ComplexityLanguageConfig(
 #
 # Verificado contra tree-sitter-java (ver hallazgos-java.md):
 #   - if_statement, for_statement, enhanced_for_statement (for-each, tipo
-#     de nodo DISTINTO al for clásico), while_statement, catch_clause,
+#     de nodo DISTINTO al for clásico), while_statement, do_statement
+#     (do-while), catch_clause,
 #     ternary_expression, switch_label (case, no default) son decisión.
 #   - && / || son binary_expression genérico, NO un tipo de nodo propio;
 #     se distinguen por el valor del campo `operator`.
@@ -142,6 +143,7 @@ _JAVA_CC_DECISION_TYPES = frozenset({
     "for_statement",
     "enhanced_for_statement",
     "while_statement",
+    "do_statement",
     "catch_clause",
     "ternary_expression",
     # switch_label NO va aquí: su conteo depende de "case" vs "default",
@@ -153,6 +155,7 @@ _JAVA_COGNITIVE_NESTING_TYPES = frozenset({
     "for_statement",
     "enhanced_for_statement",
     "while_statement",
+    "do_statement",
     "catch_clause",
     "switch_expression",
 })
@@ -221,6 +224,7 @@ _CSHARP_CC_DECISION_TYPES = frozenset({
     "if_statement",
     "for_statement",
     "while_statement",
+    "do_statement",
     "foreach_statement",
     "catch_clause",
     "conditional_expression",
@@ -232,6 +236,7 @@ _CSHARP_COGNITIVE_NESTING_TYPES = frozenset({
     "if_statement",
     "for_statement",
     "while_statement",
+    "do_statement",
     "foreach_statement",
     "catch_clause",
     "switch_expression",  # switch como expresión (C# 8+); switch_statement

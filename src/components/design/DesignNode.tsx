@@ -1,17 +1,52 @@
-import React, { memo } from 'react';
+import React, { memo, useEffect, useRef, useState } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { Box, Boxes, Globe2, UserRound } from 'lucide-react';
 import type { ProposedNodeType } from '../../../shared/types';
-import type { DesignNodeData } from './design-flow';
+import { useDesignStore } from '../../stores/useDesignStore';
+import { getNodeSubtitle, NODE_TYPE_LABELS, type DesignNodeData } from './design-flow';
 
-const NODE_PRESENTATION: Record<
-  ProposedNodeType,
-  { icon: React.ElementType; label: string }
-> = {
-  module: { icon: Boxes, label: 'Módulo' },
-  container: { icon: Box, label: 'Contenedor' },
-  'external-system': { icon: Globe2, label: 'Sistema externo' },
-  actor: { icon: UserRound, label: 'Actor' },
+const NODE_ICONS: Record<ProposedNodeType, React.ElementType> = {
+  module: Boxes,
+  container: Box,
+  'external-system': Globe2,
+  actor: UserRound,
+};
+
+const InlineLabelEditor: React.FC<{ nodeId: string; label: string }> = ({ nodeId, label }) => {
+  const updateNode = useDesignStore((state) => state.updateNode);
+  const setEditingNode = useDesignStore((state) => state.setEditingNode);
+  const [value, setValue] = useState(label);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const finished = useRef(false);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, []);
+
+  const finish = (shouldCommit: boolean) => {
+    if (finished.current) return;
+    finished.current = true;
+    const next = value.trim();
+    if (shouldCommit && next && next !== label) updateNode(nodeId, { label: next });
+    setEditingNode(null);
+  };
+
+  return (
+    <input
+      ref={inputRef}
+      className="design-node__label-input nodrag nopan"
+      value={value}
+      aria-label="Nombre del componente"
+      onChange={(event) => setValue(event.target.value)}
+      onBlur={() => finish(true)}
+      onKeyDown={(event) => {
+        event.stopPropagation();
+        if (event.key === 'Enter') finish(true);
+        if (event.key === 'Escape') finish(false);
+      }}
+    />
+  );
 };
 
 const DesignNode: React.FC<NodeProps> = ({
@@ -20,9 +55,11 @@ const DesignNode: React.FC<NodeProps> = ({
   targetPosition,
   sourcePosition,
 }) => {
-  const { node } = data as DesignNodeData;
-  const presentation = NODE_PRESENTATION[node.nodeType];
-  const Icon = presentation.icon;
+  const { node, dimmed } = data as DesignNodeData;
+  const isEditing = useDesignStore((state) => state.editingNodeId === node.id);
+  const Icon = NODE_ICONS[node.nodeType];
+  const typeLabel = NODE_TYPE_LABELS[node.nodeType];
+  const subtitle = getNodeSubtitle(node);
 
   const className = [
     'design-node',
@@ -30,12 +67,17 @@ const DesignNode: React.FC<NodeProps> = ({
     `design-node--${node.origin}`,
     node.modified ? 'design-node--modified' : '',
     selected ? 'design-node--selected' : '',
+    dimmed ? 'design-node--dimmed' : '',
   ]
     .filter(Boolean)
     .join(' ');
 
   return (
-    <article className={className} aria-label={`${presentation.label}: ${node.label}`}>
+    <article
+      className={className}
+      aria-label={`${typeLabel}: ${node.label}`}
+      title={isEditing ? undefined : 'Doble clic para renombrar'}
+    >
       <Handle
         type="target"
         position={targetPosition || Position.Left}
@@ -44,11 +86,17 @@ const DesignNode: React.FC<NodeProps> = ({
 
       <header className="design-node__header">
         <Icon className="design-node__icon" aria-hidden="true" />
-        <span className="design-node__label">{node.label}</span>
+        {isEditing ? (
+          <InlineLabelEditor nodeId={node.id} label={node.label} />
+        ) : (
+          <span className="design-node__label">{node.label}</span>
+        )}
       </header>
 
+      {subtitle && <p className="design-node__subtitle">{subtitle}</p>}
+
       <div className="design-node__meta">
-        <span className="design-node__type">{presentation.label}</span>
+        <span className="design-node__type">{typeLabel}</span>
         <span className={`design-node__origin design-node__origin--${node.origin}`}>
           {node.origin === 'imported' ? 'Importado' : 'Propuesto'}
         </span>

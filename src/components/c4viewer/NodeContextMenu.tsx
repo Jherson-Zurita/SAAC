@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import type { C4Node, Module } from '../../../shared/types';
 import { useProjectStore } from '../../stores/useProjectStore';
+import { getModuleGroupColor } from '../../lib/color-utils';
 
 interface NodeContextMenuProps {
   node: C4Node;
@@ -27,6 +28,9 @@ export const NodeContextMenu: React.FC<NodeContextMenuProps> = ({
   const matchingModule: Module | undefined = amg?.modules.find(
     (m) => m.id === node.amgNodeId || m.id === node.id || node.id.startsWith(m.id)
   );
+
+  const moduleGroup = matchingModule?.id || node.amgNodeId || node.technology || node.label;
+  const moduleColor = getModuleGroupColor(moduleGroup);
 
   // Find antipatterns affecting this module
   const antipatterns = (amg?.antipatterns || []).filter(
@@ -58,18 +62,29 @@ export const NodeContextMenu: React.FC<NodeContextMenuProps> = ({
         left: position ? Math.min(position.x, window.innerWidth - 340) : '50%',
         top: position ? Math.min(position.y, window.innerHeight - 450) : '50%',
         transform: position ? 'none' : 'translate(-50%, -50%)',
+        borderTop: `3px solid ${moduleColor.hex}`,
       }}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2.5 bg-[var(--panel-2)] border-b border-[var(--border)]">
-        <div className="flex items-center gap-2 min-w-0">
-          <FileCode className="w-4 h-4 text-[var(--cyan)] shrink-0" />
+        <div className="flex items-center gap-2 min-w-0 flex-1 pr-2">
+          <FileCode className="w-4 h-4 shrink-0" style={{ color: moduleColor.hex }} />
           <span className="font-bold text-[var(--text)] truncate">{node.label}</span>
+          <span
+            className="text-[8px] font-mono px-1.5 py-0.5 rounded font-bold shrink-0 ml-auto"
+            style={{
+              color: moduleColor.hex,
+              backgroundColor: moduleColor.bg,
+              border: `1px solid ${moduleColor.border}`,
+            }}
+          >
+            Mod: {moduleGroup.split(/[/\\:]/).pop()}
+          </span>
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="p-1 text-[var(--muted)] hover:text-[var(--text)] rounded hover:bg-[var(--border-soft)] transition-colors"
+          className="p-1 text-[var(--muted)] hover:text-[var(--text)] rounded hover:bg-[var(--border-soft)] transition-colors shrink-0"
         >
           <X className="w-3.5 h-3.5" />
         </button>

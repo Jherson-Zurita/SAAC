@@ -6,6 +6,7 @@ import { useDiagramStore } from '../stores/useDiagramStore';
 interface KeyboardShortcutsOptions {
   onOpenProject?: () => void;
   onAnalyzeProject?: () => void;
+  onExportReport?: () => void;
 }
 
 export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
@@ -15,6 +16,23 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const isMacPlatform = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const modKey = isMacPlatform ? e.metaKey : e.ctrlKey;
+      const key = e.key.toLowerCase();
+
+      // Paleta de comandos y configuración: también desde inputs
+      if (modKey && ((key === 'k' && !e.shiftKey) || (key === 'p' && e.shiftKey))) {
+        e.preventDefault();
+        const ui = useUiStore.getState();
+        ui.setCommandPaletteOpen(!ui.commandPaletteOpen);
+        return;
+      }
+      if (modKey && e.key === ',') {
+        e.preventDefault();
+        useUiStore.getState().setSettingsOpen(true);
+        return;
+      }
+
       // Ignorar si el usuario está escribiendo en un input o textarea
       const target = e.target as HTMLElement;
       if (
@@ -43,6 +61,13 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
         return;
       }
 
+      // Ctrl+Shift+E: Exportar informe en Markdown
+      if (cmdOrCtrl && e.shiftKey && e.key.toLowerCase() === 'e') {
+        e.preventDefault();
+        options.onExportReport?.();
+        return;
+      }
+
       // Ctrl+B: Toggle Leftbar
       if (cmdOrCtrl && e.key.toLowerCase() === 'b' && !e.shiftKey) {
         e.preventDefault();
@@ -64,8 +89,9 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
         return;
       }
 
-      // Esc: Limpiar Selección
-      if (e.key === 'Escape') {
+      // Esc: Limpiar Selección (los modales manejan su propio Esc)
+      const ui = useUiStore.getState();
+      if (e.key === 'Escape' && !ui.commandPaletteOpen && !ui.settingsOpen) {
         clearSelection();
         return;
       }

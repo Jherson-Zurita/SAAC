@@ -11,7 +11,13 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useAiStore } from '../../stores/useAiStore';
-import { checkAiStatus } from '../../lib/tauri-api';
+import {
+  checkAiStatus,
+  getSavedAiConfig,
+  hasAiApiKey,
+  saveAiApiKey,
+  saveAiConfig,
+} from '../../lib/tauri-api';
 import type { AiConfig, AiProvider } from '../../../shared/types';
 
 interface AiSettingsModalProps {
@@ -28,24 +34,29 @@ export const AiSettingsModal: React.FC<AiSettingsModalProps> = ({
   const [provider, setProvider] = useState<AiProvider>('ollama');
   const [endpointUrl, setEndpointUrl] = useState('http://localhost:11434');
   const [modelName, setModelName] = useState('qwen2.5-coder');
+  // Key escrita en esta sesión del modal; la guardada nunca vuelve al frontend.
   const [apiKey, setApiKey] = useState('');
+  const [hasStoredKey, setHasStoredKey] = useState(false);
+  const [removeStoredKey, setRemoveStoredKey] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
-  // Cargar configuración previa guardada en localStorage
+  // Cargar configuración previa (sin la API key)
   useEffect(() => {
-    const savedConfig = localStorage.getItem('saac_ai_config');
-    if (savedConfig) {
-      try {
-        const parsed: AiConfig = JSON.parse(savedConfig);
-        setProvider(parsed.provider);
-        setEndpointUrl(parsed.endpointUrl || '');
-        setModelName(parsed.modelName || '');
-        setApiKey(parsed.apiKey || '');
-      } catch (err) {
-        console.error('Error cargando configuración IA:', err);
-      }
+    if (!isOpen) return;
+    const saved = getSavedAiConfig();
+    if (saved) {
+      setProvider(saved.provider);
+      setEndpointUrl(saved.endpointUrl || '');
+      setModelName(saved.modelName || '');
     }
+    setApiKey('');
+    setRemoveStoredKey(false);
+    setTestResult(null);
+    hasAiApiKey()
+      .then(setHasStoredKey)
+      .catch((err) => console.warn('No se pudo consultar la API key guardada:', err));
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -124,19 +135,35 @@ export const AiSettingsModal: React.FC<AiSettingsModalProps> = ({
     }
   };
 
-  // Guardar configuración
-  const handleSave = () => {
+  // Guardar configuración: los datos públicos en localStorage, la key en el almacén seguro
+  const handleSave = async () => {
     const config: AiConfig = {
       provider,
       endpointUrl,
       modelName,
-      apiKey: apiKey.trim() || undefined,
       temperature: 0.2,
       timeoutSeconds: 30,
     };
 
-    localStorage.setItem('saac_ai_config', JSON.stringify(config));
-    handleTestConnection();
+    setIsSaving(true);
+    try {
+      if (apiKey.trim()) {
+        setHasStoredKey(await saveAiApiKey(apiKey));
+      } else if (removeStoredKey) {
+        setHasStoredKey(await saveAiApiKey(null));
+      }
+    } catch (err) {
+      setTestResult({ success: false, message: `No se pudo guardar la API key: ${String(err)}` });
+      return;
+    } finally {
+      setIsSaving(false);
+    }
+
+    saveAiConfig(config);
+    setApiKey('');
+    checkAiStatus()
+      .then(setAiStatus)
+      .catch((err) => console.warn('AI status check failed:', err));
     onClose();
   };
 
@@ -248,11 +275,36 @@ export const AiSettingsModal: React.FC<AiSettingsModalProps> = ({
               </label>
               <input
                 type="password"
+                autoComplete="off"
                 value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="AIzaSy... o sk-..."
+                onChange={(e) => {
+                  setApiKey(e.target.value);
+                  if (e.target.value) setRemoveStoredKey(false);
+                }}
+                placeholder={
+                  hasStoredKey && !removeStoredKey
+                    ? '•••••••• guardada (escribe para reemplazarla)'
+                    : 'AIzaSy... o sk-...'
+                }
                 className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-2.5 py-1.5 text-xs text-[var(--text)] font-mono focus:outline-none focus:border-[var(--purple)] placeholder:text-[var(--muted-2)]"
               />
+              <div className="flex items-center justify-between text-[9.5px] text-[var(--muted-2)]">
+                <span>Se guarda en el almacén de credenciales del sistema, no en la app.</span>
+                {hasStoredKey && !apiKey && (
+                  <button
+                    type="button"
+                    onClick={() => setRemoveStoredKey((value) => !value)}
+                    className={`font-semibold transition ${
+                      removeStoredKey ? 'text-[var(--muted)]' : 'text-[var(--red)] hover:underline'
+                    }`}
+                  >
+                    {removeStoredKey ? 'Deshacer' : 'Eliminar key guardada'}
+                  </button>
+                )}
+              </div>
+              {removeStoredKey && (
+                <p className="text-[9.5px] text-[var(--red)]">La key guardada se eliminará al guardar.</p>
+              )}
             </div>
           </div>
 
@@ -296,10 +348,11 @@ export const AiSettingsModal: React.FC<AiSettingsModalProps> = ({
               <button
                 type="button"
                 onClick={handleSave}
-                className="px-3.5 py-1.5 rounded bg-[var(--purple)] hover:opacity-90 text-white font-bold flex items-center space-x-1.5 transition shadow"
+                disabled={isSaving}
+                className="px-3.5 py-1.5 rounded bg-[var(--purple)] hover:opacity-90 text-white font-bold flex items-center space-x-1.5 transition shadow disabled:opacity-50"
               >
                 <Save className="w-3.5 h-3.5" />
-                <span>Guardar</span>
+                <span>{isSaving ? 'Guardando...' : 'Guardar'}</span>
               </button>
             </div>
           </div>

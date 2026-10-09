@@ -86,3 +86,39 @@ pub fn export_proposed_architecture(
 ) -> Result<String, String> {
     export_design(&project_path, &design_id, format).map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub fn save_proposed_architecture_export(
+    project_path: String,
+    design_id: String,
+    format: ExportFormat,
+    target_path: String,
+) -> Result<(), String> {
+    let expected_extension = match format {
+        ExportFormat::StructurizrDsl => "dsl",
+        ExportFormat::PlantUml => "puml",
+        ExportFormat::Mermaid => "mmd",
+    };
+    let target = std::path::Path::new(&target_path);
+    let extension_matches = target
+        .extension()
+        .and_then(|value| value.to_str())
+        .is_some_and(|value| value.eq_ignore_ascii_case(expected_extension));
+    if !extension_matches {
+        return Err(format!(
+            "La ruta de exportación debe terminar en .{}",
+            expected_extension
+        ));
+    }
+    if !target.parent().is_some_and(|parent| parent.is_dir()) {
+        return Err(format!(
+            "La carpeta de destino de '{}' no existe",
+            target_path
+        ));
+    }
+
+    let content =
+        export_design(&project_path, &design_id, format).map_err(|e| e.to_string())?;
+    std::fs::write(target, content)
+        .map_err(|e| format!("No se pudo escribir '{}': {}", target_path, e))
+}

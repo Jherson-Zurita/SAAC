@@ -26,7 +26,9 @@ export type MainTab =
   | 'metrics'
   | 'antipatterns'
   | 'adrs'
-  | 'design';
+  | 'design'
+  | 'modules'
+  | 'code';
 
 export type LeftbarTab = 'explorer' | 'navigation' | 'search';
 export type DownbarTab = 'output' | 'problems' | 'history' | 'console';
@@ -41,7 +43,11 @@ interface UiState {
   activeLeftbarTab: LeftbarTab;
   activeDownbarTab: DownbarTab;
   activeMainTab: MainTab;
+  settingsOpen: boolean;
+  commandPaletteOpen: boolean;
 
+  setSettingsOpen: (open: boolean) => void;
+  setCommandPaletteOpen: (open: boolean) => void;
   setTheme: (theme: 'dark' | 'light') => void;
   toggleTheme: () => void;
   setLeftbarOpen: (open: boolean) => void;
@@ -58,7 +64,7 @@ interface UiState {
 }
 
 export const useUiStore = create<UiState>((set) => ({
-  theme: 'dark',
+  theme: 'light',
   leftbarOpen: true,
   rightbarOpen: true,
   downbarOpen: false,
@@ -67,7 +73,11 @@ export const useUiStore = create<UiState>((set) => ({
   activeLeftbarTab: 'explorer',
   activeDownbarTab: 'output',
   activeMainTab: 'dashboard',
+  settingsOpen: false,
+  commandPaletteOpen: false,
 
+  setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
+  setCommandPaletteOpen: (commandPaletteOpen) => set({ commandPaletteOpen }),
   setTheme: (theme) => set({ theme }),
   toggleTheme: () => set((state) => ({ theme: state.theme === 'dark' ? 'light' : 'dark' })),
   setLeftbarOpen: (leftbarOpen) => set({ leftbarOpen }),

@@ -1,6 +1,7 @@
 import React from 'react';
 import type { C4DiagramData } from '../../../shared/types';
 import { useProjectStore } from '../../stores/useProjectStore';
+import { useSelectionStore } from '../../stores/useSelectionStore';
 
 interface TreemapViewProps {
   diagramData: C4DiagramData;
@@ -8,6 +9,7 @@ interface TreemapViewProps {
 
 export const TreemapView: React.FC<TreemapViewProps> = ({ diagramData: _diagramData }) => {
   const { amg } = useProjectStore();
+  const { selectElement } = useSelectionStore();
   const modules = amg?.modules || [];
 
   if (modules.length === 0) {
@@ -18,9 +20,16 @@ export const TreemapView: React.FC<TreemapViewProps> = ({ diagramData: _diagramD
 
   return (
     <div className="flex flex-col w-full h-full p-4 overflow-auto bg-[var(--bg)] text-[var(--text)] font-sans transition-colors duration-200">
-      <div className="mb-3">
-        <h3 className="text-sm font-bold text-[var(--purple)] tracking-tight">Mapa de Carpetas y Módulos (Treemap)</h3>
-        <p className="text-xs text-[var(--muted)]">
+      <div className="mb-3 p-3 rounded-lg bg-[var(--panel)] border border-[var(--border)]">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-[var(--purple)] tracking-tight">
+            Mapa de Carpetas y Módulos (Treemap)
+          </h3>
+          <span className="text-[10px] font-mono text-[var(--muted-2)]">
+            {modules.length} módulos · Clic en una celda para abrir en inspector
+          </span>
+        </div>
+        <p className="text-xs text-[var(--muted)] mt-1">
           El área de cada celda es proporcional a sus Líneas de Código (LOC). El color representa la salud arquitectónica (Verde: Alta mantenibilidad, Rojo: Complejo/Inestable).
         </p>
       </div>
@@ -30,20 +39,21 @@ export const TreemapView: React.FC<TreemapViewProps> = ({ diagramData: _diagramD
           const pct = Math.max(8, Math.min(100, ((m.loc || 1) / totalLoc) * 100 * 3));
           const maint = m.metrics.maintainabilityIndex || 70;
 
-          let bgColor = 'bg-[#4FD49A]/10 border-[#4FD49A]/30 text-[var(--green)]';
+          let bgColor = 'bg-[#4FD49A]/10 border-[#4FD49A]/30 text-[var(--green)] hover:bg-[#4FD49A]/20';
           if (maint < 50) {
-            bgColor = 'bg-[#EF6B73]/15 border-[#EF6B73]/40 text-[var(--red)]';
+            bgColor = 'bg-[#EF6B73]/15 border-[#EF6B73]/40 text-[var(--red)] hover:bg-[#EF6B73]/25';
           } else if (maint < 70) {
-            bgColor = 'bg-[#E7B85B]/15 border-[#E7B85B]/40 text-[var(--yellow)]';
+            bgColor = 'bg-[#E7B85B]/15 border-[#E7B85B]/40 text-[var(--yellow)] hover:bg-[#E7B85B]/25';
           }
 
           return (
             <div
               key={m.id}
+              onClick={() => selectElement(m.id, 'module', m)}
               style={{ flexGrow: Math.max(1, Math.round(pct)), minWidth: '120px', minHeight: '80px' }}
-              className={`p-2.5 rounded-md border flex flex-col justify-between transition-transform hover:scale-[1.01] cursor-pointer ${bgColor}`}
+              className={`p-2.5 rounded-md border flex flex-col justify-between transition-all hover:scale-[1.01] cursor-pointer shadow-sm ${bgColor}`}
             >
-              <div className="font-semibold text-xs truncate" title={m.id}>
+              <div className="font-semibold text-xs truncate" title={`Ver ${m.id} en inspector`}>
                 {m.name}
               </div>
               <div className="text-[10px] space-y-0.5 opacity-90 font-mono">

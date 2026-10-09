@@ -1,6 +1,7 @@
 use crate::engine::aggregator::Aggregator;
 use crate::engine::amg::{ArchitectureModelGraph, SnapshotType, WorkerAnalysisResult};
 use crate::engine::cache::CacheManager;
+use crate::engine::deployment_detector::DeploymentDetector;
 use crate::engine::go_module_roots::detect_go_modules;
 use crate::engine::history::HistoryManager;
 use crate::engine::java_source_roots::detect_java_source_roots;
@@ -14,6 +15,7 @@ use crate::workers::types::{
     AnalysisFileStatus, FileAnalysisOutcome, ProjectAnalysisResult, ProjectProgressEvent,
     SkippedFile,
 };
+use ignore::overrides::OverrideBuilder;
 use ignore::WalkBuilder;
 use sha2::{Digest, Sha256};
 use std::io::Read;
@@ -40,26 +42,34 @@ pub struct CancellationRegistry {
 }
 
 impl CancellationRegistry {
-    /// Registra un nuevo flag de cancelación como el análisis "activo",
-    /// reemplazando cualquier flag anterior (que, si existía, ya debería
-    /// haber finalizado — `analyze_project` limpia su propio flag al salir).
-    fn register(&self, flag: Arc<AtomicBool>) {
+    /// Registra el flag de un análisis nuevo como el activo. Falla si ya hay
+    /// otro en curso: ambos compartirían los mismos procesos worker y el
+    /// segundo dejaría al primero sin forma de cancelarse.
+    ///
+    /// El flag se libera al soltar el `ActiveAnalysis` devuelto, en cualquier
+    /// camino de salida de `analyze_project`.
+    fn begin(&self) -> Result<ActiveAnalysis<'_>, String> {
         let mut guard = self
             .current
             .lock()
             .expect("CancellationRegistry mutex envenenado");
-        *guard = Some(flag);
+        if guard.is_some() {
+            return Err("Ya hay un análisis en curso. Cancélalo o espera a que termine.".to_string());
+        }
+        let flag = Arc::new(AtomicBool::new(false));
+        *guard = Some(flag.clone());
+        Ok(ActiveAnalysis { registry: self, flag })
     }
 
-    /// Limpia el flag activo. Debe llamarse siempre al finalizar
-    /// `analyze_project`, tanto en éxito como en cancelación, para que un
-    /// `cancel_analysis` posterior no actúe sobre un análisis ya terminado.
-    fn clear(&self) {
+    /// Limpia el flag activo solo si sigue siendo `flag`.
+    fn clear(&self, flag: &Arc<AtomicBool>) {
         let mut guard = self
             .current
             .lock()
             .expect("CancellationRegistry mutex envenenado");
-        *guard = None;
+        if guard.as_ref().is_some_and(|current| Arc::ptr_eq(current, flag)) {
+            *guard = None;
+        }
     }
 
     /// Solicita la cancelación del análisis activo, si lo hay.
@@ -75,6 +85,24 @@ impl CancellationRegistry {
         } else {
             false
         }
+    }
+}
+
+/// Análisis registrado en `CancellationRegistry`; lo libera al soltarse.
+struct ActiveAnalysis<'a> {
+    registry: &'a CancellationRegistry,
+    flag: Arc<AtomicBool>,
+}
+
+impl ActiveAnalysis<'_> {
+    fn is_cancelled(&self) -> bool {
+        self.flag.load(Ordering::SeqCst)
+    }
+}
+
+impl Drop for ActiveAnalysis<'_> {
+    fn drop(&mut self) {
+        self.registry.clear(&self.flag);
     }
 }
 
@@ -147,9 +175,40 @@ pub fn scan_project_directory(path: &str) -> (Vec<String>, Vec<SkippedFile>, usi
     let mut node_files_count = 0;
     let mut python_files_count = 0;
 
-    let effective_ignores = ProjectConfigManager::get_effective_ignore_patterns(path);
+    let config = ProjectConfigManager::load_config(path);
+    let max_file_size_bytes = if config.max_file_size_mb > 0.0 {
+        (config.max_file_size_mb * 1024.0 * 1024.0) as u64
+    } else {
+        MAX_FILE_SIZE_BYTES
+    };
+    let ignored_extensions: Vec<String> = config
+        .ignore_extensions
+        .iter()
+        .map(|ext| ext.trim().to_lowercase())
+        .filter(|ext| !ext.is_empty())
+        .map(|ext| if ext.starts_with('.') { ext } else { format!(".{}", ext) })
+        .collect();
+
     let mut builder = WalkBuilder::new(path);
+    // `.saacignore` se aplica con semántica de `.gitignore`; los patrones
+    // de `.saac/config.json` se aplican como globs (overrides de exclusión).
     builder.add_custom_ignore_filename(".saacignore");
+    let mut overrides = OverrideBuilder::new(path);
+    for pattern in &config.ignore_patterns {
+        let pattern = pattern.trim();
+        if pattern.is_empty() || pattern.starts_with('!') {
+            continue;
+        }
+        if let Err(e) = overrides.add(&format!("!{}", pattern)) {
+            tracing::warn!("Patrón de ignorado inválido '{}': {}", pattern, e);
+        }
+    }
+    match overrides.build() {
+        Ok(overrides) => {
+            builder.overrides(overrides);
+        }
+        Err(e) => tracing::warn!("No se pudieron aplicar los patrones de ignorado: {}", e),
+    }
     let walker = builder.build();
 
     for result in walker {
@@ -159,16 +218,14 @@ pub fn scan_project_directory(path: &str) -> (Vec<String>, Vec<SkippedFile>, usi
                     let p = entry.path();
                     let path_str = p.to_string_lossy().replace('\\', "/");
 
-                    // Exclusiones explícitas y patrones configurados
+                    // Exclusiones explícitas y extensiones configuradas
+                    let path_lower = path_str.to_lowercase();
                     if path_str.contains("/node_modules/")
                         || path_str.contains("/target/")
                         || path_str.contains("/.venv/")
                         || path_str.contains("/.git/")
                         || path_str.contains("/.saac/")
-                        || effective_ignores.iter().any(|pattern| {
-                            let clean_pat = pattern.trim_matches('*').trim_matches('/');
-                            !clean_pat.is_empty() && path_str.contains(clean_pat)
-                        })
+                        || ignored_extensions.iter().any(|ext| path_lower.ends_with(ext.as_str()))
                     {
                         continue;
                     }
@@ -178,7 +235,7 @@ pub fn scan_project_directory(path: &str) -> (Vec<String>, Vec<SkippedFile>, usi
 
                     if is_node || is_python {
                         let file_size = entry.metadata().map(|m| m.len()).unwrap_or(0);
-                        if file_size > MAX_FILE_SIZE_BYTES {
+                        if file_size > max_file_size_bytes {
                             skipped_files.push(SkippedFile {
                                 file_path: p.to_string_lossy().into_owned(),
                                 reason: "file_too_large".to_string(),
@@ -340,6 +397,11 @@ pub async fn analyze_project(
     app_handle: tauri::AppHandle,
     path: String,
 ) -> Result<ProjectAnalysisResult, String> {
+    // Se registra antes de escanear para que `cancel_analysis` surta efecto
+    // también durante el escaneo y el cálculo de hashes.
+    let active = cancellation.begin()?;
+    let cancel_flag = active.flag.clone();
+
     let start_time = std::time::Instant::now();
     let (file_paths, skipped_files, node_files_count, python_files_count) =
         scan_project_directory(&path);
@@ -401,8 +463,13 @@ pub async fn analyze_project(
     let mut files_to_analyze = Vec::new();
     let mut cached_outcomes = Vec::new();
     let mut file_hashes = std::collections::HashMap::new();
+    let mut cancelled_while_hashing = false;
 
     for file_path in file_paths {
+        if active.is_cancelled() {
+            cancelled_while_hashing = true;
+            break;
+        }
         if let Ok(hash) = calculate_file_hash(&file_path) {
             file_hashes.insert(file_path.clone(), hash.clone());
 
@@ -426,12 +493,6 @@ pub async fn analyze_project(
         }
     }
 
-    // Registrar el flag de cancelación de este análisis ANTES de empezar a
-    // procesar, para que una llamada a `cancel_analysis` en cualquier momento
-    // posterior (incluso durante el primer chunk) surta efecto.
-    let cancel_flag = Arc::new(AtomicBool::new(false));
-    cancellation.register(cancel_flag.clone());
-
     // El progreso inicial refleja los archivos recuperados de la caché
     let completed_files = Arc::new(std::sync::atomic::AtomicUsize::new(cached_outcomes.len()));
     let reporter = ProgressReporter {
@@ -444,7 +505,9 @@ pub async fn analyze_project(
     };
 
     // Fase 2: Analizar archivos con chunking, reporte de progreso y chequeo de cancelación
-    let (mut outcomes, was_cancelled) = if !files_to_analyze.is_empty() {
+    let (mut outcomes, was_cancelled) = if cancelled_while_hashing {
+        (Vec::new(), true)
+    } else if !files_to_analyze.is_empty() {
         let (new_outcomes, cancelled) = analyze_files_internal(
             &node_manager,
             &python_manager,
@@ -482,10 +545,7 @@ pub async fn analyze_project(
     // Agregar resultados recuperados de la caché
     outcomes.extend(cached_outcomes);
 
-    // Liberar el flag del registro SIEMPRE al salir (éxito o cancelación), para
-    // que `cancel_analysis` no actúe por error sobre un análisis futuro que
-    // reutilice el mismo slot del registro.
-    cancellation.clear();
+    drop(active);
 
     let duration_ms = start_time.elapsed().as_millis() as u64;
 
@@ -516,9 +576,12 @@ pub async fn analyze_project(
     };
     let _ = app_handle.emit("project://progress", final_event);
 
-    // Intentar realizar la agregación si no hubo una cancelación total sin outcomes
+    // Un análisis cancelado no produce AMG: con solo parte de los archivos,
+    // las métricas, ciclos y antipatrones serían incorrectos y se guardarían
+    // en la caché y el historial como si fueran un análisis completo. Los
+    // resultados por archivo ya quedaron en caché para el próximo análisis.
     let (worker_results, _failures) = Aggregator::parse_worker_results(&outcomes);
-    let amg = if !worker_results.is_empty() {
+    let amg = if !was_cancelled && !worker_results.is_empty() {
         // Detección de raíces de fuentes Java (pom.xml / build.gradle* /
         // convención estándar) — necesaria para resolver con precisión
         // imports de paquetes Java contra los module_id del proyecto. Se
@@ -556,7 +619,7 @@ pub async fn analyze_project(
             .as_ref()
             .and_then(|c| c.get_latest_amg().map(|a| a.amg_id));
 
-        let compiled_amg = ArchitectureModelGraph {
+        let mut compiled_amg = ArchitectureModelGraph {
             amg_id,
             analysis_run_id,
             project_id: format!("{:x}", sha2::Sha256::digest(path.as_bytes())),
@@ -578,13 +641,25 @@ pub async fn analyze_project(
             c4_models: aggregated.c4_models,
         };
 
-        if let Some(ref cache_mgr) = cache {
-            let _ = cache_mgr.set_latest_amg(&compiled_amg);
-        }
+        let deployment_diagram = DeploymentDetector::detect_and_generate(
+            Path::new(&path),
+            &compiled_amg.containers,
+            &compiled_amg.external_systems,
+        );
+        compiled_amg.c4_models.component_diagrams.insert(
+            "supplementary:deployment-diagram".to_string(),
+            deployment_diagram,
+        );
 
         // Evaluar reglas de arquitectura y registrar la ejecución en el historial .saac/history.json
         let rules_config = RulesEngine::load_rules_config(&path);
         let fitness_res = RulesEngine::evaluate(&compiled_amg, &rules_config);
+        compiled_amg.metrics.fitness_score = fitness_res.fitness_score;
+
+        if let Some(ref cache_mgr) = cache {
+            let _ = cache_mgr.set_latest_amg(&compiled_amg);
+        }
+
         let _ = HistoryManager::record_run(
             &path,
             &compiled_amg.analysis_run_id,
@@ -628,6 +703,37 @@ pub fn cancel_analysis(cancellation: State<'_, CancellationRegistry>) -> Result<
     Ok(cancellation.request_cancel())
 }
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkerStatus {
+    pub available: bool,
+    pub message: Option<String>,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkersStatus {
+    pub node: WorkerStatus,
+    pub python: WorkerStatus,
+}
+
+/// Estado de arranque de los workers: si alguno no pudo iniciarse, sus
+/// lenguajes no se analizarán y `message` explica por qué.
+#[tauri::command]
+pub fn get_workers_status(
+    node_manager: State<'_, NodeWorkerManager>,
+    python_manager: State<'_, PythonWorkerManager>,
+) -> WorkersStatus {
+    let status = |reason: Option<&str>| WorkerStatus {
+        available: reason.is_none(),
+        message: reason.map(str::to_string),
+    };
+    WorkersStatus {
+        node: status(node_manager.unavailable_reason()),
+        python: status(python_manager.unavailable_reason()),
+    }
+}
+
 #[tauri::command]
 pub async fn analyze_file(
     node_manager: State<'_, NodeWorkerManager>,
@@ -665,4 +771,76 @@ pub async fn analyze_files(
     let (outcomes, _cancelled) =
         analyze_files_internal(&node_manager, &python_manager, file_paths, None, None).await;
     Ok(outcomes)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    fn scanned_names(root: &Path) -> Vec<String> {
+        let (files, _, _, _) = scan_project_directory(&root.to_string_lossy());
+        let mut names: Vec<String> = files
+            .iter()
+            .map(|f| {
+                Path::new(f)
+                    .strip_prefix(root)
+                    .unwrap()
+                    .to_string_lossy()
+                    .replace('\\', "/")
+            })
+            .collect();
+        names.sort();
+        names
+    }
+
+    #[test]
+    fn cancellation_registry_allows_one_analysis_at_a_time() {
+        let registry = CancellationRegistry::default();
+        assert!(!registry.request_cancel());
+
+        let active = registry.begin().unwrap();
+        assert!(registry.begin().is_err());
+        assert!(registry.request_cancel());
+        assert!(active.is_cancelled());
+
+        drop(active);
+        assert!(!registry.request_cancel());
+        let next = registry.begin().unwrap();
+        assert!(!next.is_cancelled());
+    }
+
+    #[test]
+    fn scan_applies_glob_patterns_and_ignored_extensions() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let root = dir.path();
+        for file in ["src/keep.ts", "src/rebuildCache.ts", "build/out.js", "src/app.min.js", "dist/x.py"] {
+            let path = root.join(file);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, "x").unwrap();
+        }
+
+        // Config por defecto: `**/build/**`, `**/dist/**` y `.min.js`.
+        assert_eq!(scanned_names(root), vec!["src/keep.ts", "src/rebuildCache.ts"]);
+    }
+
+    #[test]
+    fn scan_respects_configured_max_file_size() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let root = dir.path();
+        fs::create_dir_all(root.join(".saac")).unwrap();
+        fs::write(
+            root.join(".saac/config.json"),
+            r#"{"ignorePatterns":[],"ignoreExtensions":[],"maxFileSizeMb":0.001}"#,
+        )
+        .unwrap();
+        fs::write(root.join("small.ts"), "x").unwrap();
+        fs::write(root.join("big.ts"), "x".repeat(4096)).unwrap();
+
+        let (files, skipped, _, _) = scan_project_directory(&root.to_string_lossy());
+        assert_eq!(files.len(), 1);
+        assert!(files[0].ends_with("small.ts"));
+        assert_eq!(skipped.len(), 1);
+        assert_eq!(skipped[0].reason, "file_too_large");
+    }
 }

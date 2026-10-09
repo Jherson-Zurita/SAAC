@@ -503,11 +503,17 @@ pub struct Module {
     pub language: Language,
     pub loc: u32,
     pub lloc: u32,
+    #[serde(default)]
     pub classes: Vec<ClassInfo>,
+    #[serde(default)]
     pub functions: Vec<FunctionInfo>,
+    #[serde(default)]
     pub imports: Vec<String>,
+    #[serde(default)]
     pub imported_by: Vec<String>,
+    #[serde(default)]
     pub stable_since: String,
+    #[serde(default)]
     pub last_seen_in: String,
     pub metrics: ModuleMetrics,
 }
@@ -624,13 +630,17 @@ pub struct Container {
     pub id: String,
     #[serde(rename = "type")]
     pub node_type: NodeType,
+    #[serde(default)]
     pub stable_since: String,
+    #[serde(default)]
     pub last_seen_in: String,
     pub name: String,
     pub technology: String,
     pub container_type: ContainerType,
     pub description: String,
+    #[serde(default)]
     pub module_ids: Vec<String>,
+    #[serde(default)]
     pub detected_from: String,
 }
 
@@ -652,12 +662,15 @@ pub struct ExternalSystem {
     pub id: String,
     #[serde(rename = "type")]
     pub node_type: NodeType,
+    #[serde(default)]
     pub stable_since: String,
+    #[serde(default)]
     pub last_seen_in: String,
     pub name: String,
     pub description: String,
     pub system_type: ExternalSystemType,
     pub protocol: ExternalProtocol,
+    #[serde(default)]
     pub detected_via: String,
 }
 
@@ -667,7 +680,9 @@ pub struct Actor {
     pub id: String,
     #[serde(rename = "type")]
     pub node_type: NodeType,
+    #[serde(default)]
     pub stable_since: String,
+    #[serde(default)]
     pub last_seen_in: String,
     pub name: String,
     pub role: String,
@@ -766,6 +781,7 @@ pub struct ArchitectureModelGraph {
     pub detected_style: ArchStyle,
     pub style_confidence: f64,
     pub analyzed_at: String,
+    #[serde(default)]
     pub parent_amg_id: Option<String>,
     pub snapshot_type: SnapshotType,
     pub modules: Vec<Module>,

@@ -16,4 +16,5 @@ pub mod project_config;
 pub mod project_detector;
 pub mod rules;
 pub mod rust_crate_roots;
+pub mod secrets;
 pub mod supplementary_diagrams;

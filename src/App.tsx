@@ -1,11 +1,17 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { AppShell } from './components/layout/AppShell';
 import { useProjectStore } from './stores/useProjectStore';
 import { useAiStore } from './stores/useAiStore';
 import { useUiStore } from './stores/useUiStore';
 import { useAnalysisHistoryStore } from './stores/useAnalysisHistoryStore';
+import { useSelectionStore } from './stores/useSelectionStore';
 import { useDiagramStore } from './stores/useDiagramStore';
 import { useRecentProjectsStore } from './stores/useRecentProjectsStore';
+import { useSettingsStore, resolveTheme } from './stores/useSettingsStore';
+import { toast } from './stores/useToastStore';
+import { sendSystemNotification } from './lib/notifications';
+import { exportArchitectureReport } from './lib/export-report';
+import type { ProjectAnalysisResult } from '../shared/types';
 import {
   analyzeProject,
   cancelAnalysis,
@@ -21,6 +27,13 @@ import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { saveCachedProjectData, loadCachedProjectData } from './lib/project-cache';
 import { generateAnalysisSummary } from './lib/analysis-summary';
+import {
+  DEMO_AMG,
+  DEMO_FITNESS_RESULT,
+  DEMO_ANNOTATIONS,
+  DEMO_ANALYSIS_RESULT,
+  DEMO_PROJECT_PATH,
+} from './lib/demo-data';
 
 export function App() {
   const {
@@ -37,10 +50,38 @@ export function App() {
   } = useProjectStore();
 
   const { setAiStatus } = useAiStore();
-  const { theme } = useUiStore();
+  const { theme, setTheme, setActiveMainTab } = useUiStore();
+  const themePreference = useSettingsStore((s) => s.config.defaultTheme);
   const { setHistory } = useAnalysisHistoryStore();
   const { resetDiagram } = useDiagramStore();
   const { addRecentProject } = useRecentProjectsStore();
+  const { clearSelection } = useSelectionStore();
+
+  // Cada apertura de proyecto incrementa `sessionRef`; las respuestas async
+  // (análisis, metadatos) de una sesión anterior se descartan al llegar.
+  const sessionRef = useRef(0);
+  // Análisis en curso, para esperar a que termine tras cancelarlo antes de
+  // iniciar otro (el backend admite uno a la vez).
+  const analysisRef = useRef<Promise<void> | null>(null);
+
+  const stopRunningAnalysis = async () => {
+    const running = analysisRef.current;
+    if (!running) return;
+    try {
+      await cancelAnalysis();
+    } catch (err) {
+      console.warn('No se pudo cancelar el análisis en curso:', err);
+    }
+    await running.catch(() => undefined);
+  };
+
+  const resetWorkspace = () => {
+    sessionRef.current += 1;
+    resetProject();
+    resetDiagram();
+    clearSelection();
+    setHistory(null);
+  };
 
   // Aplicar tema al documento root
   useEffect(() => {
@@ -54,20 +95,38 @@ export function App() {
     }
   }, [theme]);
 
-  // Suscripción a eventos de progreso en tiempo real y chequeo de IA
+  // Con tema «Sistema», seguir los cambios de modo claro/oscuro del SO
+  useEffect(() => {
+    if (themePreference !== 'system') return;
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = () => setTheme(resolveTheme('system'));
+    media.addEventListener('change', onChange);
+    return () => media.removeEventListener('change', onChange);
+  }, [themePreference, setTheme]);
+
+  // Suscripción a eventos de progreso, configuración global y chequeo de IA
   useEffect(() => {
     let unlisten: (() => void) | undefined;
+    let disposed = false;
 
     async function initListeners() {
       // 1. Escuchar eventos de progreso de análisis desde Rust (project://progress)
-      unlisten = await onProjectProgress((event) => {
+      const stop = await onProjectProgress((event) => {
         setProgress(event);
       });
+      if (disposed) stop();
+      else unlisten = stop;
 
-      // 2. Verificar disponibilidad de IA local (Ollama / Mock)
+      // 2. Configuración global persistida (tema, notificaciones, IA)
+      const settings = await useSettingsStore.getState().load();
+      if (disposed) return;
+      setTheme(resolveTheme(settings.defaultTheme));
+
+      // 3. Verificar disponibilidad de IA local (Ollama / Mock)
+      if (!settings.autoCheckAi) return;
       try {
         const status = await checkAiStatus();
-        setAiStatus(status);
+        if (!disposed) setAiStatus(status);
       } catch (err) {
         console.warn('AI status check failed:', err);
       }
@@ -76,19 +135,66 @@ export function App() {
     initListeners();
 
     return () => {
+      disposed = true;
       if (unlisten) unlisten();
     };
-  }, [setProgress, setAiStatus]);
+  }, [setProgress, setAiStatus, setTheme]);
+
+  /** Avisa del fin de un análisis largo: notificación del SO si la app no tiene el foco, toast si lo tiene. */
+  const notifyAnalysisFinished = (result: ProjectAnalysisResult | null, error?: unknown) => {
+    const { notifyOnAnalysisComplete, notifyMinDurationSecs } = useSettingsStore.getState().config;
+    const durationMs = result?.durationMs ?? 0;
+    if (!notifyOnAnalysisComplete || durationMs < notifyMinDurationSecs * 1000) return;
+
+    const seconds = (durationMs / 1000).toFixed(1);
+    const name = result?.amg?.projectName ?? useProjectStore.getState().projectName ?? 'Proyecto';
+    const title = error
+      ? 'El análisis falló'
+      : result?.cancelled
+        ? 'Análisis cancelado'
+        : `Análisis completado: ${name}`;
+    const body = error
+      ? String(error)
+      : result?.cancelled
+        ? `Se detuvo tras ${seconds} s.`
+        : `${result?.successful ?? 0} de ${result?.totalFiles ?? 0} archivos en ${seconds} s` +
+          (result?.amg ? ` · ${result.amg.antipatterns.length} antipatrones` : '');
+
+    if (!document.hasFocus()) {
+      sendSystemNotification(title, body).then((sent) => {
+        if (!sent) toast.info(title, body);
+      });
+    } else if (!error) {
+      toast.success(title, body, result?.amg ? { label: 'Ver dashboard', onClick: () => setActiveMainTab('dashboard') } : undefined);
+    }
+  };
 
   // Ejecutar el análisis AST para una ruta específica
-  const runAnalysisForPath = async (targetPath: string) => {
-    if (!targetPath) return;
+  const runAnalysisForPath = (targetPath: string): Promise<void> => {
+    if (!targetPath) return Promise.resolve();
+    if (analysisRef.current) return analysisRef.current;
+
+    const session = sessionRef.current;
+    const run = executeAnalysis(targetPath, session).finally(() => {
+      if (analysisRef.current === run) analysisRef.current = null;
+    });
+    analysisRef.current = run;
+    return run;
+  };
+
+  const executeAnalysis = async (targetPath: string, session: number) => {
+    const isCurrent = () =>
+      sessionRef.current === session && useProjectStore.getState().projectPath === targetPath;
 
     setIsAnalyzing(true);
+    const startedAt = Date.now();
     try {
       const result = await analyzeProject(targetPath);
+      if (!isCurrent()) return;
       setLastAnalysisResult(result);
+      notifyAnalysisFinished(result);
 
+      // Un análisis cancelado no trae AMG: se conserva el que ya estaba en pantalla.
       if (result.amg) {
         resetDiagram();
         setAmg(result.amg);
@@ -99,6 +205,7 @@ export function App() {
         // Evaluar reglas de arquitectura y actualizar Fitness Score
         try {
           fitnessData = await evaluateFitnessRules(targetPath, result.amg);
+          if (!isCurrent()) return;
           setFitnessResult(fitnessData);
           calculatedFitnessScore = fitnessData.fitnessScore;
         } catch (e) {
@@ -112,7 +219,7 @@ export function App() {
         // Actualizar historial
         try {
           const updatedHistory = await getAnalysisHistory(targetPath);
-          setHistory(updatedHistory);
+          if (isCurrent()) setHistory(updatedHistory);
         } catch (e) {
           console.warn('Error al actualizar historial:', e);
         }
@@ -129,9 +236,12 @@ export function App() {
       }
     } catch (err) {
       console.error('Error durante el análisis del proyecto:', err);
-      alert(`Error en el análisis: ${err}`);
+      if (isCurrent()) {
+        toast.error('Error en el análisis', String(err));
+        notifyAnalysisFinished({ durationMs: Date.now() - startedAt } as ProjectAnalysisResult, err);
+      }
     } finally {
-      setIsAnalyzing(false);
+      if (sessionRef.current === session) setIsAnalyzing(false);
     }
   };
 
@@ -139,28 +249,37 @@ export function App() {
   const handleOpenProjectByPath = async (targetPath: string) => {
     if (!targetPath) return;
 
+    await stopRunningAnalysis();
+    // Limpiar el proyecto anterior antes de cargar el nuevo, para que no
+    // queden su AMG, fitness, anotaciones o selección visibles bajo la ruta nueva.
+    resetWorkspace();
+    const session = sessionRef.current;
+    const isCurrent = () => sessionRef.current === session;
+
     try {
       await openProject(targetPath);
+      if (!isCurrent()) return;
       setProjectPath(targetPath);
 
       // Cargar metadatos y configuraciones del proyecto
-      try {
-        const config = await getProjectConfig(targetPath);
-        setProjectConfig(config);
-
-        const annotations = await loadProjectAnnotations(targetPath);
-        setAnnotations(annotations);
-
-        const historyData = await getAnalysisHistory(targetPath);
-        setHistory(historyData);
-      } catch (e) {
-        console.warn('Error al cargar metadatos pre-frontend:', e);
+      const [config, annotations, historyData] = await Promise.allSettled([
+        getProjectConfig(targetPath),
+        loadProjectAnnotations(targetPath),
+        getAnalysisHistory(targetPath),
+      ]);
+      if (!isCurrent()) return;
+      if (config.status === 'fulfilled') setProjectConfig(config.value);
+      if (annotations.status === 'fulfilled') setAnnotations(annotations.value);
+      if (historyData.status === 'fulfilled') setHistory(historyData.value);
+      for (const failed of [config, annotations, historyData]) {
+        if (failed.status === 'rejected') {
+          console.warn('Error al cargar metadatos pre-frontend:', failed.reason);
+        }
       }
 
       // 1. Intentar cargar el análisis guardado previamente en caché
       const cached = loadCachedProjectData(targetPath);
       if (cached.amg) {
-        resetDiagram();
         setAmg(cached.amg);
         if (cached.fitnessResult) {
           setFitnessResult(cached.fitnessResult);
@@ -179,7 +298,7 @@ export function App() {
       }
     } catch (err) {
       console.error('Error al abrir proyecto:', err);
-      alert(`No se pudo abrir la ruta: ${targetPath}`);
+      if (isCurrent()) alert(`No se pudo abrir la ruta: ${targetPath}`);
     }
   };
 
@@ -191,7 +310,7 @@ export function App() {
       const selected = await openDialog({
         directory: true,
         multiple: false,
-        title: 'Seleccionar Carpeta de Proyecto para Análisis SAAC v2.0',
+        title: 'Seleccionar Carpeta de Proyecto para Análisis SAAC',
       });
 
       if (typeof selected === 'string') {
@@ -214,14 +333,33 @@ export function App() {
   };
 
   // Manejador para cerrar el proyecto actual y volver a la pantalla de bienvenida
-  const handleCloseProject = () => {
-    resetProject();
-    resetDiagram();
+  const handleCloseProject = async () => {
+    await stopRunningAnalysis();
+    resetWorkspace();
+  };
+
+  // 🧪 MODO DEMO — Carga datos sintéticos para capturas de pantalla y documentación
+  const handleLoadDemo = async () => {
+    await stopRunningAnalysis();
+    resetWorkspace();
+    setProjectPath(DEMO_PROJECT_PATH, DEMO_AMG.projectName);
+    setAmg(DEMO_AMG);
+    setFitnessResult(DEMO_FITNESS_RESULT);
+    setAnnotations(DEMO_ANNOTATIONS);
+    setLastAnalysisResult(DEMO_ANALYSIS_RESULT);
+    addRecentProject({
+      path: DEMO_PROJECT_PATH,
+      name: DEMO_AMG.projectName,
+      fitnessScore: DEMO_FITNESS_RESULT.fitnessScore,
+      moduleCount: DEMO_AMG.modules.length,
+      loc: DEMO_AMG.metrics.totalLoc,
+      antipatternCount: DEMO_AMG.antipatterns.length,
+    });
   };
 
   // Manejador para re-ejecutar el análisis AST manualmente desde la TopBar
   const handleAnalyzeProject = async () => {
-    if (!projectPath) return;
+    if (!projectPath || projectPath === DEMO_PROJECT_PATH) return;
     await runAnalysisForPath(projectPath);
   };
 
@@ -238,6 +376,7 @@ export function App() {
   useKeyboardShortcuts({
     onOpenProject: handleOpenProject,
     onAnalyzeProject: handleAnalyzeProject,
+    onExportReport: () => void exportArchitectureReport('markdown'),
   });
 
   return (
@@ -247,6 +386,7 @@ export function App() {
       onCloseProject={handleCloseProject}
       onAnalyzeProject={handleAnalyzeProject}
       onCancelAnalysis={handleCancelAnalysis}
+      onLoadDemo={handleLoadDemo}
     />
   );
 }

@@ -16,11 +16,17 @@ import {
   AlertTriangle,
   Settings,
   HelpCircle,
+  FileText,
+  PenTool,
+  Boxes,
+  Code2,
+  Network,
 } from 'lucide-react';
-import { useUiStore } from '../../stores/useUiStore';
+import { useUiStore, type LeftbarTab } from '../../stores/useUiStore';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useSelectionStore } from '../../stores/useSelectionStore';
 import { useDiagramStore } from '../../stores/useDiagramStore';
+import { supplementaryDiagramDefinitions } from '../c4viewer/diagram-registry';
 import { AiSettingsModal } from '../ai/AiSettingsModal';
 import type { Module } from '../../../shared/types';
 
@@ -37,9 +43,15 @@ export const Leftbar: React.FC = () => {
     activeLeftbarTab,
     setActiveLeftbarTab,
     leftbarOpen,
+    setLeftbarOpen,
     activeMainTab,
     setActiveMainTab,
   } = useUiStore();
+
+  const handleLeftbarTabClick = (tab: LeftbarTab) => {
+    setActiveLeftbarTab(tab);
+    if (!leftbarOpen) setLeftbarOpen(true);
+  };
   const { amg, projectName } = useProjectStore();
   const { selectElement, selectedId } = useSelectionStore();
   const { setC4Level } = useDiagramStore();
@@ -144,13 +156,15 @@ export const Leftbar: React.FC = () => {
     return (
       <div
         key={mod.id}
-        onClick={() => selectElement(mod.id, 'module', mod)}
+        onClick={() => {
+          selectElement(mod.id, 'module', mod);
+          setActiveMainTab('code');
+        }}
         style={{ paddingLeft: `${depth * 10 + 4}px` }}
-        className={`flex items-center justify-between py-1 px-1 rounded cursor-pointer transition text-[11px] font-sans ${
-          isSelected
-            ? 'bg-[var(--purple-soft)] text-[var(--purple)] font-semibold border border-[var(--purple-border)]'
-            : 'hover:bg-[var(--panel-2)] text-[var(--muted)] hover:text-[var(--text)]'
-        }`}
+        className={`flex items-center justify-between py-1 px-1 rounded cursor-pointer transition text-[11px] font-sans ${isSelected
+          ? 'bg-[var(--purple-soft)] text-[var(--purple)] font-semibold border border-[var(--purple-border)]'
+          : 'hover:bg-[var(--panel-2)] text-[var(--muted)] hover:text-[var(--text)]'
+          }`}
       >
         <div className="flex items-center space-x-1.5 truncate">
           <FileCode className="w-3.5 h-3.5 text-[var(--cyan)] shrink-0" />
@@ -169,21 +183,18 @@ export const Leftbar: React.FC = () => {
     );
   };
 
-  if (!leftbarOpen) return null;
-
   return (
     <div className="flex h-full select-none z-10 font-sans text-xs">
-      {/* 1. ACTIVITY BAR (GraphForge Spec Section 11 — 46px Width) */}
+      {/* 1. ACTIVITY BAR (GraphForge Spec Section 11 — 46px Width) — Siempre visible */}
       <aside className="w-[46px] bg-[var(--panel)] border-r border-[var(--border)] flex flex-col justify-between items-center py-2 shrink-0 transition-colors duration-200">
         <div className="flex flex-col items-center space-y-3 w-full">
           {/* Activity Bar Items */}
           <button
-            onClick={() => setActiveLeftbarTab('explorer')}
-            className={`relative w-full py-2 flex items-center justify-center transition ${
-              activeLeftbarTab === 'explorer'
-                ? 'text-[var(--text)]'
-                : 'text-[var(--muted)] hover:text-[var(--text)]'
-            }`}
+            onClick={() => handleLeftbarTabClick('explorer')}
+            className={`relative w-full py-2 flex items-center justify-center transition ${activeLeftbarTab === 'explorer'
+              ? 'text-[var(--text)]'
+              : 'text-[var(--muted)] hover:text-[var(--text)]'
+              }`}
             title="Explorador de Archivos"
           >
             {activeLeftbarTab === 'explorer' && (
@@ -193,12 +204,11 @@ export const Leftbar: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setActiveLeftbarTab('navigation')}
-            className={`relative w-full py-2 flex items-center justify-center transition ${
-              activeLeftbarTab === 'navigation'
-                ? 'text-[var(--text)]'
-                : 'text-[var(--muted)] hover:text-[var(--text)]'
-            }`}
+            onClick={() => handleLeftbarTabClick('navigation')}
+            className={`relative w-full py-2 flex items-center justify-center transition ${activeLeftbarTab === 'navigation'
+              ? 'text-[var(--text)]'
+              : 'text-[var(--muted)] hover:text-[var(--text)]'
+              }`}
             title="Navegación C4 por Jerarquía"
           >
             {activeLeftbarTab === 'navigation' && (
@@ -208,12 +218,11 @@ export const Leftbar: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setActiveLeftbarTab('search')}
-            className={`relative w-full py-2 flex items-center justify-center transition ${
-              activeLeftbarTab === 'search'
-                ? 'text-[var(--text)]'
-                : 'text-[var(--muted)] hover:text-[var(--text)]'
-            }`}
+            onClick={() => handleLeftbarTabClick('search')}
+            className={`relative w-full py-2 flex items-center justify-center transition ${activeLeftbarTab === 'search'
+              ? 'text-[var(--text)]'
+              : 'text-[var(--muted)] hover:text-[var(--text)]'
+              }`}
             title="Búsqueda Rápida"
           >
             {activeLeftbarTab === 'search' && (
@@ -226,23 +235,49 @@ export const Leftbar: React.FC = () => {
 
           <button
             onClick={() => setActiveMainTab('dashboard')}
-            className={`relative w-full py-2 flex items-center justify-center transition ${
-              activeMainTab === 'dashboard'
-                ? 'text-[var(--purple)]'
-                : 'text-[var(--muted)] hover:text-[var(--text)]'
-            }`}
+            className={`relative w-full py-2 flex items-center justify-center transition ${activeMainTab === 'dashboard'
+              ? 'text-[var(--purple)]'
+              : 'text-[var(--muted)] hover:text-[var(--text)]'
+              }`}
             title="Dashboard"
           >
             <LayoutDashboard className="w-4 h-4" />
           </button>
 
           <button
+            onClick={() => setActiveMainTab('modules')}
+            className={`relative w-full py-2 flex items-center justify-center transition ${activeMainTab === 'modules'
+              ? 'text-[var(--purple)]'
+              : 'text-[var(--muted)] hover:text-[var(--text)]'
+              }`}
+            title="Catálogo de Módulos"
+          >
+            {activeMainTab === 'modules' && (
+              <div className="absolute left-0 top-1 bottom-1 w-[2px] bg-[var(--purple)] rounded-r" />
+            )}
+            <Boxes className="w-4 h-4" />
+          </button>
+
+          <button
+            onClick={() => setActiveMainTab('code')}
+            className={`relative w-full py-2 flex items-center justify-center transition ${activeMainTab === 'code'
+              ? 'text-[var(--purple)]'
+              : 'text-[var(--muted)] hover:text-[var(--text)]'
+              }`}
+            title="Visualizador de Código IDE"
+          >
+            {activeMainTab === 'code' && (
+              <div className="absolute left-0 top-1 bottom-1 w-[2px] bg-[var(--purple)] rounded-r" />
+            )}
+            <Code2 className="w-4 h-4" />
+          </button>
+
+          <button
             onClick={() => setActiveMainTab('metrics')}
-            className={`relative w-full py-2 flex items-center justify-center transition ${
-              activeMainTab === 'metrics'
-                ? 'text-[var(--purple)]'
-                : 'text-[var(--muted)] hover:text-[var(--text)]'
-            }`}
+            className={`relative w-full py-2 flex items-center justify-center transition ${activeMainTab === 'metrics'
+              ? 'text-[var(--purple)]'
+              : 'text-[var(--muted)] hover:text-[var(--text)]'
+              }`}
             title="Métricas de Arquitectura"
           >
             <BarChart3 className="w-4 h-4" />
@@ -250,14 +285,36 @@ export const Leftbar: React.FC = () => {
 
           <button
             onClick={() => setActiveMainTab('antipatterns')}
-            className={`relative w-full py-2 flex items-center justify-center transition ${
-              activeMainTab === 'antipatterns'
-                ? 'text-[var(--red)]'
-                : 'text-[var(--muted)] hover:text-[var(--text)]'
-            }`}
+            className={`relative w-full py-2 flex items-center justify-center transition ${activeMainTab === 'antipatterns'
+              ? 'text-[var(--red)]'
+              : 'text-[var(--muted)] hover:text-[var(--text)]'
+              }`}
             title="Antipatrones"
           >
             <AlertTriangle className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setActiveMainTab('adrs')}
+            className={`relative w-full py-2 flex items-center justify-center transition ${activeMainTab === 'adrs'
+              ? 'text-[var(--purple)]'
+              : 'text-[var(--muted)] hover:text-[var(--text)]'
+              }`}
+            title="ADRs - Architectural Decision Records"
+          >
+            <FileText className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setActiveMainTab('design')}
+            className={`relative w-full py-2 flex items-center justify-center transition ${activeMainTab === 'design'
+              ? 'text-[var(--cyan)]'
+              : 'text-[var(--muted)] hover:text-[var(--text)]'
+              }`}
+            title="Diseño Arquitectónico Interactivo"
+          >
+            {activeMainTab === 'design' && (
+              <div className="absolute left-0 top-1 bottom-1 w-[2px] bg-[var(--cyan)] rounded-r" />
+            )}
+            <PenTool className="w-4 h-4" />
           </button>
         </div>
 
@@ -281,114 +338,163 @@ export const Leftbar: React.FC = () => {
         onClose={() => setIsAiSettingsOpen(false)}
       />
 
-      {/* 2. EXPLORER PANEL (GraphForge Spec Section 12 — 218px Width) */}
-      <aside className="w-[218px] bg-[var(--panel)] border-r border-[var(--border)] flex flex-col h-full shrink-0 transition-colors duration-200">
-        {/* Panel Title */}
-        <div className="px-3 py-2 border-b border-[var(--border)] bg-[var(--bg)] flex items-center justify-between">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
-            {activeLeftbarTab === 'explorer'
-              ? 'Explorador'
-              : activeLeftbarTab === 'navigation'
-                ? 'Jerarquía C4'
-                : 'Buscar'}
-          </span>
-          <span className="text-[9px] font-mono text-[var(--muted-2)]">
-            {amg ? `${amg.modules.length} mód` : '0'}
-          </span>
-        </div>
-
-        {/* Filter Input */}
-        <div className="p-2 border-b border-[var(--border)]">
-          <div className="relative">
-            <Search className="w-3 h-3 absolute left-2 top-2 text-[var(--muted-2)]" />
-            <input
-              type="text"
-              placeholder="Filtrar..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[var(--bg)] text-[11px] text-[var(--text)] pl-7 pr-2 py-1 rounded border border-[var(--border)] focus:outline-none focus:border-[var(--purple)] font-sans placeholder:text-[var(--muted-2)]"
-            />
+      {/* 2. EXPLORER PANEL (GraphForge Spec Section 12 — 218px Width) — Visibilidad controlada por leftbarOpen */}
+      {leftbarOpen && (
+        <aside className="w-[218px] bg-[var(--panel)] border-r border-[var(--border)] flex flex-col h-full shrink-0 transition-colors duration-200">
+          {/* Panel Title */}
+          <div className="px-3 py-2 border-b border-[var(--border)] bg-[var(--bg)] flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
+              {activeLeftbarTab === 'explorer'
+                ? 'Explorador'
+                : activeLeftbarTab === 'navigation'
+                  ? 'Jerarquía C4'
+                  : 'Buscar'}
+            </span>
+            <span className="text-[9px] font-mono text-[var(--muted-2)]">
+              {amg ? `${amg.modules.length} mód` : '0'}
+            </span>
           </div>
-        </div>
 
-        {/* Explorer Content */}
-        <div className="flex-1 overflow-y-auto p-1.5 text-[11px]">
-          {!amg ? (
-            <div className="flex flex-col items-center justify-center h-48 text-center text-[var(--muted-2)] space-y-2">
-              <FolderTree className="w-7 h-7 opacity-30 text-[var(--purple)]" />
-              <p className="font-medium text-[var(--muted)]">Sin proyecto cargado</p>
-              <p className="text-[10px] text-[var(--muted-2)]">Abra una carpeta para explorar.</p>
+          {/* Filter Input */}
+          <div className="p-2 border-b border-[var(--border)]">
+            <div className="relative">
+              <Search className="w-3 h-3 absolute left-2 top-2 text-[var(--muted-2)]" />
+              <input
+                type="text"
+                placeholder="Filtrar..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-[var(--bg)] text-[11px] text-[var(--text)] pl-7 pr-2 py-1 rounded border border-[var(--border)] focus:outline-none focus:border-[var(--purple)] font-sans placeholder:text-[var(--muted-2)]"
+              />
             </div>
-          ) : (
-            <>
-              {activeLeftbarTab === 'explorer' && fileTree && (
-                <div className="space-y-0.5">{renderTreeNode(fileTree, 0)}</div>
-              )}
+          </div>
 
-              {activeLeftbarTab === 'navigation' && (
-                <div className="space-y-1.5">
-                  <div
-                    onClick={() => setC4Level(1)}
-                    className="p-2 rounded bg-[var(--panel-2)] hover:bg-[var(--panel-3)] cursor-pointer border border-[var(--border-soft)] transition"
-                  >
-                    <div className="flex items-center space-x-1.5 text-[var(--cyan)] font-bold text-[11px]">
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>Nivel 1: Contexto</span>
+          {/* Explorer Content */}
+          <div className="flex-1 overflow-y-auto p-1.5 text-[11px]">
+            {!amg ? (
+              <div className="flex flex-col items-center justify-center h-48 text-center text-[var(--muted-2)] space-y-2">
+                <FolderTree className="w-7 h-7 opacity-30 text-[var(--purple)]" />
+                <p className="font-medium text-[var(--muted)]">Sin proyecto cargado</p>
+                <p className="text-[10px] text-[var(--muted-2)]">Abra una carpeta para explorar.</p>
+              </div>
+            ) : (
+              <>
+                {activeLeftbarTab === 'explorer' && fileTree && (
+                  <div className="space-y-0.5">{renderTreeNode(fileTree, 0)}</div>
+                )}
+
+                {activeLeftbarTab === 'navigation' && (
+                  <div className="space-y-3">
+                    {/* Sección C4 Core */}
+                    <div className="space-y-1.5">
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--muted-2)] block px-1">
+                        Modelo C4 Core
+                      </span>
+                      <div
+                        onClick={() => {
+                          setC4Level(1);
+                          setActiveMainTab('c4');
+                        }}
+                        className={`p-2 rounded bg-[var(--panel-2)] hover:bg-[var(--panel-3)] cursor-pointer border border-[var(--border-soft)] transition ${
+                          activeMainTab === 'c4' ? 'border-[var(--purple)]' : ''
+                        }`}
+                      >
+                        <div className="flex items-center space-x-1.5 text-[var(--cyan)] font-bold text-[11px]">
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>Nivel 1: Contexto</span>
+                        </div>
+                        <p className="text-[10px] text-[var(--muted)] mt-0.5 font-mono">
+                          {amg.externalSystems.length} ext | {amg.actors.length} actores
+                        </p>
+                      </div>
+
+                      <div
+                        onClick={() => {
+                          setC4Level(2);
+                          setActiveMainTab('c4');
+                        }}
+                        className={`p-2 rounded bg-[var(--panel-2)] hover:bg-[var(--panel-3)] cursor-pointer border border-[var(--border-soft)] transition ${
+                          activeMainTab === 'c4' ? 'border-[var(--purple)]' : ''
+                        }`}
+                      >
+                        <div className="flex items-center space-x-1.5 text-[var(--purple)] font-bold text-[11px]">
+                          <Box className="w-3.5 h-3.5" />
+                          <span>Nivel 2: Contenedores</span>
+                        </div>
+                        <p className="text-[10px] text-[var(--muted)] mt-0.5 font-mono">
+                          {amg.containers.length} unidades desplegables
+                        </p>
+                      </div>
+
+                      <div
+                        onClick={() => {
+                          setC4Level(3);
+                          setActiveMainTab('c4');
+                        }}
+                        className={`p-2 rounded bg-[var(--panel-2)] hover:bg-[var(--panel-3)] cursor-pointer border border-[var(--border-soft)] transition ${
+                          activeMainTab === 'c4' ? 'border-[var(--purple)]' : ''
+                        }`}
+                      >
+                        <div className="flex items-center space-x-1.5 text-[var(--green)] font-bold text-[11px]">
+                          <Layers className="w-3.5 h-3.5" />
+                          <span>Nivel 3: Componentes</span>
+                        </div>
+                        <p className="text-[10px] text-[var(--muted)] mt-0.5 font-mono">
+                          {amg.modules.length} módulos
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-[10px] text-[var(--muted)] mt-0.5 font-mono">
-                      {amg.externalSystems.length} ext | {amg.actors.length} actores
-                    </p>
+
+                    {/* Sección Diagramas Suplementarios */}
+                    <div className="space-y-1">
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--muted-2)] block px-1">
+                        Diagramas Suplementarios ({supplementaryDiagramDefinitions.length})
+                      </span>
+                      {supplementaryDiagramDefinitions.map((item) => {
+                        const isSelected = activeMainTab === item.tab;
+                        return (
+                          <div
+                            key={item.tab}
+                            onClick={() => setActiveMainTab(item.tab)}
+                            className={`p-1.5 rounded cursor-pointer transition text-[11px] font-sans flex items-center justify-between ${
+                              isSelected
+                                ? 'bg-[var(--purple-soft)] text-[var(--purple)] font-semibold border border-[var(--purple-border)]'
+                                : 'bg-[var(--panel-2)] hover:bg-[var(--panel-3)] text-[var(--text)] border border-[var(--border-soft)]'
+                            }`}
+                          >
+                            <div className="flex items-center space-x-1.5 truncate">
+                              <Network className="w-3 h-3 text-[var(--purple)] shrink-0" />
+                              <span className="truncate">{item.title}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
+                )}
 
-                  <div
-                    onClick={() => setC4Level(2)}
-                    className="p-2 rounded bg-[var(--panel-2)] hover:bg-[var(--panel-3)] cursor-pointer border border-[var(--border-soft)] transition"
-                  >
-                    <div className="flex items-center space-x-1.5 text-[var(--purple)] font-bold text-[11px]">
-                      <Box className="w-3.5 h-3.5" />
-                      <span>Nivel 2: Contenedores</span>
-                    </div>
-                    <p className="text-[10px] text-[var(--muted)] mt-0.5 font-mono">
-                      {amg.containers.length} unidades desplegables
+                {activeLeftbarTab === 'search' && (
+                  <div className="space-y-1">
+                    <p className="text-[var(--muted-2)] text-[10px] font-mono mb-1">
+                      {filteredModules.length} coincidencias
                     </p>
+                    {filteredModules.map((m) => (
+                      <div
+                        key={m.id}
+                        onClick={() => selectElement(m.id, 'module', m)}
+                        className="p-1.5 rounded bg-[var(--panel-2)] hover:bg-[var(--panel-3)] cursor-pointer text-[var(--text)] border border-[var(--border-soft)] transition"
+                      >
+                        <div className="font-semibold text-[var(--cyan)] text-[11px]">{m.name}</div>
+                        <div className="text-[9px] text-[var(--muted-2)] truncate font-mono">{m.id}</div>
+                      </div>
+                    ))}
                   </div>
-
-                  <div
-                    onClick={() => setC4Level(3)}
-                    className="p-2 rounded bg-[var(--panel-2)] hover:bg-[var(--panel-3)] cursor-pointer border border-[var(--border-soft)] transition"
-                  >
-                    <div className="flex items-center space-x-1.5 text-[var(--green)] font-bold text-[11px]">
-                      <Layers className="w-3.5 h-3.5" />
-                      <span>Nivel 3: Componentes</span>
-                    </div>
-                    <p className="text-[10px] text-[var(--muted)] mt-0.5 font-mono">
-                      {amg.modules.length} módulos
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {activeLeftbarTab === 'search' && (
-                <div className="space-y-1">
-                  <p className="text-[var(--muted-2)] text-[10px] font-mono mb-1">
-                    {filteredModules.length} coincidencias
-                  </p>
-                  {filteredModules.map((m) => (
-                    <div
-                      key={m.id}
-                      onClick={() => selectElement(m.id, 'module', m)}
-                      className="p-1.5 rounded bg-[var(--panel-2)] hover:bg-[var(--panel-3)] cursor-pointer text-[var(--text)] border border-[var(--border-soft)] transition"
-                    >
-                      <div className="font-semibold text-[var(--cyan)] text-[11px]">{m.name}</div>
-                      <div className="text-[9px] text-[var(--muted-2)] truncate font-mono">{m.id}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </aside>
+                )}
+              </>
+            )}
+          </div>
+        </aside>
+      )}
     </div>
   );
 };

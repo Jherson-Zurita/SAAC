@@ -166,11 +166,21 @@ impl Aggregator {
         // "github.com/user/proyecto/pkg/service") -> TODOS los module_id
         // de archivos .go en ese directorio/paquete.
         let mut by_go_package_dir: HashMap<String, Vec<&str>> = HashMap::new();
+        // Índice específico para Python: cada sufijo de ruta del module_id
+        // (ej. "app/services/user", "services/user", "user") -> module_id.
+        // Los `__init__` se indexan por la ruta de su paquete.
+        let mut by_python_suffix: HashMap<String, Vec<&str>> = HashMap::new();
 
         for r in &worker_results {
             let id = r.module.id.as_str();
             let basename = id.rsplit('/').next().unwrap_or(id);
             by_basename.entry(basename).or_default().push(id);
+
+            if r.module.language == Language::Python {
+                for suffix in python_path_suffixes(id) {
+                    by_python_suffix.entry(suffix).or_default().push(id);
+                }
+            }
 
             if r.module.language == Language::Java {
                 if let Some(suffix) = java_package_suffix(id, java_source_roots) {
@@ -191,29 +201,55 @@ impl Aggregator {
         let mut incoming_by_module: HashMap<String, HashSet<String>> = HashMap::new();
         // source_id -> set(target_id) sin duplicados, para Ce y detección de ciclos.
         let mut outgoing_by_module: HashMap<String, HashSet<String>> = HashMap::new();
+        // (source, target, kind) -> posición en `resolved_dependencies`, para
+        // fusionar aristas repetidas sumando su peso.
+        let mut dependency_index: HashMap<(String, String, String), usize> = HashMap::new();
+        let mut push_dependency = |deps: &mut Vec<Dependency>, dep: Dependency| {
+            let key = (dep.source.clone(), dep.target.clone(), format!("{:?}", dep.kind));
+            match dependency_index.get(&key) {
+                Some(&idx) => deps[idx].weight += dep.weight,
+                None => {
+                    dependency_index.insert(key, deps.len());
+                    deps.push(dep);
+                }
+            }
+        };
 
         for r in &worker_results {
             let is_java_source = r.module.language == Language::Java;
             let is_go_source = r.module.language == Language::Go;
             let is_rust_source = r.module.language == Language::Rust;
+            let is_python_source = r.module.language == Language::Python;
 
             for dep in &r.dependencies {
-                // Cada rama produce 0, 1 (caso general) o N targets (solo
-                // Go, por su semántica de import a nivel de paquete/
-                // directorio — ver docstring del módulo).
-                let resolved_targets: Vec<String> =
-                    if dep.target.starts_with("./") || dep.target.starts_with("../") {
+                // Target con el que se conserva la arista si no resuelve a
+                // un módulo interno (Python quita el sufijo `:nombre`).
+                let mut unresolved_target: Option<String> = None;
+
+                // Cada rama produce 0, 1 (caso general) o N targets (Go y
+                // los imports Java con comodín, por su semántica de import
+                // a nivel de paquete/directorio — ver docstring del módulo).
+                let resolved_targets: Vec<String> = if is_python_source {
+                    let (targets, display) =
+                        resolve_python_import(&dep.source, &dep.target, &known_ids, &by_python_suffix);
+                    unresolved_target = Some(display);
+                    targets
+                } else if dep.target.starts_with("./") || dep.target.starts_with("../") {
                         resolve_relative_import(&dep.source, &dep.target, &known_ids)
                             .into_iter()
                             .collect()
                     } else if is_java_source {
-                        resolve_java_package_import(&dep.target, &by_java_suffix)
-                            .map(|s| vec![s])
-                            .unwrap_or_else(|| {
-                                resolve_by_basename(&dep.target, &by_basename)
-                                    .map(|s| vec![s.to_string()])
-                                    .unwrap_or_default()
-                            })
+                        if let Some(package) = dep.target.strip_suffix(".*") {
+                            resolve_java_wildcard_import(package, &by_java_suffix)
+                        } else {
+                            resolve_java_package_import(&dep.target, &by_java_suffix)
+                                .map(|s| vec![s])
+                                .unwrap_or_else(|| {
+                                    resolve_by_basename(&dep.target, &by_basename)
+                                        .map(|s| vec![s.to_string()])
+                                        .unwrap_or_default()
+                                })
+                        }
                     } else if is_go_source {
                         resolve_go_package_import(&dep.target, &by_go_package_dir).unwrap_or_else(
                             || {
@@ -238,17 +274,27 @@ impl Aggregator {
 
                 // Descarta self-imports espurios (un target resuelto que
                 // apunta al propio módulo origen).
+                let resolved_any = !resolved_targets.is_empty();
                 let resolved_targets: Vec<String> = resolved_targets
                     .into_iter()
                     .filter(|t| t != &dep.source)
                     .collect();
+
+                if resolved_any && resolved_targets.is_empty() {
+                    // Solo resolvía al propio módulo: no es una dependencia.
+                    continue;
+                }
 
                 if resolved_targets.is_empty() {
                     // No resoluble contra ningún módulo interno conocido
                     // con confianza: se conserva la arista tal cual para
                     // no perder visibilidad de dependencias externas,
                     // simplemente no participa en Ca/Ce internos.
-                    resolved_dependencies.push(dep.clone());
+                    let mut external = dep.clone();
+                    if let Some(target) = unresolved_target {
+                        external.target = target;
+                    }
+                    push_dependency(&mut resolved_dependencies, external);
                 } else {
                     for target_id in resolved_targets {
                         outgoing_by_module
@@ -259,12 +305,15 @@ impl Aggregator {
                             .entry(target_id.clone())
                             .or_default()
                             .insert(dep.source.clone());
-                        resolved_dependencies.push(Dependency {
-                            source: dep.source.clone(),
-                            target: target_id,
-                            kind: dep.kind,
-                            weight: dep.weight,
-                        });
+                        push_dependency(
+                            &mut resolved_dependencies,
+                            Dependency {
+                                source: dep.source.clone(),
+                                target: target_id,
+                                kind: dep.kind,
+                                weight: dep.weight,
+                            },
+                        );
                     }
                 }
             }
@@ -318,7 +367,9 @@ impl Aggregator {
                 // del árbol de dependencias, ej. utilidades puras).
                 1.0
             } else {
-                ce as f64 / total_imports as f64
+                // `from pkg import a, b` es un solo import declarado que puede
+                // resolver a varios submódulos.
+                (ce as f64 / total_imports as f64).min(1.0)
             };
 
             let final_metrics = ModuleMetrics::from_worker(
@@ -393,7 +444,9 @@ impl Aggregator {
 
         // ── Detección de antipatrones ──
         let mut antipatterns: Vec<Antipattern> = Vec::new();
-        antipatterns.extend(detect_god_modules(&modules, metrics.total_dependencies));
+        let internal_dependency_count: u32 =
+            outgoing_by_module.values().map(|targets| targets.len() as u32).sum();
+        antipatterns.extend(detect_god_modules(&modules, internal_dependency_count));
         antipatterns.extend(detect_circular_dependencies(&outgoing_by_module));
         antipatterns.extend(detect_layer_violations(
             &modules,
@@ -544,6 +597,76 @@ fn resolve_by_basename<'a>(
 }
 
 // ============================================================================
+// Resolución de dependencias — Python
+// ============================================================================
+
+/// Todos los sufijos de ruta de un module_id Python, del más largo al más
+/// corto. Un `pkg/__init__` se indexa por la ruta de su paquete (`pkg`),
+/// que es como se importa.
+fn python_path_suffixes(module_id: &str) -> Vec<String> {
+    let mut segments: Vec<&str> = module_id.split('/').filter(|s| !s.is_empty()).collect();
+    if segments.last() == Some(&"__init__") {
+        segments.pop();
+    }
+    (0..segments.len()).map(|i| segments[i..].join("/")).collect()
+}
+
+/// Resuelve un target emitido por `parsers/python.py`:
+///   - `a.b` (`import a.b`) o `a.b:X` (`from a.b import X`)
+///   - `.`, `..pkg`, `.:X`, `..pkg:X` (imports relativos, con `level` puntos)
+///
+/// Con nombre, primero se intenta `X` como submódulo (`a/b/X`) y si no
+/// existe se cae al módulo/paquete contenedor (`a/b`), porque `X` puede ser
+/// una clase o función definida en él. Los imports relativos se resuelven
+/// contra el directorio del archivo; los absolutos por sufijo de ruta
+/// único (ambiguo -> sin resolver, igual criterio que `resolve_by_basename`).
+///
+/// Devuelve los targets resueltos y el target con el que conservar la
+/// arista si no resuelve (sin el sufijo `:X`).
+fn resolve_python_import(
+    source_id: &str,
+    target: &str,
+    known_ids: &HashSet<&str>,
+    by_python_suffix: &HashMap<String, Vec<&str>>,
+) -> (Vec<String>, String) {
+    let (module, name) = match target.split_once(':') {
+        Some((module, name)) => (module, Some(name).filter(|n| !n.is_empty())),
+        None => (target, None),
+    };
+    let level = module.chars().take_while(|c| *c == '.').count();
+    let dotted_path = module[level..].replace('.', "/");
+
+    let resolved = if level > 0 {
+        let mut segments: Vec<&str> = source_id.split('/').collect();
+        segments.pop();
+        for _ in 1..level {
+            segments.pop();
+        }
+        segments.extend(dotted_path.split('/').filter(|s| !s.is_empty()));
+        let base = segments.join("/");
+
+        let lookup = |path: &str| -> Option<String> {
+            [path.to_string(), format!("{}/__init__", path)]
+                .into_iter()
+                .find(|candidate| known_ids.contains(candidate.as_str()))
+        };
+        name.and_then(|n| lookup(&format!("{}/{}", base, n)))
+            .or_else(|| lookup(&base))
+    } else {
+        let lookup = |path: &str| -> Option<String> {
+            match by_python_suffix.get(path) {
+                Some(candidates) if candidates.len() == 1 => Some(candidates[0].to_string()),
+                _ => None,
+            }
+        };
+        name.and_then(|n| lookup(&format!("{}/{}", dotted_path, n)))
+            .or_else(|| lookup(&dotted_path))
+    };
+
+    (resolved.into_iter().collect(), module.to_string())
+}
+
+// ============================================================================
 // Resolución de dependencias — Java
 // ============================================================================
 
@@ -598,6 +721,28 @@ fn resolve_java_package_import(
         Some(candidates) if candidates.len() == 1 => Some(candidates[0].to_string()),
         _ => None,
     }
+}
+
+/// Resuelve `import a.b.*;` (el parser emite `a.b.*`, aquí llega `a.b`) a
+/// TODAS las clases conocidas directamente dentro del paquete `a/b`, sin
+/// incluir subpaquetes — misma semántica que el comodín de Java.
+fn resolve_java_wildcard_import(
+    package: &str,
+    by_java_suffix: &HashMap<String, Vec<&str>>,
+) -> Vec<String> {
+    let prefix = format!("{}/", package.replace('.', "/"));
+    let mut targets: Vec<String> = by_java_suffix
+        .iter()
+        .filter(|(suffix, _)| {
+            suffix
+                .strip_prefix(prefix.as_str())
+                .is_some_and(|rest| !rest.is_empty() && !rest.contains('/'))
+        })
+        .flat_map(|(_, ids)| ids.iter().map(|id| id.to_string()))
+        .collect();
+    targets.sort();
+    targets.dedup();
+    targets
 }
 
 // ============================================================================
@@ -702,24 +847,37 @@ fn resolve_rust_use_import(
 
 /// Detecta módulos con Efferent Coupling excesivo (Ce > 15 ó > 20% del
 /// total de dependencias resueltas del proyecto).
-fn detect_god_modules(modules: &[Module], total_dependencies: u32) -> Vec<Antipattern> {
+/// `internal_dependencies`: aristas internas distintas (módulo -> módulo),
+/// la misma base sobre la que se calcula Ce — no incluye dependencias
+/// externas no resueltas.
+///
+/// La regla relativa (> 20 % de las aristas) solo aplica a partir de
+/// `MIN_INTERNAL_DEPS_FOR_RATIO` aristas y con un Ce mínimo: en un proyecto
+/// con 10 aristas, un módulo con Ce = 3 no es un God Module.
+fn detect_god_modules(modules: &[Module], internal_dependencies: u32) -> Vec<Antipattern> {
+    const ABSOLUTE_CE_THRESHOLD: u32 = 15;
+    const MIN_INTERNAL_DEPS_FOR_RATIO: u32 = 20;
+    const MIN_CE_FOR_RATIO: u32 = 8;
+    const RATIO_THRESHOLD: f64 = 0.20;
+
     let mut result = Vec::new();
-    let threshold_abs: u32 = 15;
 
     for m in modules {
         let ce = m.metrics.ce;
-        let pct = if total_dependencies > 0 {
-            ce as f64 / total_dependencies as f64
+        let pct = if internal_dependencies > 0 {
+            ce as f64 / internal_dependencies as f64
         } else {
             0.0
         };
 
-        let is_god = ce > threshold_abs || (total_dependencies > 0 && pct > 0.20);
+        let is_god = ce > ABSOLUTE_CE_THRESHOLD
+            || (internal_dependencies >= MIN_INTERNAL_DEPS_FOR_RATIO
+                && ce >= MIN_CE_FOR_RATIO
+                && pct > RATIO_THRESHOLD);
 
         if is_god {
-            let short_name = m.id.rsplit('/').next().unwrap_or(&m.id);
             result.push(Antipattern {
-                id: format!("antipattern:god-module:{}", short_name),
+                id: format!("antipattern:god-module:{}", m.id),
                 antipattern_type: AntipatternType::GodModule,
                 name: "God Module".to_string(),
                 severity: Severity::High,
@@ -1229,5 +1387,91 @@ fn detect_architecture_style(modules: &[Module]) -> (ArchStyle, f64) {
             (style, confidence)
         }
         None => (ArchStyle::Unknown, 0.0),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn python_index<'a>(ids: &[&'a str]) -> (HashSet<&'a str>, HashMap<String, Vec<&'a str>>) {
+        let known: HashSet<&str> = ids.iter().copied().collect();
+        let mut by_suffix: HashMap<String, Vec<&str>> = HashMap::new();
+        for id in ids {
+            for suffix in python_path_suffixes(id) {
+                by_suffix.entry(suffix).or_default().push(id);
+            }
+        }
+        (known, by_suffix)
+    }
+
+    const PY_IDS: [&str; 6] = [
+        "proj/app/__init__",
+        "proj/app/models",
+        "proj/app/api/views",
+        "proj/app/core/__init__",
+        "proj/app/core/db",
+        "proj/other/models",
+    ];
+
+    #[test]
+    fn python_relative_import_resolves_submodule_and_package() {
+        let (known, by_suffix) = python_index(&PY_IDS);
+        let src = "proj/app/api/views";
+
+        assert_eq!(
+            resolve_python_import(src, "..:models", &known, &by_suffix).0,
+            vec!["proj/app/models".to_string()]
+        );
+        // `Session` no es un submódulo: cae al módulo que lo define.
+        assert_eq!(
+            resolve_python_import(src, "..core.db:Session", &known, &by_suffix).0,
+            vec!["proj/app/core/db".to_string()]
+        );
+        // `from ..core import X` resuelve al `__init__` del paquete.
+        assert_eq!(
+            resolve_python_import(src, "..core:X", &known, &by_suffix).0,
+            vec!["proj/app/core/__init__".to_string()]
+        );
+    }
+
+    #[test]
+    fn python_absolute_import_uses_unique_path_suffix() {
+        let (known, by_suffix) = python_index(&PY_IDS);
+        let src = "proj/app/api/views";
+
+        assert_eq!(
+            resolve_python_import(src, "app.core.db", &known, &by_suffix).0,
+            vec!["proj/app/core/db".to_string()]
+        );
+        assert_eq!(
+            resolve_python_import(src, "app:models", &known, &by_suffix).0,
+            vec!["proj/app/models".to_string()]
+        );
+        // `models` es ambiguo (app/models y other/models): no se adivina.
+        let (targets, display) = resolve_python_import(src, "models", &known, &by_suffix);
+        assert!(targets.is_empty());
+        assert_eq!(display, "models");
+        // Externo: se conserva el módulo sin el nombre importado.
+        let (targets, display) = resolve_python_import(src, "typing:Any", &known, &by_suffix);
+        assert!(targets.is_empty());
+        assert_eq!(display, "typing");
+    }
+
+    #[test]
+    fn java_wildcard_import_resolves_direct_package_members_only() {
+        let mut by_suffix: HashMap<String, Vec<&str>> = HashMap::new();
+        by_suffix.insert("com/x/A".into(), vec!["src/main/java/com/x/A"]);
+        by_suffix.insert("com/x/B".into(), vec!["src/main/java/com/x/B"]);
+        by_suffix.insert("com/x/sub/C".into(), vec!["src/main/java/com/x/sub/C"]);
+        by_suffix.insert("com/xy/D".into(), vec!["src/main/java/com/xy/D"]);
+
+        assert_eq!(
+            resolve_java_wildcard_import("com.x", &by_suffix),
+            vec![
+                "src/main/java/com/x/A".to_string(),
+                "src/main/java/com/x/B".to_string()
+            ]
+        );
     }
 }

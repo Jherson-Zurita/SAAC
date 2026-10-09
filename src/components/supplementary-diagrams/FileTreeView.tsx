@@ -16,6 +16,7 @@ import '@xyflow/react/dist/style.css';
 import { FileCode, Folder, FolderOpen } from 'lucide-react';
 import type { C4DiagramData } from '../../../shared/types';
 import { useProjectStore } from '../../stores/useProjectStore';
+import { useSelectionStore } from '../../stores/useSelectionStore';
 import { getLayoutedElements } from '../../lib/dagre-layout';
 
 // ── Types ──
@@ -373,15 +374,31 @@ export const FileTreeView: React.FC<FileTreeViewProps> = ({ diagramData: _diagra
     });
   }, [treeMap, roots, expandedDirs]);
 
-  // Handle node click → toggle folders
+  const { selectElement } = useSelectionStore();
+
+  // Handle node click → toggle folders or select files in inspector
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node<FileTreeNodeData>) => {
       const entry = (node.data as FileTreeNodeData).entry;
       if (entry.isDir) {
         toggleExpand(entry.path);
+      } else {
+        const matchingMod = modules.find((m) => m.id === entry.path || m.name === entry.name);
+        if (matchingMod) {
+          selectElement(matchingMod.id, 'module', matchingMod);
+        } else {
+          selectElement(entry.path, 'c4_node', {
+            id: entry.path,
+            label: entry.name,
+            elementType: 'File',
+            technology: entry.language,
+            description: `LOC: ${entry.loc || 0}, MI: ${entry.maintainability?.toFixed(1) || 'N/A'}`,
+            amgNodeId: entry.path,
+          });
+        }
       }
     },
-    [toggleExpand]
+    [toggleExpand, modules, selectElement]
   );
 
   if (modules.length === 0) {

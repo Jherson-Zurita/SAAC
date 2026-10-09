@@ -1,18 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import type { EdgeType } from '../../../shared/types';
-
-const EDGE_TYPES: readonly { value: EdgeType; label: string }[] = [
-  { value: 'dependency', label: 'Dependencia' },
-  { value: 'containment', label: 'Contención' },
-  { value: 'inheritance', label: 'Herencia' },
-  { value: 'invocation', label: 'Invocación' },
-  { value: 'external-call', label: 'Llamada externa' },
-];
+import { EDGE_TYPE_META, EDGE_TYPE_OPTIONS } from './design-flow';
 
 export interface EdgeEditorDialogProps {
   open: boolean;
   sourceLabel: string;
   targetLabel: string;
+  suggestedType?: EdgeType;
   onCancel: () => void;
   onSubmit: (edgeType: EdgeType, label?: string) => string | null | void;
 }
@@ -21,19 +15,20 @@ export const EdgeEditorDialog: React.FC<EdgeEditorDialogProps> = ({
   open,
   sourceLabel,
   targetLabel,
+  suggestedType = 'dependency',
   onCancel,
   onSubmit,
 }) => {
-  const [edgeType, setEdgeType] = useState<EdgeType>('dependency');
+  const [edgeType, setEdgeType] = useState<EdgeType>(suggestedType);
   const [label, setLabel] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
-    setEdgeType('dependency');
+    setEdgeType(suggestedType);
     setLabel('');
     setValidationError(null);
-  }, [open, sourceLabel, targetLabel]);
+  }, [open, sourceLabel, targetLabel, suggestedType]);
 
   useEffect(() => {
     if (!open) return;
@@ -71,24 +66,40 @@ export const EdgeEditorDialog: React.FC<EdgeEditorDialogProps> = ({
         </header>
 
         <form className="design-edge-dialog__form" onSubmit={handleSubmit}>
-          <label className="design-edge-dialog__field">
-            <span className="design-edge-dialog__field-label">Tipo de arista</span>
-            <select
-              className="design-edge-dialog__select"
-              value={edgeType}
-              onChange={(event) => {
-                setEdgeType(event.target.value as EdgeType);
-                setValidationError(null);
-              }}
-              autoFocus
-            >
-              {EDGE_TYPES.map((type) => (
-                <option key={type.value} value={type.value}>
-                  {type.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <fieldset className="design-edge-dialog__types">
+            <legend className="design-edge-dialog__field-label">Tipo de arista</legend>
+            {EDGE_TYPE_OPTIONS.map((option) => {
+              const meta = EDGE_TYPE_META[option.value];
+              return (
+                <label
+                  key={option.value}
+                  className={`design-edge-dialog__type${edgeType === option.value ? ' design-edge-dialog__type--active' : ''}`}
+                  style={{ '--edge-accent': meta.color } as React.CSSProperties}
+                >
+                  <input
+                    type="radio"
+                    name="edge-type"
+                    value={option.value}
+                    checked={edgeType === option.value}
+                    autoFocus={option.value === suggestedType}
+                    onChange={() => {
+                      setEdgeType(option.value);
+                      setValidationError(null);
+                    }}
+                  />
+                  <span className="design-edge-dialog__type-copy">
+                    <strong>
+                      {option.label}
+                      {option.value === suggestedType && (
+                        <span className="design-edge-dialog__suggested">sugerido</span>
+                      )}
+                    </strong>
+                    <span>{meta.description}</span>
+                  </span>
+                </label>
+              );
+            })}
+          </fieldset>
 
           <label className="design-edge-dialog__field">
             <span className="design-edge-dialog__field-label">Etiqueta opcional</span>
@@ -96,7 +107,7 @@ export const EdgeEditorDialog: React.FC<EdgeEditorDialogProps> = ({
               className="design-edge-dialog__input"
               value={label}
               onChange={(event) => setLabel(event.target.value)}
-              placeholder="Describe la relación"
+              placeholder="Ej. REST/JSON, publica eventos, lee usuarios"
             />
           </label>
 

@@ -6,6 +6,7 @@
 //! simulado/fallback cuando no se detecta un LLM en ejecución en la máquina.
 
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use crate::engine::amg::ArchitectureModelGraph;
@@ -69,6 +70,56 @@ pub struct AiResponse {
     pub completion_tokens: u32,
     pub is_mock_fallback: bool,
     pub generated_prompt: String,
+}
+
+/// Fragmento emitido al frontend durante una respuesta en streaming.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase", tag = "event", content = "data")]
+pub enum AiStreamEvent {
+    Delta { content: String },
+    Done(AiStreamSummary),
+}
+
+/// Resultado final de `ask_stream`; el texto ya se envió como `AiStreamEvent::Delta`.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiStreamSummary {
+    pub model_used: String,
+    pub provider_used: AiProvider,
+    pub prompt_tokens: u32,
+    pub completion_tokens: u32,
+    pub is_mock_fallback: bool,
+    pub cancelled: bool,
+}
+
+/// Señal de cancelación de un stream: puede consultarse o esperarse.
+#[derive(Debug, Default)]
+pub struct CancelSignal {
+    cancelled: AtomicBool,
+    notify: tokio::sync::Notify,
+}
+
+impl CancelSignal {
+    pub fn cancel(&self) {
+        self.cancelled.store(true, Ordering::SeqCst);
+        self.notify.notify_waiters();
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        self.cancelled.load(Ordering::SeqCst)
+    }
+
+    pub async fn cancelled(&self) {
+        loop {
+            // `Notified` recibe `notify_waiters` desde que se crea, así que no se
+            // pierde una cancelación ocurrida entre la consulta y el `await`.
+            let notified = self.notify.notified();
+            if self.is_cancelled() {
+                return;
+            }
+            notified.await;
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -359,13 +410,7 @@ impl AiClient {
             // Fallback elegante cuando el servidor local no está disponible
             let mut mock_resp =
                 Self::make_mock_response(user_prompt, &system_msg, &full_user_msg, config);
-            mock_resp.content = format!(
-                "⚠️ [MODO OFFLINE DE IA - FALLBACK ELEGANTE]\n\n\
-                 No se detectó un servidor LLM en ejecución en '{}'. {}\n\n\
-                 El contexto de arquitectura fue construido exitosamente y está listo para enviarse:\n\n\
-                 {}",
-                config.endpoint_url, status.message, full_user_msg
-            );
+            mock_resp.content = Self::offline_fallback_text(config, &status.message, &full_user_msg);
             return Ok(mock_resp);
         }
 
@@ -557,6 +602,214 @@ impl AiClient {
         }
     }
 
+    fn offline_fallback_text(config: &AiConfig, status_message: &str, full_user_msg: &str) -> String {
+        format!(
+            "⚠️ [MODO OFFLINE DE IA - FALLBACK ELEGANTE]\n\n\
+             No se detectó un servidor LLM en ejecución en '{}'. {}\n\n\
+             El contexto de arquitectura fue construido exitosamente y está listo para enviarse:\n\n\
+             {}",
+            config.endpoint_url, status_message, full_user_msg
+        )
+    }
+
+    /// Igual que `ask`, pero entrega el texto a `on_delta` a medida que el modelo
+    /// lo genera. Si `on_delta` falla (el frontend dejó de escuchar) se corta el stream.
+    pub async fn ask_stream<F>(
+        user_prompt: &str,
+        context_type: &AiContextType,
+        amg: Option<&ArchitectureModelGraph>,
+        config: &AiConfig,
+        cancel: &CancelSignal,
+        mut on_delta: F,
+    ) -> Result<AiStreamSummary, String>
+    where
+        F: FnMut(String) -> Result<(), String>,
+    {
+        let (system_msg, full_user_msg) = Self::build_prompt(user_prompt, context_type, amg);
+        let fallback_summary = |cancelled| AiStreamSummary {
+            model_used: config.model_name.clone(),
+            provider_used: AiProvider::Mock,
+            prompt_tokens: 0,
+            completion_tokens: 0,
+            is_mock_fallback: true,
+            cancelled,
+        };
+
+        if config.provider == AiProvider::Mock {
+            let content =
+                Self::make_mock_response(user_prompt, &system_msg, &full_user_msg, config).content;
+            for piece in content.split_inclusive(' ') {
+                if cancel.is_cancelled() {
+                    return Ok(fallback_summary(true));
+                }
+                on_delta(piece.to_string())?;
+                tokio::time::sleep(Duration::from_millis(12)).await;
+            }
+            return Ok(fallback_summary(false));
+        }
+
+        let status = Self::check_status(config).await;
+        if !status.is_online {
+            on_delta(Self::offline_fallback_text(config, &status.message, &full_user_msg))?;
+            return Ok(fallback_summary(false));
+        }
+
+        // Timeout de inactividad (por chunk), no total: una respuesta larga puede
+        // tardar minutos mientras siga llegando texto.
+        let idle_timeout = Duration::from_secs(config.timeout_seconds.unwrap_or(60).max(5));
+        let client = reqwest::Client::builder()
+            .connect_timeout(Duration::from_secs(10))
+            .build()
+            .map_err(|e| format!("Error cliente HTTP: {}", e))?;
+
+        let messages = serde_json::json!([
+            { "role": "system", "content": system_msg },
+            { "role": "user", "content": full_user_msg },
+        ]);
+        let temperature = config.temperature.unwrap_or(0.2);
+        let endpoint = config.endpoint_url.trim_end_matches('/');
+
+        let request = match config.provider {
+            AiProvider::Ollama => client.post(format!("{}/api/chat", endpoint)).json(&serde_json::json!({
+                "model": config.model_name,
+                "messages": messages,
+                "stream": true,
+                "options": { "temperature": temperature },
+            })),
+            AiProvider::OpenAiCompatible => {
+                let mut req = client
+                    .post(format!("{}/chat/completions", endpoint))
+                    .json(&serde_json::json!({
+                        "model": config.model_name,
+                        "messages": messages,
+                        "temperature": temperature,
+                        "stream": true,
+                    }));
+                if let Some(key) = config.api_key.as_deref() {
+                    req = req.bearer_auth(key);
+                }
+                req
+            }
+            AiProvider::Mock => unreachable!(),
+        };
+
+        let mut summary = AiStreamSummary {
+            model_used: config.model_name.clone(),
+            provider_used: config.provider,
+            prompt_tokens: 0,
+            completion_tokens: 0,
+            is_mock_fallback: false,
+            cancelled: false,
+        };
+
+        let sent = tokio::select! {
+            _ = cancel.cancelled() => {
+                summary.cancelled = true;
+                return Ok(summary);
+            }
+            sent = tokio::time::timeout(idle_timeout, request.send()) => sent,
+        };
+        let mut response = sent
+            .map_err(|_| format!("El servidor de IA no respondió en {} s.", idle_timeout.as_secs()))?
+            .map_err(|e| format!("Error en petición HTTP a la IA: {}", e))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            let detail: String = body.trim().chars().take(300).collect();
+            return Err(format!("La IA devolvió HTTP {}: {}", status, detail));
+        }
+
+        let mut buffer: Vec<u8> = Vec::new();
+        'read: loop {
+            let next = tokio::select! {
+                _ = cancel.cancelled() => {
+                    summary.cancelled = true;
+                    break 'read;
+                }
+                next = tokio::time::timeout(idle_timeout, response.chunk()) => next,
+            };
+            let chunk = next
+                .map_err(|_| format!("La IA dejó de responder durante {} s.", idle_timeout.as_secs()))?
+                .map_err(|e| format!("Error leyendo la respuesta de la IA: {}", e))?;
+
+            let at_end = chunk.is_none();
+            match chunk {
+                Some(bytes) => buffer.extend_from_slice(&bytes),
+                None => buffer.push(b'\n'),
+            }
+
+            while let Some(pos) = buffer.iter().position(|b| *b == b'\n') {
+                let raw: Vec<u8> = buffer.drain(..=pos).collect();
+                let line = String::from_utf8_lossy(&raw);
+                let (delta, done) = Self::parse_stream_line(config.provider, line.trim(), &mut summary)?;
+                if let Some(text) = delta {
+                    on_delta(text)?;
+                }
+                if done {
+                    break 'read;
+                }
+            }
+            if at_end {
+                break;
+            }
+        }
+
+        Ok(summary)
+    }
+
+    /// Interpreta una línea del stream: NDJSON en Ollama, SSE (`data: ...`) en
+    /// APIs OpenAI-compatible. Devuelve el texto nuevo y si el stream terminó.
+    fn parse_stream_line(
+        provider: AiProvider,
+        line: &str,
+        summary: &mut AiStreamSummary,
+    ) -> Result<(Option<String>, bool), String> {
+        if line.is_empty() {
+            return Ok((None, false));
+        }
+        let non_empty = |v: &serde_json::Value| v.as_str().filter(|s| !s.is_empty()).map(str::to_string);
+        let as_u32 = |v: &serde_json::Value| v.as_u64().map(|n| n as u32);
+
+        match provider {
+            AiProvider::Ollama => {
+                let chunk: serde_json::Value = serde_json::from_str(line)
+                    .map_err(|e| format!("Respuesta de Ollama inválida: {}", e))?;
+                if let Some(err) = chunk.get("error").and_then(|e| e.as_str()) {
+                    return Err(format!("Ollama: {}", err));
+                }
+                let done = chunk["done"].as_bool().unwrap_or(false);
+                if done {
+                    summary.prompt_tokens = as_u32(&chunk["prompt_eval_count"]).unwrap_or(0);
+                    summary.completion_tokens = as_u32(&chunk["eval_count"]).unwrap_or(0);
+                }
+                Ok((non_empty(&chunk["message"]["content"]), done))
+            }
+            AiProvider::OpenAiCompatible => {
+                let Some(data) = line.strip_prefix("data:") else {
+                    return Ok((None, false));
+                };
+                let data = data.trim();
+                if data == "[DONE]" {
+                    return Ok((None, true));
+                }
+                let chunk: serde_json::Value = serde_json::from_str(data)
+                    .map_err(|e| format!("Respuesta de la API inválida: {}", e))?;
+                if let Some(err) = chunk.get("error").filter(|e| !e.is_null()) {
+                    let message = err["message"].as_str().map(str::to_string).unwrap_or_else(|| err.to_string());
+                    return Err(format!("API de IA: {}", message));
+                }
+                if let Some(usage) = chunk.get("usage").filter(|u| u.is_object()) {
+                    summary.prompt_tokens = as_u32(&usage["prompt_tokens"]).unwrap_or(summary.prompt_tokens);
+                    summary.completion_tokens =
+                        as_u32(&usage["completion_tokens"]).unwrap_or(summary.completion_tokens);
+                }
+                Ok((non_empty(&chunk["choices"][0]["delta"]["content"]), false))
+            }
+            AiProvider::Mock => Ok((None, false)),
+        }
+    }
+
     fn make_mock_response(
         user_prompt: &str,
         _system_msg: &str,
@@ -583,5 +836,84 @@ impl AiClient {
             is_mock_fallback: true,
             generated_prompt: full_user_msg.to_string(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn empty_summary(provider: AiProvider) -> AiStreamSummary {
+        AiStreamSummary {
+            model_used: "m".into(),
+            provider_used: provider,
+            prompt_tokens: 0,
+            completion_tokens: 0,
+            is_mock_fallback: false,
+            cancelled: false,
+        }
+    }
+
+    #[test]
+    fn parses_ollama_ndjson_lines() {
+        let mut summary = empty_summary(AiProvider::Ollama);
+        let delta = AiClient::parse_stream_line(
+            AiProvider::Ollama,
+            r#"{"message":{"role":"assistant","content":"Hola"},"done":false}"#,
+            &mut summary,
+        )
+        .unwrap();
+        assert_eq!(delta, (Some("Hola".to_string()), false));
+
+        let done = AiClient::parse_stream_line(
+            AiProvider::Ollama,
+            r#"{"message":{"content":""},"done":true,"prompt_eval_count":12,"eval_count":34}"#,
+            &mut summary,
+        )
+        .unwrap();
+        assert_eq!(done, (None, true));
+        assert_eq!((summary.prompt_tokens, summary.completion_tokens), (12, 34));
+
+        assert!(AiClient::parse_stream_line(AiProvider::Ollama, r#"{"error":"model not found"}"#, &mut summary).is_err());
+    }
+
+    #[test]
+    fn parses_openai_sse_lines() {
+        let mut summary = empty_summary(AiProvider::OpenAiCompatible);
+        let p = AiProvider::OpenAiCompatible;
+        assert_eq!(AiClient::parse_stream_line(p, ": keep-alive", &mut summary).unwrap(), (None, false));
+        assert_eq!(
+            AiClient::parse_stream_line(p, r#"data: {"choices":[{"delta":{"content":"Hi"}}]}"#, &mut summary).unwrap(),
+            (Some("Hi".to_string()), false)
+        );
+        AiClient::parse_stream_line(
+            p,
+            r#"data: {"choices":[],"usage":{"prompt_tokens":5,"completion_tokens":7}}"#,
+            &mut summary,
+        )
+        .unwrap();
+        assert_eq!((summary.prompt_tokens, summary.completion_tokens), (5, 7));
+        assert_eq!(AiClient::parse_stream_line(p, "data: [DONE]", &mut summary).unwrap(), (None, true));
+    }
+
+    #[tokio::test]
+    async fn mock_stream_emits_deltas_and_honours_cancel() {
+        let config = AiConfig { provider: AiProvider::Mock, ..AiConfig::default() };
+        let cancel = CancelSignal::default();
+        let mut text = String::new();
+        let summary = AiClient::ask_stream("hola", &AiContextType::FullAmg, None, &config, &cancel, |d| {
+            text.push_str(&d);
+            Ok(())
+        })
+        .await
+        .unwrap();
+        assert!(!summary.cancelled);
+        assert!(text.contains("Respuesta Simulada"));
+
+        cancel.cancel();
+        let summary = AiClient::ask_stream("hola", &AiContextType::FullAmg, None, &config, &cancel, |_| Ok(()))
+            .await
+            .unwrap();
+        assert!(summary.cancelled);
     }
 }

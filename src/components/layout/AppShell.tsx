@@ -29,6 +29,11 @@ import {
 import { AntipatternsPanel } from '../antipatterns';
 import { AdrsPanel } from '../adrs';
 import { DesignWorkspace } from '../design';
+import { ModulesCatalogView } from '../modules/ModulesCatalogView';
+import { CodeIdeView } from '../code/CodeIdeView';
+import { SettingsModal } from '../settings/SettingsModal';
+import { CommandPalette } from './CommandPalette';
+import { Toaster } from './Toaster';
 
 interface AppShellProps {
   onOpenProject: () => void;
@@ -36,6 +41,7 @@ interface AppShellProps {
   onCloseProject?: () => void;
   onAnalyzeProject: () => void;
   onCancelAnalysis: () => void;
+  onLoadDemo?: () => void;
   children?: React.ReactNode;
 }
 
@@ -45,6 +51,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   onCloseProject,
   onAnalyzeProject,
   onCancelAnalysis,
+  onLoadDemo,
   children,
 }) => {
   const { activeMainTab } = useUiStore();
@@ -60,6 +67,7 @@ export const AppShell: React.FC<AppShellProps> = ({
         onAnalyzeProject={onAnalyzeProject}
         onCancelAnalysis={onCancelAnalysis}
         onCloseProject={onCloseProject}
+        onLoadDemo={onLoadDemo}
       />
 
       {/* 2. Breadcrumb Bar */}
@@ -97,7 +105,7 @@ export const AppShell: React.FC<AppShellProps> = ({
                 </div>
 
                 {/* Primary Action CTA */}
-                <div className="pt-1">
+                <div className="pt-1 flex items-center space-x-2">
                   <button
                     onClick={onOpenProject}
                     className="flex items-center space-x-2 px-5 py-2 bg-[var(--purple-soft)] hover:bg-[var(--purple)] hover:text-white text-[var(--purple)] font-semibold text-xs rounded border border-[var(--purple-border)] shadow-lg transition transform hover:-translate-y-0.5"
@@ -105,6 +113,18 @@ export const AppShell: React.FC<AppShellProps> = ({
                     <FolderOpen className="w-4 h-4 text-[var(--cyan)]" />
                     <span>Seleccionar Carpeta de Proyecto</span>
                   </button>
+
+                  {/* 🧪 Botón Modo Demo */}
+                  {onLoadDemo && (
+                    <button
+                      onClick={onLoadDemo}
+                      className="flex items-center space-x-2 px-4 py-2 bg-[var(--yellow)]/10 hover:bg-[var(--yellow)]/20 text-[var(--yellow)] font-semibold text-xs rounded border border-[var(--yellow)]/30 shadow-lg transition transform hover:-translate-y-0.5"
+                      title="Carga datos de prueba sintéticos para documentación y capturas"
+                    >
+                      <span>🧪</span>
+                      <span>Cargar Modo Demo</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Recent Projects List */}
@@ -226,6 +246,10 @@ export const AppShell: React.FC<AppShellProps> = ({
             </div>
           ) : activeMainTab === 'dashboard' ? (
             <Dashboard />
+          ) : activeMainTab === 'modules' ? (
+            <ModulesCatalogView />
+          ) : activeMainTab === 'code' ? (
+            <CodeIdeView />
           ) : activeMainTab === 'metrics' ? (
             <MetricsPanel />
           ) : activeMainTab === 'antipatterns' ? (
@@ -255,6 +279,16 @@ export const AppShell: React.FC<AppShellProps> = ({
 
       {/* StatusBar (Height 23px) */}
       <StatusBar />
+
+      <CommandPalette
+        onOpenProject={onOpenProject}
+        onAnalyzeProject={onAnalyzeProject}
+        onCancelAnalysis={onCancelAnalysis}
+        onCloseProject={onCloseProject}
+        onLoadDemo={onLoadDemo}
+      />
+      <SettingsModal />
+      <Toaster />
     </div>
   );
 };

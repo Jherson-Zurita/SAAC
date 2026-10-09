@@ -166,6 +166,7 @@ export const C4Viewer: React.FC<C4ViewerProps> = ({ activeTab }) => {
 
   let diagramData: C4DiagramData | null = null;
   let title = '';
+  let selfSourced = false;
 
   if (activeTab === 'c4') {
     if (c4Level === 1) {
@@ -188,11 +189,17 @@ export const C4Viewer: React.FC<C4ViewerProps> = ({ activeTab }) => {
     }
   } else if (isSupplementaryDiagramTab(activeTab)) {
     const definition = getSupplementaryDiagramDefinition(activeTab);
-    diagramData = amg.c4Models.componentDiagrams[definition.backendKey] || null;
+    selfSourced = Boolean(definition.selfSourced);
+    diagramData =
+      amg.c4Models.componentDiagrams[definition.backendKey] ||
+      (selfSourced ? { nodes: [], edges: [] } : null);
     title = definition.title;
   }
 
-  if (!diagramData || (diagramData.nodes.length === 0 && diagramData.edges.length === 0)) {
+  if (
+    !diagramData ||
+    (!selfSourced && diagramData.nodes.length === 0 && diagramData.edges.length === 0)
+  ) {
     return (
       <div className="diagram-empty-state">
         <Sparkles aria-hidden="true" />

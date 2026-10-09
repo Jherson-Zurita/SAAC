@@ -608,6 +608,7 @@ _KOTLIN_CC_DECISION_TYPES = frozenset({
     "if_expression",
     "for_statement",
     "while_statement",
+    "do_while_statement",
     "catch_block",
     # when_entry NO va aquí: su conteo depende de si tiene field `condition`
     # (rama con valor) o no (rama `else`) — se maneja vía
@@ -619,6 +620,7 @@ _KOTLIN_COGNITIVE_NESTING_TYPES = frozenset({
     "if_expression",
     "for_statement",
     "while_statement",
+    "do_while_statement",
     "catch_block",
     "when_expression",
 })

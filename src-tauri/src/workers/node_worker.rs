@@ -151,9 +151,37 @@ pub struct NodeWorkerManager {
     pending: PendingMap,
     /// Contador de reintentos de respawn consumidos en la sesión actual.
     respawn_attempts: Arc<Mutex<u32>>,
+    /// Motivo por el que el worker no pudo iniciarse (`None` si está operativo).
+    unavailable_reason: Option<String>,
 }
 
 impl NodeWorkerManager {
+    /// Manager sin proceso: todas las requests devuelven `WorkerUnavailable`
+    /// con `reason`. Permite que la app arranque aunque Node no esté instalado.
+    pub fn new_unavailable(app_handle: AppHandle, config: WorkerConfig, reason: String) -> Self {
+        Self {
+            config,
+            app_handle,
+            process: Arc::new(Mutex::new(None)),
+            stdin: Arc::new(Mutex::new(None)),
+            pending: Arc::new(Mutex::new(HashMap::new())),
+            respawn_attempts: Arc::new(Mutex::new(0)),
+            unavailable_reason: Some(reason),
+        }
+    }
+
+    /// `Some(motivo)` si el worker no pudo iniciarse.
+    pub fn unavailable_reason(&self) -> Option<&str> {
+        self.unavailable_reason.as_deref()
+    }
+
+    fn unavailable_message(&self) -> String {
+        match &self.unavailable_reason {
+            Some(reason) => format!("El worker de Node.js no está disponible: {reason}"),
+            None => "El worker no está disponible tras agotar los reintentos".to_string(),
+        }
+    }
+
     /// Crea el manager y spawnea el proceso worker por primera vez.
     pub async fn new(app_handle: AppHandle, config: WorkerConfig) -> Result<Self> {
         let pending: PendingMap = Arc::new(Mutex::new(HashMap::new()));
@@ -168,6 +196,7 @@ impl NodeWorkerManager {
             stdin: stdin_slot,
             pending,
             respawn_attempts,
+            unavailable_reason: None,
         };
 
         manager.spawn_process().await?;
@@ -428,9 +457,7 @@ impl NodeWorkerManager {
                 file_path,
                 status: AnalysisFileStatus::WorkerUnavailable,
                 result: None,
-                error_message: Some(
-                    "El worker no está disponible tras agotar los reintentos".into(),
-                ),
+                error_message: Some(self.unavailable_message()),
             },
             Err(other) => FileAnalysisOutcome {
                 file_path,
@@ -519,12 +546,13 @@ impl NodeWorkerManager {
                 }
             }
             Err(WorkerError::Unavailable) => {
+                let message = self.unavailable_message();
                 for file_path in &file_paths {
                     outcomes.push(FileAnalysisOutcome {
                         file_path: file_path.clone(),
                         status: AnalysisFileStatus::WorkerUnavailable,
                         result: None,
-                        error_message: Some("El worker no está disponible".into()),
+                        error_message: Some(message.clone()),
                     });
                 }
             }
@@ -548,6 +576,9 @@ impl NodeWorkerManager {
     /// cierre de ventana de Tauri (`on_window_close_requested`) para no dejar
     /// procesos Node huérfanos.
     pub async fn shutdown(&self) {
+        if self.unavailable_reason.is_some() {
+            return;
+        }
         let request_id = uuid_v4();
         let request = WorkerRequest {
             request_id: request_id.clone(),

@@ -4,6 +4,7 @@ pub mod analysis;
 pub mod design;
 pub mod pre_frontend;
 pub mod project;
+pub mod report;
 
 // Reexportar módulos de engine
 pub use crate::engine::aggregator;

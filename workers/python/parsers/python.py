@@ -812,15 +812,21 @@ def parse_python_file(
     external_calls = _detect_external_calls(root, source, module_id)
     invocations = _extract_invocations(classes, functions)
 
-    # Imports resueltos como IDs de módulo
+    # `import_ids` son los módulos declarados (`a.b`, `..pkg`); los destinos
+    # de dependencia añaden el nombre importado (`a.b:X`) para que el
+    # aggregator distinga `from pkg import submodulo` de `from pkg import Clase`.
     import_ids: list[str] = []
+    dependency_targets: list[str] = []
     for imp in imports_data:
         module = imp.get("module", "")
-        if module and not imp.get("isRelative", False):
-            import_ids.append(module)
-        elif imp.get("isRelative"):
-            # Para imports relativos, el ID estable será relativo al archivo
-            import_ids.append(module)
+        if not module:
+            continue
+        import_ids.append(module)
+        names = [n["name"] for n in imp.get("names", []) if n.get("name")]
+        if names and not imp.get("isWildcard", False):
+            dependency_targets.extend(f"{module}:{name}" for name in names)
+        else:
+            dependency_targets.append(module)
 
     # LOC / LLOC
     loc = len(source.splitlines())
@@ -874,8 +880,8 @@ def parse_python_file(
             },
         },
         "dependencies": [
-            {"source": module_id, "target": imp, "kind": "import", "weight": 1}
-            for imp in set(import_ids)
+            {"source": module_id, "target": target, "kind": "import", "weight": 1}
+            for target in dict.fromkeys(dependency_targets)
         ],
         "invocations": invocations,
         "externalCalls": external_calls,

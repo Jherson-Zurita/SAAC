@@ -7,4 +7,6 @@ export * from './DesignSidebar';
 export * from './DesignToolbar';
 export * from './DesignWorkspace';
 export * from './EdgeEditorDialog';
+export * from './ValidationPanel';
 export * from './design-flow';
+export * from './design-templates';

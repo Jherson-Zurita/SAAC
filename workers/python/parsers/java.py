@@ -33,10 +33,19 @@ def _extract_imports(root, source: bytes) -> list[dict[str, Any]]:
             for sub in child.children:
                 if sub.type == "static":
                     is_static = True
-                elif sub.type == "scoped_identifier":
+                elif sub.type in ("scoped_identifier", "identifier"):
                     module_name = _node_text(sub, source)
                 elif sub.type == "asterisk":
                     is_wildcard = True
+
+            # El destino de la dependencia es siempre un tipo o un paquete:
+            #   import static a.b.Util.max;  -> a.b.Util   (se quita el miembro)
+            #   import static a.b.Util.*;    -> a.b.Util   (todos los miembros de la clase)
+            #   import a.b.*;                -> a.b.*      (todas las clases del paquete)
+            if module_name and is_static and not is_wildcard and "." in module_name:
+                module_name = module_name.rsplit(".", 1)[0]
+            elif module_name and is_wildcard and not is_static:
+                module_name = f"{module_name}.*"
 
             if module_name:
                 imports.append({

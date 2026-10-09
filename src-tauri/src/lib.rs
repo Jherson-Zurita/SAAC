@@ -32,15 +32,24 @@ pub fn build_app() -> tauri::App<tauri::Wry> {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
+        .manage(commands::ai::AiStreamRegistry::default())
         .invoke_handler(tauri::generate_handler![
             greet,
             commands::analysis::analyze_project,
             commands::analysis::analyze_file,
             commands::analysis::analyze_files,
             commands::analysis::cancel_analysis,
+            commands::analysis::get_workers_status,
             commands::project::open_project,
+            commands::project::read_module_source,
+            commands::report::save_report,
             commands::ai::ask_ai,
+            commands::ai::ask_ai_stream,
+            commands::ai::cancel_ai_stream,
             commands::ai::check_ai_status,
+            commands::ai::set_ai_api_key,
+            commands::ai::has_ai_api_key,
             commands::pre_frontend::get_project_config,
             commands::pre_frontend::update_project_config,
             commands::pre_frontend::execute_console_command,
@@ -65,6 +74,7 @@ pub fn build_app() -> tauri::App<tauri::Wry> {
             commands::design::delete_proposed_architecture,
             commands::design::compare_proposed_architecture,
             commands::design::export_proposed_architecture,
+            commands::design::save_proposed_architecture_export,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
@@ -83,18 +93,28 @@ pub async fn init_workers(app: &tauri::App<tauri::Wry>) {
     let handle_node = app.handle().clone();
     let handle_python = app.handle().clone();
 
+    // Si un worker no puede iniciarse (Node/Python ausente o sin dependencias),
+    // la app arranca igual: sus archivos se reportan como `WorkerUnavailable`
+    // y la UI consulta el motivo con `get_workers_status`.
     let node_config = NodeConfig::default();
-    let node_manager = NodeWorkerManager::new(handle_node, node_config)
-        .await
-        .expect("Failed to initialize Node worker manager");
+    let node_manager = match NodeWorkerManager::new(handle_node.clone(), node_config.clone()).await {
+        Ok(manager) => manager,
+        Err(e) => {
+            tracing::error!("No se pudo iniciar el worker de Node.js: {e:#}");
+            NodeWorkerManager::new_unavailable(handle_node, node_config, format!("{e:#}"))
+        }
+    };
     app.manage(node_manager);
 
     let python_config = PythonConfig::default();
-    // Si la validación de entorno de Python falla, el constructor de PythonWorkerManager
-    // propagará el error informando que no hay una versión compatible.
-    let python_manager = PythonWorkerManager::new(handle_python, python_config)
-        .await
-        .expect("Failed to initialize Python worker manager");
+    let python_manager =
+        match PythonWorkerManager::new(handle_python.clone(), python_config.clone()).await {
+            Ok(manager) => manager,
+            Err(e) => {
+                tracing::error!("No se pudo iniciar el worker de Python: {e:#}");
+                PythonWorkerManager::new_unavailable(handle_python, python_config, format!("{e:#}"))
+            }
+        };
     app.manage(python_manager);
 
     // Registro de cancelación para analyze_project. Se inicializa vacío

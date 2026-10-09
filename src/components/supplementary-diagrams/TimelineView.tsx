@@ -14,9 +14,15 @@ export const TimelineView: React.FC<TimelineViewProps> = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!projectPath) {
+      setHistory([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     async function load() {
       try {
-        const data = await getAnalysisHistory(projectPath || '.');
+        const data = await getAnalysisHistory(projectPath!);
         setHistory(data.runs || []);
       } catch (err) {
         console.error('Error cargando historial:', err);
@@ -45,9 +51,16 @@ export const TimelineView: React.FC<TimelineViewProps> = () => {
 
   return (
     <div className="flex flex-col w-full h-full p-4 overflow-auto bg-[var(--bg)] text-[var(--text)] font-sans transition-colors duration-200">
-      <div className="mb-3">
-        <h3 className="text-sm font-bold text-[var(--purple)] tracking-tight">Línea de Tiempo de Evolución Arquitectónica</h3>
-        <p className="text-xs text-[var(--muted)]">
+      <div className="mb-3 p-3 rounded-lg bg-[var(--panel)] border border-[var(--border)]">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-[var(--purple)] tracking-tight">
+            Línea de Tiempo de Evolución Arquitectónica
+          </h3>
+          <span className="text-[10px] font-mono text-[var(--muted-2)]">
+            {history.length} ejecuciones registradas
+          </span>
+        </div>
+        <p className="text-xs text-[var(--muted)] mt-1">
           Tendencia de salud del proyecto a través de ejecuciones consecutivas de análisis (AnalysisRuns).
         </p>
       </div>

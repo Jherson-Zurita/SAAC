@@ -15,6 +15,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import type { C4DiagramData } from '../../../shared/types';
 import { useProjectStore } from '../../stores/useProjectStore';
+import { useSelectionStore } from '../../stores/useSelectionStore';
 import { getLayoutedElements } from '../../lib/dagre-layout';
 import { NodeContextMenu } from '../c4viewer/NodeContextMenu';
 
@@ -148,17 +149,33 @@ export const ForceGraphView: React.FC<ForceGraphViewProps> = ({ diagramData: _di
     pos: { x: number; y: number };
   } | null>(null);
 
+  const { selectElement } = useSelectionStore();
+
   const handleNodeClick = (event: React.MouseEvent, node: Node<ForceNodeData>) => {
-    const c4Node = {
-      id: node.id,
-      label: node.data.label,
-      elementType: 'Module',
-      technology: `${node.data.language} (${node.data.connections} conexiones)`,
-      description: `LOC: ${node.data.loc}, Maintainability Index: ${node.data.maintainability.toFixed(1)}`,
-      amgNodeId: node.id,
-    };
+    const matchingMod = modules.find((m) => m.id === node.id);
+    if (matchingMod) {
+      selectElement(matchingMod.id, 'module', matchingMod);
+    } else {
+      const c4Node = {
+        id: node.id,
+        label: node.data.label,
+        elementType: 'Module',
+        technology: `${node.data.language} (${node.data.connections} conexiones)`,
+        description: `LOC: ${node.data.loc}, Maintainability Index: ${node.data.maintainability.toFixed(1)}`,
+        amgNodeId: node.id,
+      };
+      selectElement(node.id, 'c4_node', c4Node);
+    }
+
     setContextNode({
-      node: c4Node,
+      node: {
+        id: node.id,
+        label: node.data.label,
+        elementType: 'Module',
+        technology: `${node.data.language} (${node.data.connections} conexiones)`,
+        description: `LOC: ${node.data.loc}, Maintainability Index: ${node.data.maintainability.toFixed(1)}`,
+        amgNodeId: node.id,
+      },
       pos: { x: event.clientX, y: event.clientY },
     });
   };
@@ -173,7 +190,13 @@ export const ForceGraphView: React.FC<ForceGraphViewProps> = ({ diagramData: _di
     for (const mod of modules) {
       connectionCount.set(mod.id, 0);
     }
-    for (const dep of dependencies) {
+    const internalDependencies = dependencies.filter(
+      (dep) =>
+        dep.source !== dep.target &&
+        connectionCount.has(dep.source) &&
+        connectionCount.has(dep.target)
+    );
+    for (const dep of internalDependencies) {
       connectionCount.set(dep.source, (connectionCount.get(dep.source) || 0) + 1);
       connectionCount.set(dep.target, (connectionCount.get(dep.target) || 0) + 1);
     }
@@ -210,7 +233,7 @@ export const ForceGraphView: React.FC<ForceGraphViewProps> = ({ diagramData: _di
       };
     });
 
-    const rawEdges: Edge[] = dependencies.map((dep, idx) => ({
+    const rawEdges: Edge[] = internalDependencies.map((dep, idx) => ({
       id: `force-edge-${idx}-${dep.source}-${dep.target}`,
       source: dep.source,
       target: dep.target,
@@ -277,7 +300,7 @@ export const ForceGraphView: React.FC<ForceGraphViewProps> = ({ diagramData: _di
           Grafo de Dependencias — Nodos Proporcionales
         </span>
         <span style={{ fontSize: 10, color: 'var(--muted)' }}>
-          Tamaño ∝ N° de conexiones · Color = Índice de Mantenibilidad · {modules.length} módulos · {dependencies.length} aristas · Clic en un nodo para inspección
+          Tamaño ∝ N° de conexiones · Color = Índice de Mantenibilidad · {modules.length} módulos · {layoutedEdges.length} aristas · Clic en un nodo para inspección
         </span>
       </div>
 

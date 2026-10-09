@@ -4,6 +4,21 @@ import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Copy, Check } from 'lucide-react';
+import { openUrl } from '@tauri-apps/plugin-opener';
+
+const EXTERNAL_LINK_PROTOCOLS = new Set(['http:', 'https:', 'mailto:']);
+
+/** Abre el link en el navegador del sistema; los demás esquemas se ignoran. */
+function openExternalLink(event: React.MouseEvent<HTMLAnchorElement>, href?: string) {
+  event.preventDefault();
+  if (!href) return;
+  try {
+    if (!EXTERNAL_LINK_PROTOCOLS.has(new URL(href).protocol)) return;
+  } catch {
+    return;
+  }
+  openUrl(href).catch((err) => console.warn('No se pudo abrir el enlace:', err));
+}
 
 interface MarkdownRendererProps {
   content: string;
@@ -118,7 +133,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
         a: ({ href, children }) => (
           <a
             href={href}
-            target="_blank"
+            onClick={(event) => openExternalLink(event, href)}
             rel="noopener noreferrer"
             className="text-[var(--purple)] hover:text-[var(--purple)]/80 underline underline-offset-2 transition"
           >

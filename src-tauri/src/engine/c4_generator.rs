@@ -13,7 +13,6 @@ use crate::engine::amg::{
     Container, ContainerType, Dependency, ExternalCall, ExternalProtocol, ExternalSystem,
     ExternalSystemType, Invocation, Language, Module, NodeType, ProjectType,
 };
-use crate::engine::deployment_detector::DeploymentDetector;
 use crate::engine::supplementary_diagrams::SupplementaryDiagrams;
 
 pub struct C4GeneratorOutput {
@@ -483,16 +482,8 @@ fn generate_component_diagrams(
     let extra_diagrams = SupplementaryDiagrams::generate_all(modules, dependencies, invocations);
     map.extend(extra_diagrams);
 
-    // Añadir diagrama de despliegue (C4 Deployment Diagram)
-    let deployment_diagram = DeploymentDetector::detect_and_generate(
-        std::path::Path::new("."),
-        containers,
-        &[],
-    );
-    map.insert(
-        "supplementary:deployment-diagram".to_string(),
-        deployment_diagram,
-    );
+    // El diagrama de despliegue necesita la ruta del proyecto; se genera en
+    // `commands::analysis::analyze_project` con `DeploymentDetector`.
 
     map
 }
@@ -548,13 +539,16 @@ fn generate_circular_dependencies_diagram(
         }
 
         for window in cycle.windows(2) {
-            cyclic_edges.insert((window[0].clone(), window[1].clone()));
+            if window[0] != window[1] {
+                cyclic_edges.insert((window[0].clone(), window[1].clone()));
+            }
         }
-        // Cierre del ciclo: el `cycle_path` normalizado no repite el nodo
-        // inicial al final (ver `detect_circular_dependencies`), así que la
-        // arista que cierra el ciclo (último -> primero) se añade aparte.
+        // `detect_circular_dependencies` emite el ciclo ya cerrado
+        // ([A, B, C, A]); solo se añade el cierre si llega abierto.
         if let (Some(last), Some(first)) = (cycle.last(), cycle.first()) {
-            cyclic_edges.insert((last.clone(), first.clone()));
+            if last != first {
+                cyclic_edges.insert((last.clone(), first.clone()));
+            }
         }
     }
 
@@ -575,6 +569,9 @@ fn generate_circular_dependencies_diagram(
     }
 
     for (source, target) in cyclic_edges {
+        if !module_map.contains_key(source.as_str()) || !module_map.contains_key(target.as_str()) {
+            continue;
+        }
         edges.push(C4Edge {
             source,
             target,

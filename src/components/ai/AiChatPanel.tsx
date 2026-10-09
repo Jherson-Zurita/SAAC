@@ -8,18 +8,21 @@ import {
   User,
   AlertCircle,
   Settings,
+  Square,
 } from 'lucide-react';
 import { useAiStore } from '../../stores/useAiStore';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useSelectionStore } from '../../stores/useSelectionStore';
-import { askAi } from '../../lib/tauri-api';
+import { askAiStream, cancelAiStream, saveReport } from '../../lib/tauri-api';
+import { toast } from '../../stores/useToastStore';
 import { parseSlashCommand, AVAILABLE_SLASH_COMMANDS } from '../../lib/slash-commands';
 import { AiStatusIndicator } from './AiStatusIndicator';
 import { AiSettingsModal } from './AiSettingsModal';
 import { MarkdownRenderer } from './MarkdownRenderer';
 
 export const AiChatPanel: React.FC = () => {
-  const { messages, isThinking, addMessage, setIsThinking, clearChat } = useAiStore();
+  const { messages, isThinking, addMessage, appendToMessage, updateMessage, setIsThinking, clearChat } =
+    useAiStore();
   const { amg } = useProjectStore();
   const { selectedId } = useSelectionStore();
 
@@ -28,14 +31,22 @@ export const AiChatPanel: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const activeRequestRef = useRef<string | null>(null);
 
   useEffect(() => {
-    scrollToBottom();
+    // Durante el streaming el contenido crece en cada flush: sin animación para no "temblar".
+    messagesEndRef.current?.scrollIntoView({ behavior: isThinking ? 'auto' : 'smooth' });
   }, [messages, isThinking]);
+
+  const handleStop = () => {
+    const requestId = activeRequestRef.current;
+    if (requestId) cancelAiStream(requestId).catch((err) => console.warn('No se pudo detener la IA:', err));
+  };
+
+  const handleClearChat = () => {
+    handleStop();
+    clearChat();
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -57,31 +68,52 @@ export const AiChatPanel: React.FC = () => {
     // 1. Parsear comandos slash
     const parsed = parseSlashCommand(query, selectedId);
 
-    // 2. Agregar mensaje de usuario
+    // 2. Mensaje del usuario y burbuja vacía del asistente que se va llenando
     addMessage('user', query);
+    const assistantId = addMessage('assistant', '', { isStreaming: true });
+    const requestId = crypto.randomUUID();
+    activeRequestRef.current = requestId;
     setIsThinking(true);
 
+    // Los fragmentos se agrupan cada 50 ms para no re-renderizar el Markdown por token.
+    let pending = '';
+    let flushTimer: ReturnType<typeof setTimeout> | null = null;
+    const flush = () => {
+      if (flushTimer !== null) clearTimeout(flushTimer);
+      flushTimer = null;
+      if (pending) {
+        appendToMessage(assistantId, pending);
+        pending = '';
+      }
+    };
+
     try {
-      // 3. Invocar ask_ai en el backend de Rust
-      const response = await askAi(
+      // 3. Invocar ask_ai_stream en el backend de Rust
+      const summary = await askAiStream(
+        requestId,
         parsed.prompt,
         parsed.contextType,
         parsed.targetId,
-        amg || undefined
+        amg || undefined,
+        (delta) => {
+          pending += delta;
+          flushTimer ??= setTimeout(flush, 50);
+        }
       );
-
-      // 4. Agregar respuesta del asistente
-      addMessage('assistant', response.answer, {
-        isMockFallback: true, // Siempre marcado adecuadamente si es fallback local
-        tokensUsed: response.tokensUsed,
+      flush();
+      updateMessage(assistantId, {
+        isStreaming: false,
+        isMockFallback: summary.isMockFallback,
+        tokensUsed: summary.completionTokens || undefined,
+        cancelled: summary.cancelled,
       });
     } catch (err) {
       console.error('Error invocando IA:', err);
-      addMessage(
-        'assistant',
-        `⚠️ Error al procesar la solicitud de IA: ${err}`
-      );
+      flush();
+      appendToMessage(assistantId, `\n\n⚠️ Error al procesar la solicitud de IA: ${err}`);
+      updateMessage(assistantId, { isStreaming: false });
     } finally {
+      activeRequestRef.current = null;
       setIsThinking(false);
     }
   };
@@ -90,7 +122,7 @@ export const AiChatPanel: React.FC = () => {
   const exportChatMarkdown = () => {
     if (messages.length === 0) return;
 
-    let content = `# SAAC v2.0 — Transcript de Asistente IA\n`;
+    let content = `# SAAC — Transcript de Asistente IA\n`;
     content += `*Fecha:* ${new Date().toLocaleString()}\n`;
     content += `*Proyecto:* ${amg?.projectName || 'Sin proyecto'}\n\n---\n\n`;
 
@@ -99,12 +131,11 @@ export const AiChatPanel: React.FC = () => {
       content += `### ${sender} _(${m.timestamp})_\n\n${m.text}\n\n`;
     });
 
-    const blob = new Blob([content], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `saac_chat_${Date.now()}.md`;
-    a.click();
+    saveReport('markdown', `saac_chat_${Date.now()}`, new TextEncoder().encode(content))
+      .then((savedPath) => {
+        if (savedPath) toast.success('Conversación exportada', savedPath);
+      })
+      .catch((err) => toast.error('No se pudo exportar la conversación', String(err)));
   };
 
   return (
@@ -137,7 +168,7 @@ export const AiChatPanel: React.FC = () => {
             <Download className="w-3.5 h-3.5" />
           </button>
           <button
-            onClick={clearChat}
+            onClick={handleClearChat}
             disabled={messages.length === 0}
             className="p-1.5 rounded bg-[var(--panel-2)] hover:bg-[var(--panel-3)] text-[var(--muted)] hover:text-[var(--red)] border border-[var(--border-soft)] transition disabled:opacity-40"
             title="Limpiar conversación"
@@ -206,20 +237,34 @@ export const AiChatPanel: React.FC = () => {
                 {m.sender === 'assistant' && (
                   <div className="flex items-center justify-between border-b border-[var(--border-soft)] pb-1 mb-1.5">
                     <span className="text-[10px] font-bold text-[var(--purple)]">IA SAAC</span>
-                    {m.isMockFallback && (
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[var(--yellow)]/10 text-[var(--yellow)] border border-[var(--yellow)]/20 flex items-center space-x-1">
-                        <AlertCircle className="w-2.5 h-2.5" />
-                        <span>Mock Fallback</span>
-                      </span>
-                    )}
+                    <div className="flex items-center space-x-1">
+                      {m.cancelled && (
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[var(--panel-2)] text-[var(--muted)] border border-[var(--border-soft)]">
+                          Detenido
+                        </span>
+                      )}
+                      {m.isMockFallback && (
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[var(--yellow)]/10 text-[var(--yellow)] border border-[var(--yellow)]/20 flex items-center space-x-1">
+                          <AlertCircle className="w-2.5 h-2.5" />
+                          <span>Mock Fallback</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
                 )}
 
                 {/* Markdown rendering for assistant, plain text for user */}
                 {m.sender === 'assistant' ? (
-                  <div className="saac-markdown-body">
-                    <MarkdownRenderer content={m.text} />
-                  </div>
+                  m.isStreaming && !m.text ? (
+                    <div className="flex items-center space-x-2 text-[var(--purple)] text-[11px] font-mono animate-pulse">
+                      <Bot className="w-3.5 h-3.5" />
+                      <span>Generando respuesta arquitectónica...</span>
+                    </div>
+                  ) : (
+                    <div className="saac-markdown-body">
+                      <MarkdownRenderer content={m.isStreaming ? `${m.text} ▍` : m.text} />
+                    </div>
+                  )
                 ) : (
                   <div className="whitespace-pre-wrap leading-relaxed text-[11.5px]">{m.text}</div>
                 )}
@@ -236,13 +281,6 @@ export const AiChatPanel: React.FC = () => {
               )}
             </div>
           ))
-        )}
-
-        {isThinking && (
-          <div className="flex items-center space-x-2 text-[var(--purple)] text-xs font-mono animate-pulse">
-            <Bot className="w-4 h-4" />
-            <span>Generando respuesta arquitectónica...</span>
-          </div>
         )}
 
         <div ref={messagesEndRef} />
@@ -285,13 +323,24 @@ export const AiChatPanel: React.FC = () => {
             disabled={isThinking}
             className="flex-1 bg-[var(--bg)] text-xs text-[var(--text)] px-3 py-2 rounded-md border border-[var(--border)] focus:outline-none focus:border-[var(--purple)] font-sans placeholder:text-[var(--muted-2)]"
           />
-          <button
-            type="submit"
-            disabled={!input.trim() || isThinking}
-            className="p-2 bg-[var(--purple-soft)] hover:bg-[var(--purple)] hover:text-white text-[var(--purple)] rounded-md border border-[var(--purple-border)] disabled:opacity-40 transition"
-          >
-            <Send className="w-4 h-4" />
-          </button>
+          {isThinking ? (
+            <button
+              type="button"
+              onClick={handleStop}
+              className="p-2 bg-[var(--red)]/10 hover:bg-[var(--red)]/20 text-[var(--red)] rounded-md border border-[var(--red)]/30 transition"
+              title="Detener la respuesta"
+            >
+              <Square className="w-4 h-4 fill-current" />
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={!input.trim()}
+              className="p-2 bg-[var(--purple-soft)] hover:bg-[var(--purple)] hover:text-white text-[var(--purple)] rounded-md border border-[var(--purple-border)] disabled:opacity-40 transition"
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          )}
         </form>
       </div>
     </div>

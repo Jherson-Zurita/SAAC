@@ -1,5 +1,5 @@
 /**
- * SAAC v2.0 — Shared Type Definitions
+ * SAAC — Shared Type Definitions
  * ====================================
  * Fuente única de verdad para el esquema del Architecture Model Graph (AMG)
  * y todas las entidades de dominio expuestas por el backend de Rust.
@@ -187,6 +187,8 @@ export interface Module {
   functions: FunctionInfo[];
   imports: string[];
   importedBy: string[];
+  stableSince?: string;
+  lastSeenIn?: string;
   metrics: ModuleMetrics;
 }
 
@@ -218,6 +220,8 @@ export interface Container {
   description: string;
   moduleIds: string[];
   detectedFrom: string;
+  stableSince?: string;
+  lastSeenIn?: string;
 }
 
 export interface ExternalSystem {
@@ -228,6 +232,8 @@ export interface ExternalSystem {
   systemType: 'api' | 'database' | 'message-broker' | 'file-storage' | 'auth-provider' | 'cdn' | 'other';
   protocol: ExternalProtocol;
   detectedVia: string;
+  stableSince?: string;
+  lastSeenIn?: string;
 }
 
 export interface Actor {
@@ -236,6 +242,8 @@ export interface Actor {
   type: 'actor';
   role: string;
   description: string;
+  stableSince?: string;
+  lastSeenIn?: string;
 }
 
 export interface Antipattern {
@@ -479,8 +487,33 @@ export interface GlobalConfig {
   aiEndpoint: string;
   aiDefaultModel: string;
   maxWorkerThreads: number;
-  defaultTheme: string;
+  defaultTheme: 'dark' | 'light' | 'system';
   autoCheckAi: boolean;
+  notifyOnAnalysisComplete: boolean;
+  notifyMinDurationSecs: number;
+  reportAuthor: string;
+}
+
+// Código fuente real de un módulo (visor CodeIdeView)
+export interface ModuleSource {
+  filePath: string;
+  relativePath: string;
+  extension: string;
+  content: string;
+  sizeBytes: number;
+  lineCount: number;
+  modifiedAt: string | null;
+}
+
+// Estado de arranque de los workers de análisis
+export interface WorkerStatus {
+  available: boolean;
+  message: string | null;
+}
+
+export interface WorkersStatus {
+  node: WorkerStatus;
+  python: WorkerStatus;
 }
 
 // IA Status
@@ -608,4 +641,13 @@ export interface AiResponse {
   completionTokens: number;
   isMockFallback: boolean;
   generatedPrompt: string;
+}
+
+export interface AiStreamSummary {
+  modelUsed: string;
+  providerUsed: AiProvider;
+  promptTokens: number;
+  completionTokens: number;
+  isMockFallback: boolean;
+  cancelled: boolean;
 }

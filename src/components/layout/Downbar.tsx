@@ -19,7 +19,7 @@ export const Downbar: React.FC = () => {
 
   const [consoleInput, setConsoleInput] = useState('');
   const [consoleLogs, setConsoleLogs] = useState<Array<{ text: string; type: 'cmd' | 'output' | 'error' }>>([
-    { text: 'SAAC Workspace Console v2.0 ready. Type "help" for commands.', type: 'output' },
+    { text: 'SAAC Workspace Console ready. Type "help" for commands.', type: 'output' },
   ]);
 
   const logsEndRef = useRef<HTMLDivElement>(null);

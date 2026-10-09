@@ -1,0 +1,40 @@
+{
+  "id": "snapshot_0000000003",
+  "designId": "design_8c17b7c4-53ca-4aa9-9fd1-a667d498b497",
+  "revision": 3,
+  "createdAt": "2026-08-26T13:55:20.588866900+00:00",
+  "architecture": {
+    "schemaVersion": 1,
+    "id": "design_8c17b7c4-53ca-4aa9-9fd1-a667d498b497",
+    "projectId": "973ac036516e0b4c04d091b0f4ca7d0d3a205895f80cf9f311153c8c406c2acd",
+    "name": "Nueva arquitectura",
+    "description": null,
+    "basedOnAnalysisRunId": null,
+    "createdAt": "2026-08-26T13:53:40.823503200+00:00",
+    "updatedAt": "2026-08-26T13:55:20.588866900+00:00",
+    "revision": 3,
+    "nodes": [
+      {
+        "id": "prop_38bbff2a-0460-45cc-b2d8-a99a86c9f6ef",
+        "origin": "proposed",
+        "originalNodeId": null,
+        "nodeType": "module",
+        "label": "Modulo de front end",
+        "modified": false,
+        "properties": {},
+        "position": {
+          "x": 177.0,
+          "y": 172.0
+        }
+      }
+    ],
+    "edges": [],
+    "canvasLayout": {
+      "viewport": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "zoom": 1.0
+    }
+  }
+}

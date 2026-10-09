@@ -102,7 +102,19 @@ def _extract_imports(root, source: bytes) -> list[dict[str, Any]]:
     """
     imports: list[dict[str, Any]] = []
 
-    for child in root.children:
+    def _directives(container):
+        # Los `using` también pueden declararse dentro de un namespace con
+        # bloque (`namespace A { using X; }`), incluso anidado. Los de un
+        # namespace de archivo (`namespace A;`) quedan en la raíz.
+        for node in container.children:
+            if node.type == "using_directive":
+                yield node
+            elif node.type == "namespace_declaration":
+                body = node.child_by_field_name("body") or _child_by_type(node, "declaration_list")
+                if body is not None:
+                    yield from _directives(body)
+
+    for child in _directives(root):
         if child.type == "using_directive":
             is_static = False
             is_global = False
