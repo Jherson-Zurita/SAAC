@@ -231,6 +231,9 @@ pub struct ParameterInfo {
     pub name: String,
     #[serde(rename = "type")]
     pub type_name: String,
+    /// Algunos parsers históricos emitían `hasDefault` en vez de `isOptional`
+    /// (p. ej. Kotlin antes del fix). El alias evita descartar el módulo entero.
+    #[serde(default, alias = "hasDefault")]
     pub is_optional: bool,
     /// No está en `shared/types.ts` todavía — ver discrepancias arriba.
     #[serde(default)]
@@ -282,6 +285,9 @@ pub struct FunctionInfo {
     pub id: String,
     pub name: String,
     pub visibility: Visibility,
+    /// Default `false` para no tumbar módulos cuyo worker aún emite forma
+    /// de método (sin `isExported`) en `functions` top-level.
+    #[serde(default)]
     pub is_exported: bool,
     pub parameters: Vec<ParameterInfo>,
     pub return_type: String,
@@ -604,6 +610,25 @@ pub struct WorkerAnalysisResult {
     pub invocations: Vec<Invocation>,
     #[serde(default)]
     pub external_calls: Vec<ExternalCall>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub symbols: Option<ModuleSymbols>,
+}
+
+/// Tabla de símbolos de un archivo para resolver dependencias entre
+/// archivos en lenguajes donde el nombre del archivo no identifica lo que
+/// se importa (Kotlin: varias clases por archivo, imports de símbolo y uso
+/// sin import dentro del mismo paquete).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModuleSymbols {
+    #[serde(default)]
+    pub package: String,
+    /// Símbolos top-level declarados (clases, objects, funciones, propiedades, typealias).
+    #[serde(default)]
+    pub declared: Vec<String>,
+    /// Identificadores usados en el archivo, para detectar uso intra-paquete.
+    #[serde(default)]
+    pub referenced: Vec<String>,
 }
 
 // ============================================================================

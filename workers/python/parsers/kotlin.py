@@ -37,25 +37,81 @@ def _node_text(node, source: bytes) -> str:
     return source[node.start_byte:node.end_byte].decode("utf-8", errors="replace")
 
 
+# Hay dos gramáticas de Kotlin en circulación y el parser soporta ambas:
+#   - la de hallazgos-kotlin.md: `import`, `qualified_identifier`,
+#     nombres como `identifier`, `class_parameters` envolviendo parámetros;
+#   - la de tree-sitter-language-pack >= 1.x (fwcd/tree-sitter-kotlin):
+#     `import_header`, `identifier` (calificado), `wildcard_import`,
+#     `import_alias`, nombres como `simple_identifier`/`type_identifier`,
+#     `class_parameter` y `delegation_specifier` como hijos directos.
+_IMPORT_NODE_TYPES = frozenset({"import", "import_header"})
+_QUALIFIED_NAME_TYPES = frozenset({"qualified_identifier", "identifier"})
+_DECL_NAME_TYPES = ("simple_identifier", "type_identifier", "identifier")
+_TYPE_NODE_TYPES = frozenset({
+    "user_type", "nullable_type", "function_type", "parenthesized_type",
+})
+
+
+def _decl_name(node) -> str | None:
+    """Nombre de una declaración (clase, función, parámetro, variable)."""
+    named = node.child_by_field_name("name")
+    if named is None:
+        for type_name in _DECL_NAME_TYPES:
+            named = _first_named_child(node, type_name)
+            if named is not None:
+                break
+    if named is None:
+        return None
+    return named.text.decode("utf-8", errors="replace")
+
+
+def _user_type_name(user_type) -> str | None:
+    """`Foo<Bar>` -> "Foo"; `a.b.Foo` -> "Foo"."""
+    names = [c for c in user_type.children if c.type in ("type_identifier", "identifier")]
+    if names:
+        return names[-1].text.decode("utf-8", errors="replace")
+    return None
+
+
+def _declared_type_text(node) -> str:
+    for child in node.children:
+        if child.type in _TYPE_NODE_TYPES:
+            return child.text.decode("utf-8", errors="replace")
+    return "Any"
+
+
+def _class_body(node):
+    return (
+        node.child_by_field_name("body")
+        or _first_named_child(node, "class_body")
+        or _first_named_child(node, "enum_class_body")
+    )
+
+
+def _extract_package(root, source: bytes) -> str:
+    for child in root.children:
+        if child.type == "package_header":
+            for sub in child.children:
+                if sub.type in _QUALIFIED_NAME_TYPES:
+                    return _node_text(sub, source)
+    return ""
+
+
 def _extract_imports(root, source: bytes) -> list[dict[str, Any]]:
     """
-    Recorre los nodos `import` del árbol. Verificado (hallazgos-kotlin.md
-    §1): ningún hijo de `import` tiene field name — se dispatcha por tipo
-    de nodo y posición, igual que en Java. Sin imports relativos ni
-    múltiples símbolos por línea (cada `import` trae exactamente un
-    símbolo o un wildcard de paquete).
+    Recorre los nodos de import del árbol. Ningún hijo tiene field name —
+    se dispatcha por tipo de nodo. Sin imports relativos ni múltiples
+    símbolos por línea (cada import trae un símbolo o un wildcard).
     """
     imports: list[dict[str, Any]] = []
 
     def visit(node):
-        # El nodo contenedor `import` (is_named=True) tiene como PRIMER HIJO
-        # un token literal también llamado "import" (is_named=False, la
-        # palabra clave en sí). Sin filtrar por is_named, ambos se cuentan
-        # como si fueran declaraciones de import, produciendo entradas
-        # duplicadas/vacías ("<desconocido>") — confirmado al ejecutar
-        # contra la gramática real, no era evidente solo leyendo el código.
-        if node.type == "import" and node.is_named:
+        # En la gramática vieja el contenedor `import` (is_named=True) tiene
+        # como primer hijo un token literal también llamado "import"
+        # (is_named=False); sin filtrar por is_named se duplican entradas.
+        if node.type in _IMPORT_NODE_TYPES and node.is_named:
             imports.append(_extract_import(node, source))
+            return
         for child in node.children:
             visit(child)
 
@@ -79,14 +135,19 @@ def _extract_import(node, source: bytes) -> dict[str, Any]:
     saw_as = False
 
     for child in node.children:
-        if child.type == "qualified_identifier":
+        if child.type in _QUALIFIED_NAME_TYPES and not saw_as and qualified_id is None:
             qualified_id = _node_text(child, source)
-        elif child.type == "*":
+        elif child.type in ("*", "wildcard_import"):
             is_wildcard = True
+        elif child.type == "import_alias":
+            alias = _decl_name(child)
         elif child.type == "as":
             saw_as = True
         elif child.type == "identifier" and saw_as:
             alias = _node_text(child, source)
+
+    if qualified_id is not None:
+        qualified_id = "".join(qualified_id.split())
 
     source_str = qualified_id or "<desconocido>"
 
@@ -174,15 +235,11 @@ def _extract_annotation_name(annotation_node) -> str | None:
     """
     for child in annotation_node.children:
         if child.type == "user_type":
-            ident = _first_named_child(child, "identifier")
-            if ident is not None:
-                return ident.text.decode("utf-8", errors="replace")
+            return _user_type_name(child)
         elif child.type == "constructor_invocation":
             user_type = _first_named_child(child, "user_type")
             if user_type is not None:
-                ident = _first_named_child(user_type, "identifier")
-                if ident is not None:
-                    return ident.text.decode("utf-8", errors="replace")
+                return _user_type_name(user_type)
     return None
 
 
@@ -240,17 +297,18 @@ def _extract_parameters(params_node) -> list[dict[str, Any]]:
         if child.type == "parameter_modifiers":
             pending_is_variadic = _contains_token(child, "vararg")
         elif child.type == "parameter":
-            name_node = _first_named_child(child, "identifier")
-            type_node = _first_named_child(child, "user_type")
-
+            name = _decl_name(child)
             has_default = (
                 i + 1 < len(children) and children[i + 1].type == "="
             )
 
             result.append({
-                "name": name_node.text.decode("utf-8") if name_node else "<desconocido>",
-                "type": type_node.text.decode("utf-8", errors="replace") if type_node else "Any",
-                "hasDefault": has_default,
+                "name": name or "<desconocido>",
+                "type": _declared_type_text(child),
+                # `isOptional` (no `hasDefault`): el AMG en Rust deserializa
+                # ParameterInfo.is_optional; con el nombre viejo fallaba todo
+                # el módulo y se perdían clases/pantallas Kotlin en el grafo.
+                "isOptional": has_default,
                 "isVariadic": pending_is_variadic,
             })
             pending_is_variadic = False
@@ -289,7 +347,7 @@ def _extract_classes(root, source: bytes, module_id: str) -> list[dict[str, Any]
     def visit(node, enclosing_class_name: str | None = None):
         if node.type == "class_declaration":
             classes.append(_extract_class_declaration(node, source, module_id))
-            body = node.child_by_field_name("body") or _first_named_child(node, "class_body")
+            body = _class_body(node)
             if body is not None:
                 for child in body.children:
                     if child.type == "companion_object":
@@ -309,8 +367,8 @@ def _extract_classes(root, source: bytes, module_id: str) -> list[dict[str, Any]
 
 
 def _extract_class_declaration(node, source: bytes, module_id: str) -> dict[str, Any]:
-    name_node = node.child_by_field_name("name") or _first_named_child(node, "identifier")
-    name = name_node.text.decode("utf-8") if name_node else "<anonima>"
+    name = _decl_name(node) or "<anonima>"
+    is_interface = _contains_direct_token(node, "interface")
 
     decorators, visibility = _extract_modifiers_and_annotations(node)
     is_data_class = _has_modifier_token(node, "data")
@@ -344,7 +402,7 @@ def _extract_class_declaration(node, source: bytes, module_id: str) -> dict[str,
         })
         method_body_nodes.append(None)  # el constructor primario no tiene block propio
 
-    class_body = node.child_by_field_name("body") or _first_named_child(node, "class_body")
+    class_body = _class_body(node)
     if class_body is not None:
         for child in class_body.children:
             if child.type == "function_declaration":
@@ -359,8 +417,8 @@ def _extract_class_declaration(node, source: bytes, module_id: str) -> dict[str,
     return {
         "id": f"{module_id}::{name}",
         "name": name,
-        "isAbstract": _has_modifier_token(node, "abstract"),
-        "isInterface": False,  # Kotlin interfaces no se detectan todavía — ver nota aparte
+        "isAbstract": _has_modifier_token(node, "abstract") or _has_modifier_token(node, "sealed"),
+        "isInterface": is_interface,
         "extends": extends,
         "implements": implements,
         "decorators": decorators,
@@ -379,8 +437,7 @@ def _extract_object_declaration(node, source: bytes, module_id: str) -> dict[str
     superclase con parámetros (Kotlin no permite `object Foo(x: Int)`),
     pero sí puede implementar interfaces vía delegation_specifiers.
     """
-    name_node = node.child_by_field_name("name") or _first_named_child(node, "identifier")
-    name = name_node.text.decode("utf-8") if name_node else "<anonimo>"
+    name = _decl_name(node) or "<anonimo>"
 
     decorators, visibility = _extract_modifiers_and_annotations(node)
     extends, implements = _extract_delegation_specifiers(node, source)
@@ -389,7 +446,7 @@ def _extract_object_declaration(node, source: bytes, module_id: str) -> dict[str
     attributes: list[dict[str, Any]] = []
     method_body_nodes: list[Any] = []
 
-    class_body = node.child_by_field_name("body") or _first_named_child(node, "class_body")
+    class_body = _class_body(node)
     if class_body is not None:
         for child in class_body.children:
             if child.type == "function_declaration":
@@ -426,8 +483,7 @@ def _extract_companion_object(node, source: bytes, module_id: str) -> dict[str, 
     con `companion object Named { ... }`; se usa ese nombre si está
     presente, o "Companion" si es anónimo, que es el caso más común).
     """
-    name_node = _first_named_child(node, "identifier")
-    name = name_node.text.decode("utf-8") if name_node else "Companion"
+    name = _decl_name(node) or "Companion"
 
     methods: list[dict[str, Any]] = []
     attributes: list[dict[str, Any]] = []
@@ -478,28 +534,25 @@ def _extract_primary_constructor(ctor_node, source: bytes) -> tuple[list[dict], 
     params: list[dict[str, Any]] = []
     attributes: list[dict[str, Any]] = []
 
-    class_params = _first_named_child(ctor_node, "class_parameters")
-    if class_params is None:
-        return params, attributes
+    class_params = _first_named_child(ctor_node, "class_parameters") or ctor_node
 
     for child in class_params.children:
         if child.type != "class_parameter":
             continue
 
-        name_node = _first_named_child(child, "identifier")
-        type_node = _first_named_child(child, "user_type")
-        name = name_node.text.decode("utf-8") if name_node else "<desconocido>"
-        type_str = type_node.text.decode("utf-8", errors="replace") if type_node else "Any"
+        name = _decl_name(child) or "<desconocido>"
+        type_str = _declared_type_text(child)
 
-        is_val = _contains_direct_token(child, "val")
-        is_var = _contains_direct_token(child, "var")
+        binding = _first_named_child(child, "binding_pattern_kind") or child
+        is_val = _contains_direct_token(binding, "val")
+        is_var = _contains_direct_token(binding, "var")
 
         param_decorators, param_visibility = _extract_modifiers_and_annotations(child)
 
         params.append({
             "name": name,
             "type": type_str,
-            "hasDefault": any(c.type == "=" for c in child.children),
+            "isOptional": any(c.type == "=" for c in child.children),
             "isVariadic": False,
         })
 
@@ -535,9 +588,7 @@ def _extract_delegation_specifiers(node, source: bytes) -> tuple[list[str], list
     extends: list[str] = []
     implements: list[str] = []
 
-    delegation = _first_named_child(node, "delegation_specifiers")
-    if delegation is None:
-        return extends, implements
+    delegation = _first_named_child(node, "delegation_specifiers") or node
 
     for spec in delegation.children:
         if spec.type != "delegation_specifier":
@@ -546,17 +597,15 @@ def _extract_delegation_specifiers(node, source: bytes) -> tuple[list[str], list
         ctor_inv = _first_named_child(spec, "constructor_invocation")
         if ctor_inv is not None:
             user_type = _first_named_child(ctor_inv, "user_type")
-            if user_type is not None:
-                ident = _first_named_child(user_type, "identifier")
-                if ident is not None:
-                    extends.append(ident.text.decode("utf-8"))
+            name = _user_type_name(user_type) if user_type is not None else None
+            if name:
+                extends.append(name)
             continue
 
         user_type = _first_named_child(spec, "user_type")
-        if user_type is not None:
-            ident = _first_named_child(user_type, "identifier")
-            if ident is not None:
-                implements.append(ident.text.decode("utf-8"))
+        name = _user_type_name(user_type) if user_type is not None else None
+        if name:
+            implements.append(name)
 
     return extends, implements
 
@@ -569,16 +618,17 @@ def _extract_property_declaration(node, source: bytes) -> dict[str, Any] | None:
     var_decl = _first_named_child(node, "variable_declaration")
     if var_decl is None:
         return None
-    name_node = _first_named_child(var_decl, "identifier")
-    if name_node is None:
+    name = _decl_name(var_decl)
+    if name is None:
         return None
 
-    is_val = _contains_direct_token(node, "val")
+    binding = _first_named_child(node, "binding_pattern_kind") or node
+    is_val = _contains_direct_token(binding, "val")
     decorators, visibility = _extract_modifiers_and_annotations(node)
 
     return {
-        "name": name_node.text.decode("utf-8"),
-        "type": "Any",  # el tipo no siempre está anotado explícitamente; se refina si se requiere
+        "name": name,
+        "type": _declared_type_text(var_decl),
         "visibility": visibility,
         "isStatic": False,
         "isReadonly": is_val,
@@ -636,7 +686,10 @@ def _kotlin_when_entry_has_condition(when_entry_node) -> bool:
     name `condition`; la rama `else` no lo tiene (su primer hijo es el
     token literal `else`, sin field name).
     """
-    return when_entry_node.child_by_field_name("condition") is not None
+    return (
+        when_entry_node.child_by_field_name("condition") is not None
+        or _first_named_child(when_entry_node, "when_condition") is not None
+    )
 
 
 KOTLIN_COMPLEXITY_CONFIG = ComplexityLanguageConfig(
@@ -665,8 +718,7 @@ def _extract_function(
     `id` (`modulo::Clase::funcion` o `modulo::funcion`, mismo patrón que
     python.py/java.py).
     """
-    name_node = node.child_by_field_name("name") or _first_named_child(node, "identifier")
-    name = name_node.text.decode("utf-8") if name_node else "<anonima>"
+    name = _decl_name(node) or "<anonima>"
 
     decorators, visibility = _extract_modifiers_and_annotations(node)
     is_async = _has_modifier_token(node, "suspend")
@@ -761,12 +813,27 @@ def _extract_top_level_functions(root, source: bytes, module_id: str) -> list[di
     anidados dentro de ningún class_body/companion_object. Kotlin permite
     funciones top-level (fuera de cualquier clase) de forma idiomática, a
     diferencia de Java donde todo método vive dentro de una clase.
+
+    Emite el shape de `FunctionInfo` del AMG (con `isExported`), no el de
+    `MethodInfo`: si se reutilizaba el dict de método tal cual, serde
+    descartaba el módulo entero al faltar `isExported`.
     """
     functions: list[dict[str, Any]] = []
     for child in root.children:
         if child.type == "function_declaration":
             m, _ = _extract_function(child, source, module_id, None)
-            functions.append(m)
+            functions.append({
+                "id": m["id"],
+                "name": m["name"],
+                "visibility": m["visibility"],
+                "isExported": m.get("visibility") == "public",
+                "parameters": m["parameters"],
+                "returnType": m["returnType"],
+                "cyclomaticComplexity": m["cyclomaticComplexity"],
+                "cognitiveComplexity": m["cognitiveComplexity"],
+                "loc": m["loc"],
+                "calls": m.get("calls", []),
+            })
     return functions
 
 
@@ -985,6 +1052,65 @@ def _detect_external_calls(root, source: bytes, module_id: str) -> list[dict[str
     return calls
 
 
+# ─────────────────────────────────────────────────────────────────────────
+# Tabla de símbolos para la resolución entre archivos (aggregator.rs)
+# ─────────────────────────────────────────────────────────────────────────
+#
+# En Kotlin un archivo puede declarar varias clases y su nombre no tiene por
+# qué coincidir con ninguna, y los símbolos del MISMO paquete se usan sin
+# import. Resolver por nombre de archivo pierde casi todas las relaciones,
+# así que el worker reporta el paquete, los símbolos top-level declarados y
+# los identificadores referenciados; el agregador cruza esas tablas.
+
+_TOP_LEVEL_DECL_TYPES = frozenset({
+    "class_declaration", "object_declaration", "function_declaration", "type_alias",
+})
+
+
+def _extract_declared_symbols(root) -> list[str]:
+    """Símbolos top-level visibles desde otros archivos (se excluyen los `private`)."""
+    symbols: set[str] = set()
+
+    def visit(node):
+        for child in node.children:
+            if child.type in _TOP_LEVEL_DECL_TYPES or child.type == "property_declaration":
+                if _extract_modifiers_and_annotations(child)[1] == "private":
+                    continue
+            if child.type in _TOP_LEVEL_DECL_TYPES:
+                name = _decl_name(child)
+                if name:
+                    symbols.add(name)
+            elif child.type == "property_declaration":
+                var_decl = _first_named_child(child, "variable_declaration")
+                name = _decl_name(var_decl) if var_decl is not None else None
+                if name:
+                    symbols.add(name)
+            elif child.type == "ERROR":
+                visit(child)
+
+    visit(root)
+    return sorted(symbols)
+
+
+_REFERENCE_SKIP_TYPES = frozenset({"package_header", "import_list", "import_header", "import"})
+
+
+def _extract_referenced_identifiers(root) -> set[str]:
+    names: set[str] = set()
+
+    def visit(node):
+        if node.type in _REFERENCE_SKIP_TYPES:
+            return
+        if node.type in ("simple_identifier", "type_identifier"):
+            names.add(node.text.decode("utf-8", errors="replace"))
+            return
+        for child in node.children:
+            visit(child)
+
+    visit(root)
+    return names
+
+
 def parse_kotlin_file(file_path: str, tree, source: bytes) -> dict[str, Any]:
     """
     Parseo detallado de un archivo Kotlin, extrayendo la estructura completa
@@ -1010,7 +1136,20 @@ def parse_kotlin_file(file_path: str, tree, source: bytes) -> dict[str, Any]:
         class_info["metrics"] = _compute_class_metrics(class_info)
         del class_info["_methodBodyNodes"]
 
-    import_ids = [imp["source"] for imp in imports_data if imp["source"] != "<desconocido>"]
+    # Los wildcards viajan como `paquete.*` (misma convención que Java) para
+    # que el agregador los expanda a todos los archivos de ese paquete.
+    import_ids = sorted({
+        imp["source"] + ".*" if imp["isWildcard"] else imp["source"]
+        for imp in imports_data
+        if imp["source"] != "<desconocido>"
+    })
+
+    package = _extract_package(root, source)
+    declared_symbols = _extract_declared_symbols(root)
+    referenced_symbols = sorted(_extract_referenced_identifiers(root) - set(declared_symbols))
+
+    abstract_count = sum(1 for c in classes if c.get("isAbstract") or c.get("isInterface"))
+    abstractness = abstract_count / len(classes) if classes else 0.0
 
     loc = len(source.splitlines())
     lloc = sum(1 for line in source.splitlines() if line.strip())
@@ -1022,8 +1161,7 @@ def parse_kotlin_file(file_path: str, tree, source: bytes) -> dict[str, Any]:
     cc_avg = sum(all_cc) / len(all_cc) if all_cc else 1.0
     cc_max = max(all_cc) if all_cc else 1
 
-    total_classes = len(classes)
-    ce = len(set(import_ids))
+    ce = len(import_ids)
 
     lloc_safe = max(lloc, 1)
     loc_safe = max(loc, 1)
@@ -1041,13 +1179,13 @@ def parse_kotlin_file(file_path: str, tree, source: bytes) -> dict[str, Any]:
             "lloc": lloc,
             "classes": classes,
             "functions": functions,
-            "imports": list(set(import_ids)),
+            "imports": import_ids,
             "importedBy": [],
             "stableSince": "",
             "lastSeenIn": "",
             "metrics": {
                 "ce": ce,
-                "abstractness": 0.0,
+                "abstractness": round(abstractness, 4),
                 "lcom4": 1,
                 "maintainabilityIndex": round(mi, 2),
                 "cyclomaticComplexityAvg": round(cc_avg, 2),
@@ -1058,9 +1196,14 @@ def parse_kotlin_file(file_path: str, tree, source: bytes) -> dict[str, Any]:
         },
         "dependencies": [
             {"source": module_id, "target": imp, "kind": "import", "weight": 1}
-            for imp in set(import_ids)
+            for imp in import_ids
         ],
         "invocations": invocations,
         "externalCalls": external_calls,
         "rawImports": imports_data,
+        "symbols": {
+            "package": package,
+            "declared": declared_symbols,
+            "referenced": referenced_symbols,
+        },
     }

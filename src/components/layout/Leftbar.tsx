@@ -27,7 +27,7 @@ import { useProjectStore } from '../../stores/useProjectStore';
 import { useSelectionStore } from '../../stores/useSelectionStore';
 import { useDiagramStore } from '../../stores/useDiagramStore';
 import { supplementaryDiagramDefinitions } from '../c4viewer/diagram-registry';
-import { AiSettingsModal } from '../ai/AiSettingsModal';
+import { createModulePathResolver } from '../../lib/module-paths';
 import type { Module } from '../../../shared/types';
 
 interface TreeNode {
@@ -37,6 +37,25 @@ interface TreeNode {
   module?: Module;
   children: Record<string, TreeNode>;
 }
+
+/** Une carpetas con un único hijo carpeta (`src` › `components` → `src/components`), como VS Code. */
+function compactFolders(node: TreeNode): TreeNode {
+  const children: Record<string, TreeNode> = {};
+  for (const child of Object.values(node.children)) {
+    let current = child;
+    while (current.isFolder) {
+      const only = Object.values(current.children);
+      if (only.length !== 1 || !only[0].isFolder) break;
+      current = { ...only[0], name: `${current.name}/${only[0].name}` };
+    }
+    const compacted = current.isFolder ? compactFolders(current) : current;
+    children[compacted.path] = compacted;
+  }
+  return { ...node, children };
+}
+
+const sortTreeNodes = (a: TreeNode, b: TreeNode) =>
+  a.isFolder !== b.isFolder ? (a.isFolder ? -1 : 1) : a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
 
 export const Leftbar: React.FC = () => {
   const {
@@ -52,19 +71,36 @@ export const Leftbar: React.FC = () => {
     setActiveLeftbarTab(tab);
     if (!leftbarOpen) setLeftbarOpen(true);
   };
-  const { amg, projectName } = useProjectStore();
+  const { amg, projectName, projectPath } = useProjectStore();
   const { selectElement, selectedId } = useSelectionStore();
   const { setC4Level } = useDiagramStore();
+  const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({ root: true });
-  const [isAiSettingsOpen, setIsAiSettingsOpen] = useState(false);
 
-  const toggleExpand = (nodePath: string) => {
-    setExpandedNodes((prev) => ({ ...prev, [nodePath]: !prev[nodePath] }));
+  const toggleExpand = (nodePath: string, currentlyExpanded: boolean) => {
+    setExpandedNodes((prev) => ({ ...prev, [nodePath]: !currentlyExpanded }));
   };
 
-  // Construir árbol jerárquico de archivos desde amg.modules
+  const relativePath = useMemo(
+    () => createModulePathResolver(amg?.modules.map((m) => m.id) ?? [], projectPath),
+    [amg, projectPath]
+  );
+
+  // Filtrar módulos si hay búsqueda (por nombre o ruta relativa)
+  const filteredModules = useMemo(() => {
+    if (!amg) return [];
+    if (!searchQuery.trim()) return amg.modules;
+    const q = searchQuery.toLowerCase();
+    return amg.modules.filter(
+      (m) => m.name.toLowerCase().includes(q) || relativePath(m.id).toLowerCase().includes(q)
+    );
+  }, [amg, searchQuery, relativePath]);
+
+  const isFiltering = searchQuery.trim() !== '';
+
+  // Árbol de carpetas relativo a la raíz del proyecto (no a la unidad del disco)
   const fileTree = useMemo(() => {
     if (!amg) return null;
 
@@ -75,50 +111,43 @@ export const Leftbar: React.FC = () => {
       children: {},
     };
 
-    amg.modules.forEach((mod) => {
-      const parts = mod.id.split(/[/\\]/).filter(Boolean);
+    filteredModules.forEach((mod) => {
+      const parts = relativePath(mod.id).split('/').filter(Boolean);
       let current = root;
 
       parts.forEach((part, idx) => {
         const isLast = idx === parts.length - 1;
         const currentPath = parts.slice(0, idx + 1).join('/');
+        const key = isLast ? `file:${part}` : part;
 
-        if (!current.children[part]) {
-          current.children[part] = {
-            name: part,
-            path: currentPath,
+        if (!current.children[key]) {
+          current.children[key] = {
+            name: isLast ? mod.name : part,
+            path: isLast ? mod.id : currentPath,
             isFolder: !isLast,
             module: isLast ? mod : undefined,
             children: {},
           };
         }
-        current = current.children[part];
+        current = current.children[key];
       });
     });
 
-    return root;
-  }, [amg, projectName]);
-
-  // Filtrar módulos si hay búsqueda
-  const filteredModules = useMemo(() => {
-    if (!amg) return [];
-    if (!searchQuery.trim()) return amg.modules;
-    const q = searchQuery.toLowerCase();
-    return amg.modules.filter(
-      (m) => m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q)
-    );
-  }, [amg, searchQuery]);
+    return compactFolders(root);
+  }, [amg, projectName, filteredModules, relativePath]);
 
   // Renderizador recursivo de nodos del árbol
   const renderTreeNode = (node: TreeNode, depth: number = 0) => {
-    const isExpanded = expandedNodes[node.path] ?? depth < 2;
+    // Al filtrar se muestra todo expandido para ver las coincidencias.
+    const isExpanded = isFiltering || (expandedNodes[node.path] ?? depth < 2);
 
     if (node.isFolder) {
-      const childKeys = Object.keys(node.children);
+      const children = Object.values(node.children).sort(sortTreeNodes);
       return (
         <div key={node.path} className="select-none font-sans">
           <div
-            onClick={() => toggleExpand(node.path)}
+            onClick={() => toggleExpand(node.path, isExpanded)}
+            title={node.path === 'root' ? (projectPath ?? undefined) : node.path}
             style={{ paddingLeft: `${depth * 10 + 4}px` }}
             className="flex items-center space-x-1 py-1 px-1 rounded cursor-pointer hover:bg-[var(--panel-2)] text-[var(--muted)] hover:text-[var(--text)] transition text-[11px]"
           >
@@ -137,7 +166,7 @@ export const Leftbar: React.FC = () => {
 
           {isExpanded && (
             <div>
-              {childKeys.map((key) => renderTreeNode(node.children[key], depth + 1))}
+              {children.map((child) => renderTreeNode(child, depth + 1))}
             </div>
           )}
         </div>
@@ -161,6 +190,7 @@ export const Leftbar: React.FC = () => {
           setActiveMainTab('code');
         }}
         style={{ paddingLeft: `${depth * 10 + 4}px` }}
+        title={relativePath(mod.id)}
         className={`flex items-center justify-between py-1 px-1 rounded cursor-pointer transition text-[11px] font-sans ${isSelected
           ? 'bg-[var(--purple-soft)] text-[var(--purple)] font-semibold border border-[var(--purple-border)]'
           : 'hover:bg-[var(--panel-2)] text-[var(--muted)] hover:text-[var(--text)]'
@@ -324,19 +354,14 @@ export const Leftbar: React.FC = () => {
             <HelpCircle className="w-4 h-4" />
           </button>
           <button
-            onClick={() => setIsAiSettingsOpen(true)}
+            onClick={() => setSettingsOpen(true)}
             className="p-2 hover:text-[var(--text)] transition"
-            title="Configuración de IA (Ollama / Gemini / OpenAI)"
+            title="Configuración (Ctrl+,)"
           >
             <Settings className="w-4 h-4" />
           </button>
         </div>
       </aside>
-
-      <AiSettingsModal
-        isOpen={isAiSettingsOpen}
-        onClose={() => setIsAiSettingsOpen(false)}
-      />
 
       {/* 2. EXPLORER PANEL (GraphForge Spec Section 12 — 218px Width) — Visibilidad controlada por leftbarOpen */}
       {leftbarOpen && (
@@ -380,7 +405,13 @@ export const Leftbar: React.FC = () => {
             ) : (
               <>
                 {activeLeftbarTab === 'explorer' && fileTree && (
-                  <div className="space-y-0.5">{renderTreeNode(fileTree, 0)}</div>
+                  isFiltering && filteredModules.length === 0 ? (
+                    <p className="text-[10px] text-[var(--muted-2)] text-center py-6">
+                      Ningún archivo coincide con «{searchQuery.trim()}».
+                    </p>
+                  ) : (
+                    <div className="space-y-0.5">{renderTreeNode(fileTree, 0)}</div>
+                  )
                 )}
 
                 {activeLeftbarTab === 'navigation' && (
@@ -485,7 +516,9 @@ export const Leftbar: React.FC = () => {
                         className="p-1.5 rounded bg-[var(--panel-2)] hover:bg-[var(--panel-3)] cursor-pointer text-[var(--text)] border border-[var(--border-soft)] transition"
                       >
                         <div className="font-semibold text-[var(--cyan)] text-[11px]">{m.name}</div>
-                        <div className="text-[9px] text-[var(--muted-2)] truncate font-mono">{m.id}</div>
+                        <div className="text-[9px] text-[var(--muted-2)] truncate font-mono" title={relativePath(m.id)}>
+                          {relativePath(m.id)}
+                        </div>
                       </div>
                     ))}
                   </div>

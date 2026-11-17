@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, CornerDownLeft, FileCode2 } from 'lucide-react';
 import { useUiStore, type MainTab } from '../../stores/useUiStore';
 import { useProjectStore } from '../../stores/useProjectStore';
+import { createModulePathResolver } from '../../lib/module-paths';
 import { useSelectionStore } from '../../stores/useSelectionStore';
 import { useDiagramStore, type C4Level } from '../../stores/useDiagramStore';
 import { useSettingsStore } from '../../stores/useSettingsStore';
@@ -132,6 +133,11 @@ export const CommandPalette: React.FC<CommandPaletteActions> = (actions) => {
     return list;
   }, [actions, amg, projectPath, isAnalyzing, theme, setActiveMainTab, setC4Level, setSettingsOpen, setTheme, saveSettings, toggleLeftbar, toggleRightbar, toggleDownbar]);
 
+  const relativePath = useMemo(
+    () => createModulePathResolver(amg?.modules.map((m) => m.id) ?? [], projectPath),
+    [amg, projectPath]
+  );
+
   const results = useMemo(() => {
     const q = normalize(query.trim());
     const scored = commands
@@ -142,7 +148,7 @@ export const CommandPalette: React.FC<CommandPaletteActions> = (actions) => {
     // Los módulos solo se listan al escribir, para no inundar la paleta.
     if (amg && q.length >= 2) {
       const modules = amg.modules
-        .map((mod) => ({ mod, score: matchScore(q, normalize(mod.name)) ?? matchScore(q, normalize(mod.id)) }))
+        .map((mod) => ({ mod, score: matchScore(q, normalize(mod.name)) ?? matchScore(q, normalize(relativePath(mod.id))) }))
         .filter((r): r is { mod: (typeof amg.modules)[number]; score: number } => r.score !== null)
         .sort((a, b) => b.score - a.score)
         .slice(0, MAX_MODULE_RESULTS)
@@ -152,7 +158,7 @@ export const CommandPalette: React.FC<CommandPaletteActions> = (actions) => {
             id: `module-${mod.id}`,
             title: mod.name,
             group: 'Módulos',
-            hint: mod.id,
+            hint: relativePath(mod.id),
             run: () => {
               selectElement(mod.id, 'module', mod);
               setActiveMainTab('code');
@@ -162,7 +168,7 @@ export const CommandPalette: React.FC<CommandPaletteActions> = (actions) => {
       scored.push(...modules);
     }
     return scored.map((r) => r.cmd);
-  }, [commands, query, amg, selectElement, setActiveMainTab]);
+  }, [commands, query, amg, relativePath, selectElement, setActiveMainTab]);
 
   useEffect(() => {
     setActiveIndex(0);

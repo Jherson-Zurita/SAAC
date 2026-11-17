@@ -195,6 +195,18 @@ export function App() {
       notifyAnalysisFinished(result);
 
       // Un análisis cancelado no trae AMG: se conserva el que ya estaba en pantalla.
+      // Si terminó sin cancelar y sin AMG (p. ej. worker caído), avisar: antes
+      // solo se creaba `.saac/` y la UI quedaba vacía sin explicación.
+      if (!result.amg && !result.cancelled) {
+        const failed = result.failed ?? 0;
+        const successful = result.successful ?? 0;
+        toast.error(
+          'Análisis sin resultados',
+          successful + failed === 0
+            ? 'No se encontraron archivos de código analizables en el proyecto.'
+            : `Se procesaron archivos pero no se pudo construir el modelo (${failed} fallidos, ${successful} ok). Revisa que el worker de Python esté disponible.`
+        );
+      }
       if (result.amg) {
         resetDiagram();
         setAmg(result.amg);

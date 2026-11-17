@@ -28,8 +28,13 @@
 //!     archivo, probando primero que el último segmento sea un ÍTEM
 //!     dentro de un archivo (caso más común) y si no como archivo/módulo
 //!     en sí (`mod.rs` o no).
-//!   - **Todo lo demás** (namespaces C#, paquetes Python, Kotlin sin
-//!     convención Java estándar): fallback conservador por nombre base
+//!   - **Kotlin**: el worker reporta paquete, símbolos top-level declarados
+//!     e identificadores referenciados (`WorkerAnalysisResult.symbols`). Los
+//!     imports se resuelven contra el nombre calificado del símbolo (un
+//!     archivo puede declarar varias clases y no llamarse como ninguna), y
+//!     el uso sin import dentro del mismo paquete se enlaza cruzando los
+//!     identificadores referenciados con lo que declaran sus vecinos.
+//!   - **Todo lo demás** (namespaces C#, paquetes Python): fallback conservador por nombre base
 //!     (último segmento del path, separando por `/`, `.` o `::`) que
 //!     SOLO resuelve cuando hay un único módulo candidato con ese nombre
 //!     — con dos o más candidatos (basenames ambiguos como `utils`/
@@ -38,10 +43,8 @@
 //!     en Ca/Ce internos) en vez de adivinar. Java/Go/Rust también caen a
 //!     este fallback cuando su resolución específica no matchea (import
 //!     de librería externa, archivo no incluido en el análisis, etc.).
-//!   - **Limitación conocida restante**: C# (namespaces) y Kotlin (que no
-//!     siempre sigue la convención de carpetas de Java) no tienen
-//!     resolución específica todavía — dependen del fallback por
-//!     basename.
+//!   - **Limitación conocida restante**: C# (namespaces) no tiene
+//!     resolución específica todavía — depende del fallback por basename.
 //! - **Ca / Ce / Instability**: contados sobre el grafo de dependencias
 //!   YA RESUELTAS (solo módulos internos) — ver la nota en
 //!   `ModuleMetrics::from_worker` (amg.rs) sobre por qué esto reemplaza el
@@ -78,9 +81,8 @@
 //!   de sistemas (Architecture Quanta, Fitness Functions/Rules) no
 //!   implementados en ningún punto del pipeline.
 //! - No hace caché ni análisis incremental — eso es `cache.rs`.
-//! - Resolución de imports C# (namespaces) y Kotlin fuera de convención
-//!   Java estándar — pendiente, mismo tipo de trabajo que Java/Go/Rust
-//!   pero sin hacer todavía.
+//! - Resolución de imports C# (namespaces) — pendiente, mismo tipo de
+//!   trabajo que Java/Go/Rust pero sin hacer todavía.
 //! - Diferenciación web/`modular-monolith`/`microservices` en la
 //!   detección de estilo NO está implementada: requeriría analizar
 //!   topología de dependencias entre "servicios" propios o detectar
@@ -93,7 +95,8 @@ use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 
 use crate::engine::amg::{
-    Actor, Antipattern, AntipatternType, ArchStyle, C4Models, Container, Dependency, ExternalCall,
+    Actor, Antipattern, AntipatternType, ArchStyle, C4Models, Container, Dependency, DependencyKind,
+    ExternalCall,
     ExternalSystem, Invocation, Language, Module, ModuleMetrics, ModuleType, ProjectMetrics,
     ProjectType, Severity, WorkerAnalysisResult,
 };
@@ -170,6 +173,11 @@ impl Aggregator {
         // (ej. "app/services/user", "services/user", "user") -> module_id.
         // Los `__init__` se indexan por la ruta de su paquete.
         let mut by_python_suffix: HashMap<String, Vec<&str>> = HashMap::new();
+        // Índices específicos para Kotlin: nombre calificado de cada símbolo
+        // top-level ("com.example.data.model.Actividad") -> archivos que lo
+        // declaran, y paquete -> archivos del paquete (para `import pkg.*`).
+        let mut by_kotlin_symbol: HashMap<String, Vec<&str>> = HashMap::new();
+        let mut by_kotlin_package: HashMap<&str, Vec<&str>> = HashMap::new();
 
         for r in &worker_results {
             let id = r.module.id.as_str();
@@ -191,6 +199,18 @@ impl Aggregator {
             if r.module.language == Language::Go {
                 if let Some(import_path) = go_import_path_for_module(id, go_modules) {
                     by_go_package_dir.entry(import_path).or_default().push(id);
+                }
+            }
+
+            if r.module.language == Language::Kotlin {
+                if let Some(symbols) = &r.symbols {
+                    by_kotlin_package.entry(symbols.package.as_str()).or_default().push(id);
+                    for name in &symbols.declared {
+                        by_kotlin_symbol
+                            .entry(kotlin_qualified_name(&symbols.package, name))
+                            .or_default()
+                            .push(id);
+                    }
                 }
             }
         }
@@ -220,6 +240,11 @@ impl Aggregator {
             let is_go_source = r.module.language == Language::Go;
             let is_rust_source = r.module.language == Language::Rust;
             let is_python_source = r.module.language == Language::Python;
+            let kotlin_symbols = if r.module.language == Language::Kotlin {
+                r.symbols.as_ref()
+            } else {
+                None
+            };
 
             for dep in &r.dependencies {
                 // Target con el que se conserva la arista si no resuelve a
@@ -238,6 +263,19 @@ impl Aggregator {
                         resolve_relative_import(&dep.source, &dep.target, &known_ids)
                             .into_iter()
                             .collect()
+                    } else if kotlin_symbols.is_some() {
+                        // Sin fallback por basename: con la tabla de símbolos
+                        // completa, un import que no resuelve es externo
+                        // (androidx, kotlinx, ...) y adivinar crea aristas falsas.
+                        let targets =
+                            resolve_kotlin_import(&dep.target, &by_kotlin_symbol, &by_kotlin_package);
+                        if targets.is_empty() {
+                            resolve_java_package_import(&dep.target, &by_java_suffix)
+                                .into_iter()
+                                .collect()
+                        } else {
+                            targets
+                        }
                     } else if is_java_source {
                         if let Some(package) = dep.target.strip_suffix(".*") {
                             resolve_java_wildcard_import(package, &by_java_suffix)
@@ -315,6 +353,44 @@ impl Aggregator {
                             },
                         );
                     }
+                }
+            }
+
+            // Kotlin usa los símbolos del mismo paquete sin import: se
+            // enlaza cada identificador referenciado que otro archivo del
+            // paquete declara. Los no resueltos no se conservan como
+            // aristas externas (son variables locales, APIs de librería...).
+            if let Some(symbols) = kotlin_symbols {
+                let source_id = r.module.id.as_str();
+                let mut weights: HashMap<&str, u32> = HashMap::new();
+                for name in &symbols.referenced {
+                    let qualified = kotlin_qualified_name(&symbols.package, name);
+                    for target in by_kotlin_symbol.get(&qualified).into_iter().flatten() {
+                        if *target != source_id {
+                            *weights.entry(*target).or_default() += 1;
+                        }
+                    }
+                }
+                let mut targets: Vec<(&str, u32)> = weights.into_iter().collect();
+                targets.sort_unstable();
+                for (target_id, weight) in targets {
+                    outgoing_by_module
+                        .entry(source_id.to_string())
+                        .or_default()
+                        .insert(target_id.to_string());
+                    incoming_by_module
+                        .entry(target_id.to_string())
+                        .or_default()
+                        .insert(source_id.to_string());
+                    push_dependency(
+                        &mut resolved_dependencies,
+                        Dependency {
+                            source: source_id.to_string(),
+                            target: target_id.to_string(),
+                            kind: DependencyKind::Import,
+                            weight,
+                        },
+                    );
                 }
             }
         }
@@ -594,6 +670,51 @@ fn resolve_by_basename<'a>(
         Some(candidates) if candidates.len() == 1 => Some(candidates[0]),
         _ => None,
     }
+}
+
+// ============================================================================
+// Resolución de dependencias — Kotlin
+// ============================================================================
+
+fn kotlin_qualified_name(package: &str, name: &str) -> String {
+    if package.is_empty() {
+        name.to_string()
+    } else {
+        format!("{}.{}", package, name)
+    }
+}
+
+/// Resuelve un import Kotlin contra la tabla de símbolos del proyecto.
+///
+/// - `pkg.*` -> todos los archivos del paquete; si `pkg` es en realidad una
+///   clase/object (`import com.x.Foo.*`), el archivo que la declara.
+/// - `pkg.Simbolo` -> el archivo que declara `Simbolo` en `pkg`. Se
+///   recortan segmentos finales para cubrir clases anidadas, entradas de
+///   enum y miembros (`com.x.Screen.Hoy`, `com.x.Foo.Companion.bar`).
+fn resolve_kotlin_import(
+    target: &str,
+    by_symbol: &HashMap<String, Vec<&str>>,
+    by_package: &HashMap<&str, Vec<&str>>,
+) -> Vec<String> {
+    let (path, is_wildcard) = match target.strip_suffix(".*") {
+        Some(package) => (package, true),
+        None => (target, false),
+    };
+
+    if is_wildcard {
+        if let Some(ids) = by_package.get(path) {
+            return ids.iter().map(|s| s.to_string()).collect();
+        }
+    }
+
+    let segments: Vec<&str> = path.split('.').collect();
+    for end in (1..=segments.len()).rev() {
+        let candidate = segments[..end].join(".");
+        if let Some(ids) = by_symbol.get(&candidate) {
+            return ids.iter().map(|s| s.to_string()).collect();
+        }
+    }
+    Vec::new()
 }
 
 // ============================================================================
@@ -1473,5 +1594,30 @@ mod tests {
                 "src/main/java/com/x/B".to_string()
             ]
         );
+    }
+
+    #[test]
+    fn kotlin_import_resolves_symbol_to_declaring_file() {
+        let mut by_symbol: HashMap<String, Vec<&str>> = HashMap::new();
+        by_symbol.insert("com.x.model.Actividad".into(), vec!["app/com/x/model/Entities"]);
+        by_symbol.insert("com.x.nav.Screen".into(), vec!["app/com/x/nav/Screen"]);
+        let mut by_package: HashMap<&str, Vec<&str>> = HashMap::new();
+        by_package.insert("com.x.ui", vec!["app/com/x/ui/A", "app/com/x/ui/B"]);
+
+        assert_eq!(
+            resolve_kotlin_import("com.x.model.Actividad", &by_symbol, &by_package),
+            vec!["app/com/x/model/Entities".to_string()]
+        );
+        // Clase anidada / entrada de enum: se resuelve al archivo del símbolo top-level.
+        assert_eq!(
+            resolve_kotlin_import("com.x.nav.Screen.Hoy", &by_symbol, &by_package),
+            vec!["app/com/x/nav/Screen".to_string()]
+        );
+        assert_eq!(
+            resolve_kotlin_import("com.x.ui.*", &by_symbol, &by_package),
+            vec!["app/com/x/ui/A".to_string(), "app/com/x/ui/B".to_string()]
+        );
+        assert!(resolve_kotlin_import("androidx.compose.runtime.Composable", &by_symbol, &by_package)
+            .is_empty());
     }
 }

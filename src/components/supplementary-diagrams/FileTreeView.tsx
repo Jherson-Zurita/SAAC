@@ -18,6 +18,7 @@ import type { C4DiagramData } from '../../../shared/types';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useSelectionStore } from '../../stores/useSelectionStore';
 import { getLayoutedElements } from '../../lib/dagre-layout';
+import { createModulePathResolver } from '../../lib/module-paths';
 
 // ── Types ──
 
@@ -35,6 +36,8 @@ interface TreeEntry {
   loc?: number;
   /** Maintainability index for files */
   maintainability?: number;
+  /** Id del módulo AMG (solo archivos) */
+  moduleId?: string;
 }
 
 interface FileTreeNodeData extends Record<string, unknown> {
@@ -183,9 +186,11 @@ const nodeTypes: NodeTypes = {
 
 // ── Helpers ──
 
-/** Build a hierarchical tree map from flat module paths */
+/** Build a hierarchical tree map from flat module paths, rooted at `rootName` */
 function buildTreeFromModules(
-  modules: { id: string; name: string; language: string; loc: number; metrics: { maintainabilityIndex: number } }[]
+  modules: { id: string; name: string; language: string; loc: number; metrics: { maintainabilityIndex: number } }[],
+  toRelative: (id: string) => string,
+  rootName: string
 ): Map<string, TreeEntry> {
   const treeMap = new Map<string, TreeEntry>();
 
@@ -211,8 +216,10 @@ function buildTreeFromModules(
     }
   };
 
+  ensureDir(rootName);
+
   for (const mod of modules) {
-    const filePath = mod.id;
+    const filePath = `${rootName}/${toRelative(mod.id)}`;
     const parts = filePath.split('/');
     const fileName = parts[parts.length - 1] || mod.name;
 
@@ -235,6 +242,7 @@ function buildTreeFromModules(
       language: mod.language,
       loc: mod.loc,
       maintainability: mod.metrics.maintainabilityIndex,
+      moduleId: mod.id,
     });
   }
 
@@ -272,14 +280,18 @@ interface FileTreeViewProps {
 }
 
 export const FileTreeView: React.FC<FileTreeViewProps> = ({ diagramData: _diagramData }) => {
-  const { amg } = useProjectStore();
-  const modules = amg?.modules || [];
+  const { amg, projectName, projectPath } = useProjectStore();
+  const modules = useMemo(() => amg?.modules ?? [], [amg]);
 
   // State: which directories are expanded
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(() => new Set());
 
-  // Build tree structure
-  const treeMap = useMemo(() => buildTreeFromModules(modules), [modules]);
+  // Build tree structure (rutas relativas al proyecto, no a la unidad del disco)
+  const treeMap = useMemo(() => {
+    const toRelative = createModulePathResolver(modules.map((m) => m.id), projectPath);
+    const rootName = (projectName || 'Proyecto').replace(/\//g, '-');
+    return buildTreeFromModules(modules, toRelative, rootName);
+  }, [modules, projectName, projectPath]);
   const roots = useMemo(() => findRoots(treeMap), [treeMap]);
 
   // Toggle expansion
@@ -383,7 +395,7 @@ export const FileTreeView: React.FC<FileTreeViewProps> = ({ diagramData: _diagra
       if (entry.isDir) {
         toggleExpand(entry.path);
       } else {
-        const matchingMod = modules.find((m) => m.id === entry.path || m.name === entry.name);
+        const matchingMod = modules.find((m) => m.id === entry.moduleId);
         if (matchingMod) {
           selectElement(matchingMod.id, 'module', matchingMod);
         } else {

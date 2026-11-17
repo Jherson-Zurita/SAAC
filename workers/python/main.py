@@ -51,9 +51,17 @@ def write_response(response) -> None:
     inmediato. El flush es obligatorio: sin él, node_worker.rs (que lee con
     BufReader::lines()) puede quedar esperando datos que están bufferizados
     del lado de Python y nunca llegan a tiempo, disparando falsos timeouts.
+
+    En Windows el stdout de un subproceso suele ser cp1252. El AMG de
+    proyectos con tildes/emojis (p. ej. Kotlin/Android en español) rompía
+    aquí con UnicodeEncodeError al emitir el JSON final del batch, y Rust
+    interpretaba la muerte del proceso como `worker_crashed` para TODOS los
+    archivos — sin AMG y sin historial, aunque `.saac/cache_db` sí se creara.
+    Se escribe UTF-8 por el buffer binario para no depender del locale.
     """
-    sys.stdout.write(response.to_json_line() + "\n")
-    sys.stdout.flush()
+    line = (response.to_json_line() + "\n").encode("utf-8")
+    sys.stdout.buffer.write(line)
+    sys.stdout.buffer.flush()
 
 
 async def handle_parse(request: WorkerRequest) -> None:
@@ -223,7 +231,19 @@ async def main() -> None:
             break
 
 
+def _configure_stdio_utf8() -> None:
+    """Fuerza UTF-8 en stderr (logs) cuando el runtime lo permite."""
+    for stream in (sys.stderr,):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except Exception:  # noqa: BLE001 — best-effort en consolas limitadas
+                pass
+
+
 if __name__ == "__main__":
+    _configure_stdio_utf8()
     try:
         asyncio.run(main())
     except KeyboardInterrupt:

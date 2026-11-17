@@ -12,14 +12,6 @@ export const ProjectSummaryCard: React.FC<ProjectSummaryCardProps> = ({
   fitnessResult,
 }) => {
   const m = amg.metrics;
-  const miAvg = Math.round(m.maintainabilityIndexAvg || 0);
-
-  const miColorClass =
-    miAvg >= 80
-      ? 'text-[var(--green)] border-[var(--green)]/30 bg-[var(--green)]/10'
-      : miAvg >= 60
-      ? 'text-[var(--yellow)] border-[var(--yellow)]/30 bg-[var(--yellow)]/10'
-      : 'text-[var(--red)] border-[var(--red)]/30 bg-[var(--red)]/10';
 
   return (
     <div className="bg-[var(--panel)] border border-[var(--border)] rounded-xl p-5 shadow-lg space-y-4 select-none">
@@ -48,13 +40,7 @@ export const ProjectSummaryCard: React.FC<ProjectSummaryCardProps> = ({
       </div>
 
       {/* Grid de Métricas Agregadas Clave */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
-        {/* MI Promedio */}
-        <div className={`p-3 rounded-lg border flex flex-col justify-between ${miColorClass}`}>
-          <span className="text-[10px] font-semibold uppercase tracking-wider opacity-80">MI Promedio</span>
-          <div className="text-2xl font-black font-mono mt-1">{miAvg} <span className="text-xs opacity-70">/100</span></div>
-        </div>
-
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {/* Fitness Score */}
         <div className="p-3 rounded-lg border border-[var(--purple-border)] bg-[var(--purple-soft)] text-[var(--purple)] flex flex-col justify-between">
           <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--purple)]">Fitness Score</span>

@@ -37,7 +37,7 @@ impl CacheManager {
         let key = format!("file:{}", file_path);
         if let Ok(Some(bytes)) = self.db.get(&key) {
             if let Ok(record) = serde_json::from_slice::<FileCacheRecord>(&bytes) {
-                if record.hash == file_hash {
+                if record.hash == file_hash && record.analyzer_version == ANALYZER_VERSION {
                     return Some(record.result);
                 }
             }
@@ -55,6 +55,7 @@ impl CacheManager {
         let key = format!("file:{}", file_path);
         let record = FileCacheRecord {
             hash: file_hash.to_string(),
+            analyzer_version: ANALYZER_VERSION,
             result: result.clone(),
         };
         let bytes = serde_json::to_vec(&record)?;
@@ -81,9 +82,16 @@ impl CacheManager {
     }
 }
 
+/// Subir cuando cambie lo que los workers extraen de un archivo: los
+/// resultados cacheados con otra versión se descartan y se re-analizan
+/// aunque el archivo no haya cambiado.
+const ANALYZER_VERSION: u32 = 2;
+
 /// Registro serializable para caché por archivo.
 #[derive(Serialize, Deserialize)]
 struct FileCacheRecord {
     hash: String,
+    #[serde(default)]
+    analyzer_version: u32,
     result: WorkerAnalysisResult,
 }
